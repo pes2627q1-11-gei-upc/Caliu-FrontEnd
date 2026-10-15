@@ -40,34 +40,6 @@ key.properties
 .history/
 
 # ==============================================================================
-# Android (Archivos nativos y de compilación local)
-# ==============================================================================
-**/android/.gradle/
-**/android/app/build/
-**/android/captures/
-**/android/gradlew.bat
-**/android/gradle-wrapper.jar
-**/android/local.properties
-**/android/**/GeneratedPluginRegistrant.java
-
-# ==============================================================================
-# iOS (Archivos nativos y dependencias de CocoaPods)
-# ==============================================================================
-**/ios/**/*.mode1v3
-**/ios/**/*.pbxuser
-**/ios/**/*.perspectivev3
-**/ios/**/*.xcuserstate
-**/ios/.symlinks/
-**/ios/Pods/
-**/ios/Flutter/ephemeral/
-**/ios/Flutter/Flutter.podspec
-**/ios/Flutter/Generated.xcconfig
-**/ios/Flutter/app.flx
-**/ios/Flutter/flutter_export_environment.sh
-**/ios/ServiceDefinitions.json
-**/ios/Runner/GeneratedPluginRegistrant.*
-
-# ==============================================================================
 # Sistemas Operativos
 # ==============================================================================
 # macOS
