@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+
+import 'config.dart';
+import 'data/event.dart';
+import 'data/events_api.dart';
 
 class MapView extends StatefulWidget {
   const MapView({super.key});
@@ -10,73 +14,168 @@ class MapView extends StatefulWidget {
 }
 
 class _MapViewState extends State<MapView> {
+  final EventsApi _eventsApi = EventsApi();
+
   GoogleMapController? mapController;
   Position? currentPosition;
-  bool isLoadingLocation = true;
+  Set<Marker> _markers = {};
 
-  // Coordenadas por defecto (Ej: Plaça Catalunya, Barcelona)
-  // por si tarda en cargar el GPS
+  bool isLoadingLocation = true;
+  bool isLoadingEvents = false;
+
   final LatLng defaultLocation = const LatLng(41.3851, 2.1734);
 
   @override
   void initState() {
     super.initState();
-    _determinePosition(); // Llamamos al GPS al iniciar la pantalla
+    _bootstrap();
   }
 
-  /// Función para la Tarea #79: Obtener la ubicación del dispositivo mediante GPS
+  Future<void> _bootstrap() async {
+    await _determinePosition();
+    final lat = currentPosition?.latitude ?? defaultLocation.latitude;
+    final lng = currentPosition?.longitude ?? defaultLocation.longitude;
+    await _loadEventMarkers(lat: lat, lng: lng);
+  }
+
   Future<void> _determinePosition() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    // 1. Comprobar si el servicio de ubicación está habilitado
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      setState(() => isLoadingLocation = false);
-      return Future.error('Los servicios de ubicación están deshabilitados.');
-    }
-
-    // 2. Comprobar permisos
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        setState(() => isLoadingLocation = false);
-        return Future.error('Los permisos de ubicación fueron denegados.');
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          setState(() => isLoadingLocation = false);
+          _showMessage('Serveis d\'ubicació desactivats. Usem Barcelona.');
+        }
+        return;
       }
-    }
 
-    if (permission == LocationPermission.deniedForever) {
-      setState(() => isLoadingLocation = false);
-      return Future.error('Permisos denegados permanentemente.');
-    }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            setState(() => isLoadingLocation = false);
+            _showMessage('Permís d\'ubicació denegat. Usem Barcelona.');
+          }
+          return;
+        }
+      }
 
-    // 3. Obtener la posición actual
-    Position position = await Geolocator.getCurrentPosition();
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          setState(() => isLoadingLocation = false);
+          _showMessage('Permís d\'ubicació bloquejat. Usem Barcelona.');
+        }
+        return;
+      }
 
-    setState(() {
-      currentPosition = position;
-      isLoadingLocation = false;
-    });
+      final position = await Geolocator.getCurrentPosition();
+      if (!mounted) return;
 
-    // 4. Mover la cámara del mapa a la ubicación del usuario
-    if (mapController != null) {
-      mapController!.animateCamera(
+      setState(() {
+        currentPosition = position;
+        isLoadingLocation = false;
+      });
+
+      await mapController?.animateCamera(
         CameraUpdate.newLatLngZoom(
           LatLng(position.latitude, position.longitude),
-          14.0, // Nivel de zoom
+          14,
         ),
       );
+    } catch (e) {
+      if (mounted) {
+        setState(() => isLoadingLocation = false);
+        _showMessage('No s\'ha pogut obtenir el GPS. Usem Barcelona.');
+      }
     }
+  }
+
+  Future<void> _loadEventMarkers({
+    required double lat,
+    required double lng,
+  }) async {
+    if (!mounted) return;
+    setState(() => isLoadingEvents = true);
+
+    try {
+      final events = await _eventsApi.fetchNearby(
+        lat: lat,
+        lng: lng,
+        radiusKm: 15,
+        limit: 50,
+      );
+      if (!mounted) return;
+
+      final withLocation = events.where((e) => e.hasLocation).toList();
+      setState(() {
+        _markers = withLocation.map(_markerFor).toSet();
+        isLoadingEvents = false;
+      });
+
+      if (withLocation.isEmpty) {
+        _showMessage('Cap esdeveniment amb ubicació en aquest radi.');
+      }
+    } on EventsApiException catch (e) {
+      if (!mounted) return;
+      setState(() => isLoadingEvents = false);
+      _showMessage(e.message);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => isLoadingEvents = false);
+      _showMessage('Error carregant esdeveniments: $e');
+    }
+  }
+
+  Marker _markerFor(Event event) {
+    final category =
+        event.categories.isNotEmpty ? event.categories.first : null;
+    final distanceKm = event.distanceMeters != null
+        ? '${(event.distanceMeters! / 1000).toStringAsFixed(1)} km'
+        : null;
+    final snippet = [
+      ?category,
+      ?distanceKm,
+    ].join(' · ');
+
+    return Marker(
+      markerId: MarkerId(event.id),
+      position: event.location!,
+      infoWindow: InfoWindow(
+        title: event.title,
+        snippet: snippet.isEmpty ? null : snippet,
+      ),
+    );
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _refresh() async {
+    final lat = currentPosition?.latitude ?? defaultLocation.latitude;
+    final lng = currentPosition?.longitude ?? defaultLocation.longitude;
+    await _loadEventMarkers(lat: lat, lng: lng);
   }
 
   @override
   Widget build(BuildContext context) {
+    final showLoading = isLoadingLocation || isLoadingEvents;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Explorar Esdeveniments (Caliu)'),
+        actions: [
+          IconButton(
+            tooltip: 'Tornar a carregar events',
+            onPressed: isLoadingEvents ? null : _refresh,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
       ),
-      // Tarea #78: Integrar el paquete Google_maps_flutter
       body: Stack(
         children: [
           GoogleMap(
@@ -85,35 +184,46 @@ class _MapViewState extends State<MapView> {
             },
             initialCameraPosition: CameraPosition(
               target: currentPosition != null
-                  ? LatLng(currentPosition!.latitude, currentPosition!.longitude)
+                  ? LatLng(
+                      currentPosition!.latitude,
+                      currentPosition!.longitude,
+                    )
                   : defaultLocation,
-              zoom: 12.0,
+              zoom: 12,
             ),
-            // Activa el famoso "puntito azul" del GPS nativo de Google Maps
             myLocationEnabled: true,
-            // Muestra el botón para centrar la cámara en el usuario
             myLocationButtonEnabled: true,
-            // Aquí en el futuro cargarás los marcadores (Tarea #80)
-            markers: {},
+            markers: _markers,
           ),
-
-          // Mostrar un indicador de carga mientras busca el GPS
-          if (isLoadingLocation)
+          if (showLoading)
             const Center(
               child: Card(
                 child: Padding(
-                  padding: EdgeInsets.all(16.0),
+                  padding: EdgeInsets.all(16),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       CircularProgressIndicator(),
                       SizedBox(width: 16),
-                      Text("Buscant ubicació..."),
+                      Text('Carregant…'),
                     ],
                   ),
                 ),
               ),
             ),
+          Positioned(
+            left: 12,
+            bottom: 24,
+            child: Card(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Text(
+                  '${_markers.length} pins · $apiBaseUrl',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

@@ -82,3 +82,4 @@ Desktop.ini
 $RECYCLE.BIN/
 # Widget Preview related
 .widget_preview/
+.flutter-plugins-dependencies

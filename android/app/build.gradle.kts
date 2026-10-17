@@ -17,8 +17,6 @@ val mapsApiKey: String = localProperties.getProperty("MAPS_API_KEY") ?: ""
 android {
     namespace = "com.example.caliu"
     compileSdk = flutter.compileSdkVersion
-    // Flutter pide 28.2.13676358; en este SDK solo está instalado el 30.
-    // Evita el fallo de sdkmanager al resolver el NDK.
     ndkVersion = "30.0.16248370"
 
     compileOptions {
@@ -39,7 +37,6 @@ android {
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        // Google Maps API key (from android/local.properties — never commit it).
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
