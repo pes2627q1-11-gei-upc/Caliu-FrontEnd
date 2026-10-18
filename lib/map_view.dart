@@ -5,6 +5,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'config.dart';
 import 'data/event.dart';
 import 'data/events_api.dart';
+import 'event_detail_screen.dart';
 
 class MapView extends StatefulWidget {
   const MapView({super.key});
@@ -19,6 +20,7 @@ class _MapViewState extends State<MapView> {
   GoogleMapController? mapController;
   Position? currentPosition;
   Set<Marker> _markers = {};
+  final Map<String, Event> _eventsById = {};
 
   bool isLoadingLocation = true;
   bool isLoadingEvents = false;
@@ -108,6 +110,10 @@ class _MapViewState extends State<MapView> {
       if (!mounted) return;
 
       final withLocation = events.where((e) => e.hasLocation).toList();
+      _eventsById
+        ..clear()
+        ..addEntries(withLocation.map((e) => MapEntry(e.id, e)));
+
       setState(() {
         _markers = withLocation.map(_markerFor).toSet();
         isLoadingEvents = false;
@@ -144,6 +150,18 @@ class _MapViewState extends State<MapView> {
       infoWindow: InfoWindow(
         title: event.title,
         snippet: snippet.isEmpty ? null : snippet,
+      ),
+      onTap: () => _openDetail(event),
+    );
+  }
+
+  void _openDetail(Event event) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EventDetailScreen(
+          eventId: event.id,
+          initialEvent: _eventsById[event.id] ?? event,
+        ),
       ),
     );
   }
@@ -216,7 +234,8 @@ class _MapViewState extends State<MapView> {
             bottom: 24,
             child: Card(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 child: Text(
                   '${_markers.length} pins · $apiBaseUrl',
                   style: Theme.of(context).textTheme.bodySmall,

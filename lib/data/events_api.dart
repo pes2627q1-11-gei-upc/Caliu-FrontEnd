@@ -36,11 +36,39 @@ class EventsApi {
       },
     );
 
+    final decoded = await _getJson(uri);
+    if (decoded is! Map<String, dynamic>) {
+      throw EventsApiException('Resposta inesperada de /events');
+    }
+
+    final items = decoded['items'];
+    if (items is! List) return const [];
+
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(Event.fromJson)
+        .toList();
+  }
+
+  Future<Event> fetchById(String id) async {
+    final uri = Uri.parse('$_baseUrl/events/$id');
+    final decoded = await _getJson(uri);
+    if (decoded is! Map<String, dynamic>) {
+      throw EventsApiException('Resposta inesperada de /events/$id');
+    }
+    return Event.fromJson(decoded);
+  }
+
+  Future<dynamic> _getJson(Uri uri) async {
     late final http.Response response;
     try {
       response = await _client.get(uri).timeout(const Duration(seconds: 15));
     } on Exception catch (e) {
       throw EventsApiException('No s\'ha pogut connectar a $_baseUrl ($e)');
+    }
+
+    if (response.statusCode == 404) {
+      throw EventsApiException('Esdeveniment no trobat');
     }
 
     if (response.statusCode != 200) {
@@ -56,19 +84,6 @@ class EventsApi {
       throw EventsApiException('API ${response.statusCode}: $detail');
     }
 
-    final decoded = jsonDecode(response.body);
-    if (decoded is! Map<String, dynamic>) {
-      throw EventsApiException('Resposta inesperada de /events');
-    }
-
-    final items = decoded['items'];
-    if (items is! List) {
-      return const [];
-    }
-
-    return items
-        .whereType<Map<String, dynamic>>()
-        .map(Event.fromJson)
-        .toList();
+    return jsonDecode(response.body);
   }
 }
