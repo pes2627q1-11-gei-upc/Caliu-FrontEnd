@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'data/event.dart';
 import 'data/events_api.dart';
@@ -118,6 +119,31 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('$label (properament)')),
     );
+  }
+
+  Future<void> _openOfficialUrl(String rawUrl) async {
+    var value = rawUrl.trim();
+    if (value.isEmpty) return;
+
+    if (!value.startsWith('http://') && !value.startsWith('https://')) {
+      value = 'https://$value';
+    }
+
+    final uri = Uri.tryParse(value);
+    if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('L\'enllaç oficial no és vàlid')),
+      );
+      return;
+    }
+
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No s\'ha pogut obrir l\'enllaç')),
+      );
+    }
   }
 
   @override
@@ -311,6 +337,28 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                 fontSize: 15,
                                 height: 1.45,
                                 color: CaliuColors.textMuted,
+                              ),
+                            ),
+                          ],
+                          if (event.url != null &&
+                              event.url!.trim().isNotEmpty) ...[
+                            const SizedBox(height: 24),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: () =>
+                                    _openOfficialUrl(event.url!),
+                                icon: const Icon(Icons.open_in_new),
+                                label: const Text('Web oficial'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: CaliuColors.red,
+                                  side: const BorderSide(
+                                    color: CaliuColors.red,
+                                  ),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                ),
                               ),
                             ),
                           ],
