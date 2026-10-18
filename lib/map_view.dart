@@ -6,6 +6,7 @@ import 'config.dart';
 import 'data/event.dart';
 import 'data/events_api.dart';
 import 'event_detail_screen.dart';
+import 'search_screen.dart';
 
 class MapView extends StatefulWidget {
   const MapView({super.key});
@@ -104,8 +105,8 @@ class _MapViewState extends State<MapView> {
       final events = await _eventsApi.fetchNearby(
         lat: lat,
         lng: lng,
-        radiusKm: 15,
-        limit: 50,
+        radiusKm: 250,
+        limit: 250,
       );
       if (!mounted) return;
 
@@ -187,6 +188,20 @@ class _MapViewState extends State<MapView> {
       appBar: AppBar(
         title: const Text('Explorar Esdeveniments (Caliu)'),
         actions: [
+          IconButton(
+            tooltip: 'Cerca',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => SearchScreen(
+                    lat: currentPosition?.latitude ?? defaultLocation.latitude,
+                    lng: currentPosition?.longitude ?? defaultLocation.longitude,
+                  ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.search),
+          ),
           IconButton(
             tooltip: 'Tornar a carregar events',
             onPressed: isLoadingEvents ? null : _refresh,

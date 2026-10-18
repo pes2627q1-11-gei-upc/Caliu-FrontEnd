@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../config.dart';
 import 'event.dart';
+import 'event_query.dart';
 
 class EventsApiException implements Exception {
   EventsApiException(this.message);
@@ -11,6 +12,20 @@ class EventsApiException implements Exception {
 
   @override
   String toString() => message;
+}
+
+class EventPageResult {
+  const EventPageResult({
+    required this.items,
+    required this.page,
+    required this.limit,
+    required this.total,
+  });
+
+  final List<Event> items;
+  final int page;
+  final int limit;
+  final int total;
 }
 
 class EventsApi {
@@ -21,19 +36,9 @@ class EventsApi {
   final http.Client _client;
   final String _baseUrl;
 
-  Future<List<Event>> fetchNearby({
-    required double lat,
-    required double lng,
-    double radiusKm = 15,
-    int limit = 50,
-  }) async {
+  Future<EventPageResult> fetchEvents(EventQuery query) async {
     final uri = Uri.parse('$_baseUrl/events').replace(
-      queryParameters: {
-        'lat': lat.toString(),
-        'lng': lng.toString(),
-        'radiusKm': radiusKm.toString(),
-        'limit': limit.toString(),
-      },
+      queryParameters: query.toQueryParameters(),
     );
 
     final decoded = await _getJson(uri);
@@ -42,12 +47,38 @@ class EventsApi {
     }
 
     final items = decoded['items'];
-    if (items is! List) return const [];
+    final list = items is List
+        ? items
+            .whereType<Map<String, dynamic>>()
+            .map(Event.fromJson)
+            .toList()
+        : <Event>[];
 
-    return items
-        .whereType<Map<String, dynamic>>()
-        .map(Event.fromJson)
-        .toList();
+    return EventPageResult(
+      items: list,
+      page: decoded['page'] is num ? (decoded['page'] as num).toInt() : 1,
+      limit: decoded['limit'] is num
+          ? (decoded['limit'] as num).toInt()
+          : query.limit,
+      total: decoded['total'] is num ? (decoded['total'] as num).toInt() : list.length,
+    );
+  }
+
+  Future<List<Event>> fetchNearby({
+    required double lat,
+    required double lng,
+    double radiusKm = 15,
+    int limit = 50,
+  }) async {
+    final page = await fetchEvents(
+      EventQuery(
+        lat: lat,
+        lng: lng,
+        radiusKm: radiusKm,
+        limit: limit,
+      ),
+    );
+    return page.items;
   }
 
   Future<Event> fetchById(String id) async {
@@ -57,6 +88,17 @@ class EventsApi {
       throw EventsApiException('Resposta inesperada de /events/$id');
     }
     return Event.fromJson(decoded);
+  }
+
+  Future<List<String>> fetchCategories() async {
+    final uri = Uri.parse('$_baseUrl/events/categories');
+    final decoded = await _getJson(uri);
+    if (decoded is! Map<String, dynamic>) {
+      throw EventsApiException('Resposta inesperada de /events/categories');
+    }
+    final categories = decoded['categories'];
+    if (categories is! List) return const [];
+    return categories.map((e) => e.toString()).toList();
   }
 
   Future<dynamic> _getJson(Uri uri) async {
