@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'data/event.dart';
 import 'data/events_api.dart';
 import 'theme/caliu_colors.dart';
+import 'widgets/caliu_chip.dart';
 
 class EventDetailScreen extends StatefulWidget {
   const EventDetailScreen({
@@ -295,26 +296,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                               spacing: 8,
                               runSpacing: 8,
                               children: chips
-                                  .map(
-                                    (label) => Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: CaliuColors.chip,
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Text(
-                                        label,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  )
+                                  .map((label) => CaliuChip(label: label))
                                   .toList(),
                             ),
                           ],

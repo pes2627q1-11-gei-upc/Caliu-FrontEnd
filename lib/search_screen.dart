@@ -5,6 +5,7 @@ import 'data/event_query.dart';
 import 'data/events_api.dart';
 import 'event_detail_screen.dart';
 import 'theme/caliu_colors.dart';
+import 'widgets/caliu_chip.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({
@@ -454,6 +455,27 @@ class _SearchScreenState extends State<SearchScreen> {
                             color: CaliuColors.textMuted,
                             fontSize: 13,
                           ),
+                        ),
+                        Builder(
+                          builder: (context) {
+                            final labels = <String>{
+                              ...event.categories,
+                              ...event.tags,
+                            }.take(3).toList();
+                            if (labels.isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: labels
+                                    .map((label) => CaliuChip(label: label))
+                                    .toList(),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
