@@ -75,7 +75,6 @@ class _SearchScreenState extends State<SearchScreen> {
       municipality: _municipalityController.text,
       lat: widget.lat,
       lng: widget.lng,
-      radiusKm: widget.lat != null && widget.lng != null ? 50 : null,
       limit: 40,
     );
   }
