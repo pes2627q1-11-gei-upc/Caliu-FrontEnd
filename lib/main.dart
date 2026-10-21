@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'map_view.dart';
+import 'main_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -17,7 +17,7 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepOrange),
         useMaterial3: true,
       ),
-      home: const MapView(),
+      home: const MainScreen(),
     );
   }
 }
