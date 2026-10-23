@@ -3,13 +3,15 @@
 App mòbil **Flutter** de **Caliu**: mapa i agenda d’esdeveniments culturals a Catalunya (equip **Cultura't** · PES FIB-UPC · grup 11).
 
 <p align="center">
+  <a href="https://github.com/pes2627q1-11-gei-upc/Caliu-FrontEnd/actions/workflows/ci-flutter.yml"><img src="https://github.com/pes2627q1-11-gei-upc/Caliu-FrontEnd/actions/workflows/ci-flutter.yml/badge.svg?branch=main" alt="CI Flutter"></a>
   <img src="https://img.shields.io/badge/Flutter-stable-02569B?logo=flutter&logoColor=white" alt="Flutter">
   <img src="https://img.shields.io/badge/Maps-Google%20Maps-4285F4?logo=googlemaps&logoColor=white" alt="Google Maps">
   <img src="https://img.shields.io/badge/API-Caliu%20Backend-339933?logo=nodedotjs&logoColor=white" alt="API">
 </p>
 
 <p align="center">
-  <a href="#arrencada-ràpida"><b>Arrencada</b></a> ·
+  <a href="docs/onboarding.md"><b>Onboarding</b></a> ·
+  <a href="CONTRIBUTING.md"><b>Contribuir</b></a> ·
   <a href="https://github.com/pes2627q1-11-gei-upc/Caliu-Backend"><b>Backend</b></a> ·
   <a href="https://github.com/pes2627q1-11-gei-upc/Caliu-Backend/blob/main/docs/openapi.yaml"><b>OpenAPI</b></a>
 </p>
