@@ -73,23 +73,23 @@ curl.exe "http://localhost:3000/events?lat=41.3851&lng=2.1734&radiusKm=15&limit=
 
 ### URL de l’API des del mòbil
 
-El mòbil **no** pot usar `localhost` (seria ell mateix).
+| Entorn | Base URL | Com |
+|--------|----------|-----|
+| Emulador Android | `http://10.0.2.2:3000` | `flutter run` (default) |
+| Mòbil físic **USB** | `http://127.0.0.1:3000` | `.\scripts\run-mobil.ps1` (`adb reverse`) |
+| Mòbil físic Wi‑Fi | `http://IP_DEL_PC:3000` | mateixa xarxa; a eduroam sovint falla → USB |
+| Demo / profe | HTTPS públic | `--dart-define=API_BASE_URL=https://...` |
 
-| Entorn | Base URL |
-|--------|----------|
-| Emulador Android | `http://10.0.2.2:3000` |
-| Mòbil físic (mateixa Wi‑Fi) | `http://IP_DEL_PC:3000` |
-| Demo / profe | URL pública HTTPS del backend desplegat |
-
-Obté la IP del PC (`ipconfig`, Wi‑Fi). Comprova al navegador del mòbil: `http://IP:3000/health`.
-
-**Preferit** (sense editar codi):
+**Mòbil per USB (recomanat):**
 
 ```powershell
-flutter run --dart-define=API_BASE_URL=http://192.168.x.x:3000
+# Backend en marxa + cable + depuració USB
+.\scripts\run-mobil.ps1
 ```
 
-Alternativa: valor per defecte a `lib/config.dart` (cada desenvolupador la seva IP local; no cal fer commit d’IPs personals).
+A l’app, pestanya **Perfil** → «Estat del servidor» (ha de sortir verd / Connectat).
+
+Més detall: [docs/onboarding.md](docs/onboarding.md).
 
 ## Stack
 
@@ -110,10 +110,12 @@ lib/
 ├── config.dart              # API_BASE_URL (dart-define)
 ├── map_view.dart
 ├── search_screen.dart
+├── profile_screen.dart      # estat API (GET /health)
 ├── event_detail_screen.dart
-├── data/                    # models + client API
+├── data/
 ├── theme/
-└── widgets/
+├── widgets/
+└── scripts/run-mobil.ps1    # adb reverse + flutter run
 ```
 
 ## Estat (Sprint 1)

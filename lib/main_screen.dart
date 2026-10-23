@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'map_view.dart';
+import 'profile_screen.dart';
 import 'search_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -21,7 +22,7 @@ class _MainScreenState extends State<MainScreen> {
   static const List<Widget> _screens = [
     SearchScreen(),
     MapView(),
-    Scaffold(backgroundColor: _barColor, body: SizedBox.expand()),
+    ProfileScreen(),
   ];
 
   static const List<String> _labels = ['Inici', 'Mapa', 'Perfil'];

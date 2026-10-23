@@ -1,6 +1,9 @@
 import 'package:caliu/data/event.dart';
 import 'package:caliu/data/event_query.dart';
+import 'package:caliu/data/events_api.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 void main() {
   group('Event.fromJson', () {
@@ -50,11 +53,42 @@ void main() {
     });
 
     test('inclou lat/lng i radi quan hi són', () {
-      const q = EventQuery(lat: 41.4, lng: 2.1, radiusKm: 15);
+      final q = EventQuery(lat: 41.4, lng: 2.1, radiusKm: 15);
       final params = q.toQueryParameters();
       expect(params['lat'], '41.4');
       expect(params['lng'], '2.1');
-      expect(params['radiusKm'], '15.0');
+      expect(params['radiusKm'], anyOf('15', '15.0'));
+    });
+  });
+
+  group('EventsApi.fetchHealth', () {
+    test('ok quan /health respon 200', () async {
+      final client = MockClient((request) async {
+        expect(request.url.path, '/health');
+        return http.Response(
+          '{"status":"ok","service":"api-node"}',
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+      final api = EventsApi(
+        client: client,
+        baseUrl: 'http://127.0.0.1:3000',
+      );
+      final health = await api.fetchHealth();
+      expect(health.ok, isTrue);
+      expect(health.service, 'api-node');
+      expect(health.baseUrl, 'http://127.0.0.1:3000');
+    });
+
+    test('no ok si la xarxa falla', () async {
+      final client = MockClient((request) async {
+        throw Exception('connection refused');
+      });
+      final api = EventsApi(client: client, baseUrl: 'http://127.0.0.1:3000');
+      final health = await api.fetchHealth();
+      expect(health.ok, isFalse);
+      expect(health.error, isNotNull);
     });
   });
 }

@@ -28,6 +28,22 @@ class EventPageResult {
   final int total;
 }
 
+class ApiHealth {
+  const ApiHealth({
+    required this.ok,
+    required this.baseUrl,
+    this.status,
+    this.service,
+    this.error,
+  });
+
+  final bool ok;
+  final String baseUrl;
+  final String? status;
+  final String? service;
+  final String? error;
+}
+
 class EventsApi {
   EventsApi({http.Client? client, String? baseUrl})
       : _client = client ?? http.Client(),
@@ -35,6 +51,44 @@ class EventsApi {
 
   final http.Client _client;
   final String _baseUrl;
+
+  String get baseUrl => _baseUrl;
+
+  /// GET /health — útil per veure si el mòbil arriba a l’API.
+  Future<ApiHealth> fetchHealth() async {
+    final uri = Uri.parse('$_baseUrl/health');
+    try {
+      final response =
+          await _client.get(uri).timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) {
+        return ApiHealth(
+          ok: false,
+          baseUrl: _baseUrl,
+          error: 'HTTP ${response.statusCode}',
+        );
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        return ApiHealth(
+          ok: false,
+          baseUrl: _baseUrl,
+          error: 'Resposta inesperada',
+        );
+      }
+      return ApiHealth(
+        ok: true,
+        baseUrl: _baseUrl,
+        status: decoded['status']?.toString(),
+        service: decoded['service']?.toString(),
+      );
+    } on Exception catch (e) {
+      return ApiHealth(
+        ok: false,
+        baseUrl: _baseUrl,
+        error: e.toString(),
+      );
+    }
+  }
 
   Future<EventPageResult> fetchEvents(EventQuery query) async {
     final uri = Uri.parse('$_baseUrl/events').replace(
