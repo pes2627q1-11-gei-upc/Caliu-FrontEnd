@@ -15,6 +15,8 @@ App mòbil **Flutter** de **Caliu**: mapa i agenda d’esdeveniments culturals a
 
 <p align="center">
   <a href="docs/onboarding.md"><b>Onboarding</b></a> ·
+  <a href="docs/deploy.md"><b>Deploy</b></a> ·
+  <a href="docs/sprint-1.md"><b>Sprint 1</b></a> ·
   <a href="CONTRIBUTING.md"><b>Contribuir</b></a> ·
   <a href="https://github.com/pes2627q1-11-gei-upc/Caliu-Backend"><b>Backend</b></a> ·
   <a href="https://github.com/pes2627q1-11-gei-upc/Caliu-Backend/blob/main/docs/openapi.yaml"><b>OpenAPI</b></a>
@@ -140,7 +142,7 @@ lib/
 | Fitxa d’esdeveniment | Fet |
 | Cerca / filtres / chips | Fet |
 | Auth / preferits | Pendent (back + front) |
-| Desplegament públic + APK release | En curs |
+| Desplegament públic + APK release | API a Render; APK pendents de compartir |
 
 ## Com treballem
 

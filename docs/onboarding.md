@@ -80,5 +80,7 @@ Comprova: https://caliu-api.onrender.com/health
 ## Més
 
 - [README](../README.md)
+- [deploy.md](deploy.md) — APK amb Render
+- [sprint-1.md](sprint-1.md) — què s’ha entregat
 - [CONTRIBUTING](../CONTRIBUTING.md)
 - OpenAPI del backend: `docs/openapi.yaml` al repo Caliu-Backend
