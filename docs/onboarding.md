@@ -54,6 +54,17 @@ flutter run --dart-define=API_BASE_URL=http://IP_DEL_PC:3000
 
 **Eduroam / xarxa de la uni:** sovint el mòbil i el PC no es veuen. Usa l’opció A (USB) o la zona Wi‑Fi del mòbil amb el PC connectat allà.
 
+### D) API a Render (sense Docker local)
+
+```powershell
+flutter run --dart-define=API_BASE_URL=https://caliu-api.onrender.com
+# o
+flutter build apk --dart-define=API_BASE_URL=https://caliu-api.onrender.com
+```
+
+Comprova: https://caliu-api.onrender.com/health  
+(Si fa temps que no s’usa, la primera resposta pot trigar una mica.)
+
 ## Comprovar que l’API arriba
 
 1. Pestanya **Perfil** a l’app → targeta «Estat del servidor» (verd = connectat).

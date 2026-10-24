@@ -1,5 +1,9 @@
 # Caliu · FrontEnd
 
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="Caliu: Sent el Caliu, enamora’t de la cultura catalana" width="100%">
+</p>
+
 App mòbil **Flutter** de **Caliu**: mapa i agenda d’esdeveniments culturals a Catalunya (equip **Cultura't** · PES FIB-UPC · grup 11).
 
 <p align="center">
@@ -78,7 +82,17 @@ curl.exe "http://localhost:3000/events?lat=41.3851&lng=2.1734&radiusKm=15&limit=
 | Emulador Android | `http://10.0.2.2:3000` | `flutter run` (default) |
 | Mòbil físic **USB** | `http://127.0.0.1:3000` | `.\scripts\run-mobil.ps1` (`adb reverse`) |
 | Mòbil físic Wi‑Fi | `http://IP_DEL_PC:3000` | mateixa xarxa; a eduroam sovint falla → USB |
-| Demo / profe | HTTPS públic | `--dart-define=API_BASE_URL=https://...` |
+| Demo / profe (Render) | `https://caliu-api.onrender.com` | APK o `flutter run` amb aquesta URL |
+
+API pública (Render): https://caliu-api.onrender.com/health  
+
+```powershell
+flutter run --dart-define=API_BASE_URL=https://caliu-api.onrender.com
+# o APK:
+flutter build apk --dart-define=API_BASE_URL=https://caliu-api.onrender.com
+```
+
+> Al pla free de Render el servei pot estar adormit: la primera petició pot trigar ~30–60 s.
 
 **Mòbil per USB (recomanat):**
 
