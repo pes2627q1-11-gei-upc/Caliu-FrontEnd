@@ -126,9 +126,11 @@ lib/
 ├── config.dart              # API_BASE_URL (dart-define)
 ├── map_view.dart
 ├── search_screen.dart
-├── profile_screen.dart      # estat API (GET /health)
+├── profile_screen.dart      # compte autenticat i estat API (GET /health)
+├── login_screen.dart        # inici de sessió (POST /auth/login)
+├── register_screen.dart     # registre d'usuari (POST /auth/register)
 ├── event_detail_screen.dart
-├── data/
+├── data/                    # auth_api.dart i auth_session.dart (JWT segur)
 ├── theme/
 ├── widgets/
 └── scripts/run-mobil.ps1    # adb reverse + flutter run
@@ -141,8 +143,12 @@ lib/
 | Mapa + markers | Fet |
 | Fitxa d’esdeveniment | Fet |
 | Cerca / filtres / chips | Fet |
-| Auth / preferits | Pendent (back + front) |
+| Registre, inici de sessió i perfil | Formularis, sessió JWT segura, consulta/edició del perfil i tancament de sessió |
 | Desplegament públic + APK release | API a Render; APK pendents de compartir |
+
+El nom d’usuari és únic (el backend respon `409` si ja està en ús) i es pot
+editar des del perfil. La foto no forma part dels camps editables del contracte
+actual de `PATCH /profile`.
 
 ## Com treballem
 
