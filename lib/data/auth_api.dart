@@ -15,18 +15,6 @@ class AuthApiException implements Exception {
   String toString() => message;
 }
 
-class RegistrationResult {
-  const RegistrationResult({
-    required this.token,
-    required this.username,
-    required this.email,
-  });
-
-  final String token;
-  final String username;
-  final String email;
-}
-
 class AuthenticatedProfile {
   const AuthenticatedProfile({
     required this.id,
@@ -39,6 +27,31 @@ class AuthenticatedProfile {
   final String username;
   final String email;
   final List<String> preferences;
+
+  factory AuthenticatedProfile.fromJson(dynamic decoded) {
+    if (decoded is! Map<String, dynamic> ||
+        decoded['id'] is! String ||
+        decoded['username'] is! String ||
+        decoded['email'] is! String ||
+        decoded['preferences'] is! List ||
+        (decoded['preferences'] as List).any((value) => value is! String)) {
+      throw const AuthApiException('El perfil rebut no té el format esperat.');
+    }
+
+    return AuthenticatedProfile(
+      id: decoded['id'] as String,
+      username: decoded['username'] as String,
+      email: decoded['email'] as String,
+      preferences: List<String>.from(decoded['preferences'] as List),
+    );
+  }
+}
+
+class AuthResult {
+  const AuthResult({required this.user, required this.token});
+
+  final AuthenticatedProfile user;
+  final String token;
 }
 
 class AuthApi {
@@ -49,7 +62,7 @@ class AuthApi {
   final http.Client _client;
   final String _baseUrl;
 
-  Future<RegistrationResult> register({
+  Future<AuthResult> register({
     required String username,
     required String email,
     required String password,
@@ -62,7 +75,7 @@ class AuthApi {
     return _parseAuthResponse(response, expectedStatus: 201);
   }
 
-  Future<RegistrationResult> login({
+  Future<AuthResult> login({
     required String email,
     required String password,
   }) async {
@@ -73,205 +86,203 @@ class AuthApi {
     return _parseAuthResponse(response, expectedStatus: 200);
   }
 
+  Future<http.Response> _send(
+    String method,
+    String path, {
+    String? token,
+    Object? body,
+  }) async {
+    final headers = <String, String>{};
+    if (token != null) headers['authorization'] = 'Bearer $token';
+    if (body != null) headers['content-type'] = 'application/json';
+
+    try {
+      final uri = Uri.parse('$_baseUrl$path');
+      final request = switch (method) {
+        'GET' => _client.get(uri, headers: headers),
+        'POST' => _client.post(
+          uri,
+          headers: headers,
+          body: body == null ? null : jsonEncode(body),
+        ),
+        'PATCH' => _client.patch(
+          uri,
+          headers: headers,
+          body: jsonEncode(body),
+        ),
+        'PUT' => _client.put(
+          uri,
+          headers: headers,
+          body: jsonEncode(body),
+        ),
+        _ => throw StateError('Mètode HTTP no admès'),
+      };
+      return await request.timeout(const Duration(seconds: 15));
+    } on Exception {
+      throw const AuthApiException(
+        'No s’ha pogut connectar amb el servidor. Comprova la connexió i torna-ho a provar.',
+      );
+    }
+  }
+
   Future<http.Response> _sendCredentials(
     String path,
     Map<String, String> credentials,
-  ) async {
-    late final http.Response response;
-    try {
-      response = await _client
-          .post(
-            Uri.parse('$_baseUrl$path'),
-            headers: {'content-type': 'application/json'},
-            body: jsonEncode(credentials),
-          )
-          .timeout(const Duration(seconds: 15));
-    } on Exception catch (error) {
-      throw AuthApiException(
-        'No s’ha pogut connectar amb el servidor. Comprova la connexió i torna-ho a provar. ($error)',
-      );
-    }
-    return response;
-  }
+  ) => _send('POST', path, body: credentials);
 
-  RegistrationResult _parseAuthResponse(
+  AuthResult _parseAuthResponse(
     http.Response response, {
     required int expectedStatus,
   }) {
+    _requireSuccess(
+      response,
+      expectedStatus,
+      'No s’ha pogut autenticar.',
+      conflictMessage: 'Aquest correu electrònic o nom d’usuari ja està en ús.',
+    );
     final dynamic decoded;
     try {
       decoded = jsonDecode(response.body);
     } on FormatException {
       throw AuthApiException(
         'El servidor ha retornat una resposta inesperada (${response.statusCode}).',
-      );
-    }
-
-    if (response.statusCode != expectedStatus) {
-      final detail = decoded is Map ? decoded['error']?.toString() : null;
-      if (response.statusCode == 409) {
-        throw const AuthApiException(
-          'Aquest correu electrònic o nom d’usuari ja està en ús.',
-        );
-      }
-      if (response.statusCode == 401) {
-        throw AuthApiException(
-          detail ?? 'El correu electrònic o la contrasenya són incorrectes.',
-          statusCode: response.statusCode,
-        );
-      }
-      if (response.statusCode == 400) {
-        throw AuthApiException(
-          detail ?? 'Revisa les dades introduïdes.',
-          statusCode: response.statusCode,
-        );
-      }
-      final fallbackMessage = expectedStatus == 200
-          ? 'No s’ha pogut iniciar sessió (error ${response.statusCode}).'
-          : 'No s’ha pogut crear el compte (error ${response.statusCode}).';
-      throw AuthApiException(
-        detail ?? fallbackMessage,
-        statusCode: response.statusCode,
       );
     }
 
     if (decoded is! Map<String, dynamic> ||
         decoded['token'] is! String ||
-        decoded['profile'] is! Map<String, dynamic>) {
+        (decoded['token'] as String).isEmpty ||
+        decoded['tokenType'] != 'Bearer' ||
+        decoded['expiresIn'] is! num ||
+        decoded['user'] is! Map<String, dynamic>) {
       throw const AuthApiException(
-        'El servidor ha creat el compte però la resposta no té el format esperat.',
-      );
-    }
-    final profile = decoded['profile'] as Map<String, dynamic>;
-    if (profile['username'] is! String || profile['email'] is! String) {
-      throw const AuthApiException(
-        'El servidor ha creat el compte però el perfil rebut no és vàlid.',
+        'El servidor ha retornat una resposta d’autenticació no vàlida.',
       );
     }
 
-    return RegistrationResult(
+    return AuthResult(
+      user: AuthenticatedProfile.fromJson(decoded['user']),
       token: decoded['token'] as String,
-      username: profile['username'] as String,
-      email: profile['email'] as String,
     );
   }
 
   Future<AuthenticatedProfile> fetchProfile(String token) async {
-    late final http.Response response;
-    try {
-      response = await _client
-          .get(
-            Uri.parse('$_baseUrl/profile'),
-            headers: {'authorization': 'Bearer $token'},
-          )
-          .timeout(const Duration(seconds: 15));
-    } on Exception catch (error) {
-      throw AuthApiException(
-        'No s’ha pogut connectar amb el servidor. ($error)',
-      );
-    }
-
-    final dynamic decoded;
-    try {
-      decoded = jsonDecode(response.body);
-    } on FormatException {
-      throw AuthApiException(
-        'El servidor ha retornat una resposta inesperada (${response.statusCode}).',
-        statusCode: response.statusCode,
-      );
-    }
-
-    if (response.statusCode != 200) {
-      final detail = decoded is Map ? decoded['error']?.toString() : null;
-      throw AuthApiException(
-        detail ?? 'No s’ha pogut carregar el perfil.',
-        statusCode: response.statusCode,
-      );
-    }
-    return _parseProfile(decoded);
+    final response = await _send('GET', '/users/me', token: token);
+    _requireSuccess(response, 200, 'No s’ha pogut carregar el perfil.');
+    return AuthenticatedProfile.fromJson(_decode(response));
   }
 
   Future<AuthenticatedProfile> updateProfile({
     required String token,
     required String username,
   }) async {
-    late final http.Response response;
-    try {
-      response = await _client
-          .patch(
-            Uri.parse('$_baseUrl/profile'),
-            headers: {
-              'authorization': 'Bearer $token',
-              'content-type': 'application/json',
-            },
-            body: jsonEncode({'username': username.trim()}),
-          )
-          .timeout(const Duration(seconds: 15));
-    } on Exception catch (error) {
+    final response = await _send(
+      'PATCH',
+      '/users/me',
+      token: token,
+      body: {'username': username.trim()},
+    );
+    _requireSuccess(
+      response,
+      200,
+      'No s’ha pogut actualitzar el perfil.',
+      conflictMessage: 'Aquest nom d’usuari ja està en ús.',
+    );
+    return AuthenticatedProfile.fromJson(_decode(response));
+  }
+
+  Future<List<String>> fetchPreferences(String token) async {
+    final response = await _send(
+      'GET',
+      '/users/me/preferences',
+      token: token,
+    );
+    _requireSuccess(response, 200, 'No s’han pogut carregar les preferències.');
+    return _parseStringList(_decode(response), 'preferences');
+  }
+
+  Future<List<String>> updatePreferences({
+    required String token,
+    required List<String> preferences,
+  }) async {
+    final response = await _send(
+      'PUT',
+      '/users/me/preferences',
+      token: token,
+      body: {'preferences': preferences},
+    );
+    _requireSuccess(response, 200, 'No s’han pogut desar les preferències.');
+    return _parseStringList(_decode(response), 'preferences');
+  }
+
+  Future<List<String>> fetchCategories() async {
+    final response = await _send('GET', '/events/categories');
+    _requireSuccess(response, 200, 'No s’han pogut carregar les categories.');
+    return _parseStringList(_decode(response), 'categories');
+  }
+
+  List<String> _parseStringList(dynamic decoded, String key) {
+    if (decoded is! Map<String, dynamic> ||
+        decoded[key] is! List ||
+        (decoded[key] as List).any((value) => value is! String)) {
       throw AuthApiException(
-        'No s’ha pogut connectar amb el servidor. ($error)',
+        'La resposta de categories o preferències no té el format esperat.',
       );
     }
+    return List<String>.from(decoded[key] as List);
+  }
 
-    final dynamic decoded;
+  dynamic _decode(http.Response response) {
     try {
-      decoded = jsonDecode(response.body);
+      return jsonDecode(response.body);
     } on FormatException {
       throw AuthApiException(
         'El servidor ha retornat una resposta inesperada (${response.statusCode}).',
         statusCode: response.statusCode,
       );
     }
-
-    if (response.statusCode != 200) {
-      final detail = decoded is Map ? decoded['error']?.toString() : null;
-      final message = response.statusCode == 409
-          ? 'Aquest nom d’usuari ja està en ús.'
-          : detail ?? 'No s’ha pogut actualitzar el perfil.';
-      throw AuthApiException(message, statusCode: response.statusCode);
-    }
-    return _parseProfile(decoded);
   }
 
-  AuthenticatedProfile _parseProfile(dynamic decoded) {
-    if (decoded is! Map<String, dynamic> ||
-        decoded['id'] is! String ||
-        decoded['username'] is! String ||
-        decoded['email'] is! String ||
-        decoded['preferences'] is! List) {
-      throw const AuthApiException('El perfil rebut no té el format esperat.');
-    }
+  void _requireSuccess(
+    http.Response response,
+    int expected,
+    String fallback, {
+    String? conflictMessage,
+  }) {
+    if (response.statusCode == expected) return;
 
-    return AuthenticatedProfile(
-      id: decoded['id'] as String,
-      username: decoded['username'] as String,
-      email: decoded['email'] as String,
-      preferences: (decoded['preferences'] as List)
-          .whereType<String>()
-          .toList(),
-    );
+    final statusCode = response.statusCode;
+    final message = switch (statusCode) {
+      400 => _errorMessage(response) ?? 'Revisa les dades introduïdes.',
+      401 => 'La sessió o les credencials no són vàlides. Inicia sessió de nou.',
+      409 =>
+        _errorMessage(response) ??
+        conflictMessage ??
+        'Aquest nom d’usuari ja està en ús.',
+      429 => 'S’han fet massa intents. Espera una estona i torna-ho a provar.',
+      500 => 'El servidor ha tingut un problema. Torna-ho a provar més tard.',
+      _ => fallback,
+    };
+    throw AuthApiException(message, statusCode: statusCode);
+  }
+
+  String? _errorMessage(http.Response response) {
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic> && decoded['error'] is String) {
+        return decoded['error'] as String;
+      }
+    } on FormatException {
+      return null;
+    }
+    return null;
   }
 
   Future<void> logout(String token) async {
-    late final http.Response response;
-    try {
-      response = await _client
-          .post(
-            Uri.parse('$_baseUrl/auth/logout'),
-            headers: {'authorization': 'Bearer $token'},
-          )
-          .timeout(const Duration(seconds: 15));
-    } on Exception catch (error) {
-      throw AuthApiException(
-        'No s’ha pogut connectar amb el servidor. ($error)',
-      );
-    }
+    final response = await _send('POST', '/auth/logout', token: token);
 
     if (response.statusCode != 204 && response.statusCode != 401) {
-      throw AuthApiException(
-        'No s’ha pogut tancar la sessió (error ${response.statusCode}).',
-        statusCode: response.statusCode,
-      );
+      _requireSuccess(response, 204, 'No s’ha pogut tancar la sessió.');
     }
   }
 }

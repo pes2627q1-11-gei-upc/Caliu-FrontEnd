@@ -1,6 +1,12 @@
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-class AuthSession {
+abstract interface class AuthSessionStore {
+  Future<String?> readToken();
+  Future<void> saveToken(String token);
+  Future<void> clear();
+}
+
+class AuthSession implements AuthSessionStore {
   AuthSession({FlutterSecureStorage? storage})
     : _storage = storage ?? const FlutterSecureStorage();
 
