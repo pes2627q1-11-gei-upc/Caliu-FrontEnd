@@ -8,9 +8,8 @@
 - Per mòbil físic: cable USB + depuració USB (`adb devices`)
 
 Per provar registre, login, perfil i preferències de Sprint 1, fes servir la
-branca `feat/backend-users` de Caliu-Backend fins que s'integri a `development`.
-La branca `main` o Render poden no incloure encara aquests endpoints. Consulta
-el contracte a [`docs/openapi.yaml` de `feat/backend-users`](https://github.com/pes2627q1-11-gei-upc/Caliu-Backend/blob/feat/backend-users/docs/openapi.yaml).
+branca `development` de Caliu-Backend i el desplegament de Render corresponent.
+Consulta el contracte a [`docs/openapi.yaml` de `development`](https://github.com/pes2627q1-11-gei-upc/Caliu-Backend/blob/development/docs/openapi.yaml).
 
 ## Passos
 

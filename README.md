@@ -19,7 +19,7 @@ App mòbil **Flutter** de **Caliu**: mapa i agenda d’esdeveniments culturals a
   <a href="docs/sprint-1.md"><b>Sprint 1</b></a> ·
   <a href="CONTRIBUTING.md"><b>Contribuir</b></a> ·
   <a href="https://github.com/pes2627q1-11-gei-upc/Caliu-Backend"><b>Backend</b></a> ·
-  <a href="https://github.com/pes2627q1-11-gei-upc/Caliu-Backend/blob/feat/backend-users/docs/openapi.yaml"><b>OpenAPI</b></a>
+  <a href="https://github.com/pes2627q1-11-gei-upc/Caliu-Backend/blob/development/docs/openapi.yaml"><b>OpenAPI</b></a>
 </p>
 
 ## Què fa
@@ -65,10 +65,9 @@ MAPS_API_KEY=la_teva_clau_aqui
 
 Cal el repo [Caliu-Backend](https://github.com/pes2627q1-11-gei-upc/Caliu-Backend) amb `.env` (copieu `.env.example` allà).
 
-Per al flux d'usuaris de Sprint 1, utilitza temporalment la branca
-`feat/backend-users` del backend fins que s'integri a `development`. El Render
-públic i la branca `main` del backend poden no tenir encara aquests endpoints.
-El contracte actualitzat és a [`docs/openapi.yaml` de `feat/backend-users`](https://github.com/pes2627q1-11-gei-upc/Caliu-Backend/blob/feat/backend-users/docs/openapi.yaml).
+Per al flux d'usuaris de Sprint 1, utilitza la branca `development` del backend
+i el desplegament de Render corresponent. El contracte actualitzat és a
+[`docs/openapi.yaml` de `development`](https://github.com/pes2627q1-11-gei-upc/Caliu-Backend/blob/development/docs/openapi.yaml).
 
 ```powershell
 cd Caliu-Backend
@@ -174,7 +173,7 @@ unicitat i el contracte final.
 
 - Canvis via **pull request** a `main`
 - Commits preferiblement en [Conventional Commits](https://www.conventionalcommits.org/) amb referència Taiga, p. ex. `feat(map): markers des de l’API` + `Refs: #85`
-- Contracte API: no inventar camps; durant aquesta integració, seguir [`docs/openapi.yaml` de `feat/backend-users`](https://github.com/pes2627q1-11-gei-upc/Caliu-Backend/blob/feat/backend-users/docs/openapi.yaml)
+- Contracte API: no inventar camps; seguir [`docs/openapi.yaml` de `development`](https://github.com/pes2627q1-11-gei-upc/Caliu-Backend/blob/development/docs/openapi.yaml)
 
 ## Equip
 

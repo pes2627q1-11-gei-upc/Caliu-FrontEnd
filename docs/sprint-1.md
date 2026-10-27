@@ -18,12 +18,11 @@ Resum del que s’ha fet al mòbil (octubre 2026). Detall conjunt: [sprint-1 del
 ## Pendent / en curs
 
 - APK release amb URL de Render (vegeu [deploy.md](deploy.md))
-- Prova end-to-end amb la branca backend `feat/backend-users` (pendent de disponibilitat en aquest entorn)
+- Prova end-to-end amb el backend `development` desplegat a Render (pendent)
 - APK de demo amb el backend integrat desplegat i configurat (pendent)
 
-El backend `main`/Render pot no contenir encara el contracte d'usuaris. Per a
-la demo d'aquesta integració, cal utilitzar `feat/backend-users` fins que
-s'integri a `development`. El client no manté un catàleg propi de preferències.
+La demo d'aquesta integració utilitza el backend `development` desplegat a
+Render. El client no manté un catàleg propi de preferències.
 
 Les proves Flutter s'han d'executar amb `flutter test` i l'anàlisi amb
 `flutter analyze`; els resultats d'aquesta entrega es registren a la PR després
