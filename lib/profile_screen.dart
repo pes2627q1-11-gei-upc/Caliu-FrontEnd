@@ -349,9 +349,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     backgroundColor: CaliuColors.maroon,
                     foregroundColor: Colors.white,
                     child: Text(
-                      profile.username.isEmpty
-                          ? '?'
-                          : profile.username[0].toUpperCase(),
+                      () {
+                        final name = profile.username?.trim() ?? '';
+                        return name.isEmpty ? '?' : name[0].toUpperCase();
+                      }(),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -360,7 +361,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          profile.username,
+                          (profile.username?.trim().isNotEmpty ?? false)
+                              ? profile.username!.trim()
+                              : 'Sense nom d’usuari',
                           style: Theme.of(context).textTheme.titleLarge
                               ?.copyWith(
                                 color: CaliuColors.maroon,
@@ -467,7 +470,7 @@ class _EditUsernameDialog extends StatefulWidget {
     required this.onSessionExpired,
   });
 
-  final String username;
+  final String? username;
   final Future<AuthenticatedProfile> Function(String username) onSave;
   final VoidCallback onSessionExpired;
 
@@ -484,7 +487,7 @@ class _EditUsernameDialogState extends State<_EditUsernameDialog> {
   @override
   void initState() {
     super.initState();
-    _controller = TextEditingController(text: widget.username);
+    _controller = TextEditingController(text: widget.username ?? '');
   }
 
   @override

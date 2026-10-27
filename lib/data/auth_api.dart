@@ -24,23 +24,24 @@ class AuthenticatedProfile {
   });
 
   final String id;
-  final String username;
+  /// Pot ser null just després del registre (abans del PATCH /users/me).
+  final String? username;
   final String email;
   final List<String> preferences;
 
   factory AuthenticatedProfile.fromJson(dynamic decoded) {
     if (decoded is! Map<String, dynamic> ||
         decoded['id'] is! String ||
-        decoded['username'] is! String ||
         decoded['email'] is! String ||
         decoded['preferences'] is! List ||
-        (decoded['preferences'] as List).any((value) => value is! String)) {
+        (decoded['preferences'] as List).any((value) => value is! String) ||
+        (decoded['username'] != null && decoded['username'] is! String)) {
       throw const AuthApiException('El perfil rebut no té el format esperat.');
     }
 
     return AuthenticatedProfile(
       id: decoded['id'] as String,
-      username: decoded['username'] as String,
+      username: decoded['username'] as String?,
       email: decoded['email'] as String,
       preferences: List<String>.from(decoded['preferences'] as List),
     );
@@ -62,17 +63,34 @@ class AuthApi {
   final http.Client _client;
   final String _baseUrl;
 
+  /// Contracte OpenAPI: register només email+password (sense token).
+  /// Després fa login i, si hi ha username, PATCH /users/me.
   Future<AuthResult> register({
     required String username,
     required String email,
     required String password,
   }) async {
+    final trimmedEmail = email.trim();
     final response = await _sendCredentials('/auth/register', {
-      'username': username.trim(),
-      'email': email.trim(),
+      'email': trimmedEmail,
       'password': password,
     });
-    return _parseAuthResponse(response, expectedStatus: 201);
+    _requireSuccess(
+      response,
+      201,
+      'No s’ha pogut crear el compte.',
+      conflictMessage: 'Aquest correu electrònic ja està en ús.',
+    );
+
+    final result = await login(email: trimmedEmail, password: password);
+    final trimmedUsername = username.trim();
+    if (trimmedUsername.isEmpty) return result;
+
+    final user = await updateProfile(
+      token: result.token,
+      username: trimmedUsername,
+    );
+    return AuthResult(user: user, token: result.token);
   }
 
   Future<AuthResult> login({

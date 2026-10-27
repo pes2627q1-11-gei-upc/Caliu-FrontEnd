@@ -57,9 +57,23 @@ void main() {
     final session = _MemorySession();
     final api = AuthApi(
       client: MockClient((request) async {
-        expect(request.url.path, '/auth/register');
-        expect(request.method, 'POST');
-        return http.Response(_authResponse(), 201);
+        switch (request.url.path) {
+          case '/auth/register':
+            expect(request.method, 'POST');
+            return http.Response(
+              '{"user":{"id":"test-user-id","username":null,"email":"nuria@example.cat","preferences":[]}}',
+              201,
+            );
+          case '/auth/login':
+            expect(request.method, 'POST');
+            return http.Response(_authResponse(), 200);
+          case '/users/me':
+            expect(request.method, 'PATCH');
+            expect(request.headers['authorization'], 'Bearer test-token');
+            return http.Response(_profileJson(), 200);
+          default:
+            fail('ruta inesperada: ${request.url.path}');
+        }
       }),
       baseUrl: 'http://localhost:3000',
     );

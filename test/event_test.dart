@@ -29,17 +29,43 @@ String _userBody({String username = 'marc'}) => jsonEncode({
 
 void main() {
   group('AuthApi registre i login', () {
-    test('el registre envia els tres camps i processa user/token', () async {
+    test('el registre fa register → login → PATCH username', () async {
+      final paths = <String>[];
       final client = MockClient((request) async {
-        expect(request.method, 'POST');
-        expect(request.url.path, '/auth/register');
+        paths.add('${request.method} ${request.url.path}');
         expect(request.headers['content-type'], 'application/json');
-        expect(jsonDecode(request.body), {
-          'username': 'marc',
-          'email': 'marc@example.com',
-          'password': 'contrasenya-segura',
-        });
-        return http.Response(_authBody(), 201);
+        switch (request.url.path) {
+          case '/auth/register':
+            expect(jsonDecode(request.body), {
+              'email': 'marc@example.com',
+              'password': 'contrasenya-segura',
+            });
+            return http.Response(
+              jsonEncode({'user': {..._user, 'username': null}}),
+              201,
+            );
+          case '/auth/login':
+            expect(jsonDecode(request.body), {
+              'email': 'marc@example.com',
+              'password': 'contrasenya-segura',
+            });
+            return http.Response(
+              jsonEncode({
+                'user': {..._user, 'username': null},
+                'token': 'jwt-token',
+                'tokenType': 'Bearer',
+                'expiresIn': 3600,
+              }),
+              200,
+            );
+          case '/users/me':
+            expect(request.method, 'PATCH');
+            expect(request.headers['authorization'], 'Bearer jwt-token');
+            expect(jsonDecode(request.body), {'username': 'marc'});
+            return http.Response(_userBody(), 200);
+          default:
+            fail('ruta inesperada: ${request.url.path}');
+        }
       });
       final api = AuthApi(client: client, baseUrl: 'http://localhost:3000');
 
@@ -49,6 +75,11 @@ void main() {
         password: 'contrasenya-segura',
       );
 
+      expect(paths, [
+        'POST /auth/register',
+        'POST /auth/login',
+        'PATCH /users/me',
+      ]);
       expect(result.token, 'jwt-token');
       expect(result.user.id, _user['id']);
       expect(result.user.username, 'marc');
