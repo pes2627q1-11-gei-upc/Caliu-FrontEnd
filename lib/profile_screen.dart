@@ -3,23 +3,35 @@ import 'package:flutter/material.dart';
 import 'config.dart';
 import 'data/auth_api.dart';
 import 'data/auth_session.dart';
+import 'data/auth_validators.dart';
 import 'data/events_api.dart';
 import 'login_screen.dart';
+import 'preferences_screen.dart';
 import 'register_screen.dart';
 import 'theme/caliu_colors.dart';
 
 /// Pestanya Perfil: mostra el compte autenticat i l’estat de connexió de l’API.
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  const ProfileScreen({
+    super.key,
+    this.authApi,
+    this.authSession,
+    this.eventsApi,
+  });
+
+  final AuthApi? authApi;
+  final AuthSessionStore? authSession;
+  final EventsApi? eventsApi;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final EventsApi _api = EventsApi();
-  final AuthApi _authApi = AuthApi();
-  final AuthSession _authSession = AuthSession();
+  late final EventsApi _api = widget.eventsApi ?? EventsApi();
+  late final AuthApi _authApi = widget.authApi ?? AuthApi();
+  late final AuthSessionStore _authSession =
+      widget.authSession ?? AuthSession();
   ApiHealth? _health;
   AuthenticatedProfile? _profile;
   String? _token;
@@ -27,6 +39,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _loading = true;
   bool _profileLoading = true;
   bool _loggingOut = false;
+  bool _logoutDialogOpen = false;
+  int _accountRequestId = 0;
 
   @override
   void initState() {
@@ -36,6 +50,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadAccount() async {
+    final requestId = ++_accountRequestId;
     if (mounted) {
       setState(() {
         _profileLoading = true;
@@ -44,8 +59,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
     try {
       final token = await _authSession.readToken();
+      if (!mounted || requestId != _accountRequestId) return;
       if (token == null) {
-        if (!mounted) return;
         setState(() {
           _token = null;
           _profile = null;
@@ -53,24 +68,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
         return;
       }
+      setState(() => _token = token);
       final profile = await _authApi.fetchProfile(token);
-      if (!mounted) return;
+      if (!mounted || requestId != _accountRequestId) return;
       setState(() {
         _token = token;
         _profile = profile;
         _profileLoading = false;
       });
     } on AuthApiException catch (error) {
-      if (!mounted) return;
+      if (!mounted || requestId != _accountRequestId) return;
       if (error.statusCode == 401) {
-        await _authSession.clear();
-        if (!mounted) return;
-        setState(() {
-          _token = null;
-          _profile = null;
-          _profileError = 'La sessió ha caducat. Inicia sessió de nou.';
-          _profileLoading = false;
-        });
+        await _expireSession(_token);
         return;
       }
       setState(() {
@@ -78,7 +87,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _profileLoading = false;
       });
     } on Exception {
-      if (!mounted) return;
+      if (!mounted || requestId != _accountRequestId) return;
       setState(() {
         _profileError = 'No s’ha pogut llegir la sessió desada al dispositiu.';
         _profileLoading = false;
@@ -100,10 +109,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (registered == true) await _loadAccount();
   }
 
-  Future<void> _logout() async {
+  Future<void> _openPreferences() async {
     final token = _token;
     if (token == null) return;
+    final updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => PreferencesScreen(
+          authApi: _authApi,
+          token: token,
+          onSessionExpired: () => _expireSession(token),
+        ),
+      ),
+    );
+    if (updated == true && mounted && _token == token) await _loadAccount();
+  }
 
+  Future<void> _expireSession([String? expectedToken]) async {
+    final token = expectedToken ?? _token;
+    if (token == null || _token != token) return;
+    ++_accountRequestId;
+    try {
+      if (await _authSession.readToken() == token) {
+        await _authSession.clear();
+      }
+    } on Exception {
+      // The expired account must no longer be visible even if storage fails.
+    }
+    if (!mounted || _token != token) return;
+    setState(() {
+      _token = null;
+      _profile = null;
+      _profileError = 'La sessió ha caducat. Inicia sessió de nou.';
+      _profileLoading = false;
+    });
+  }
+
+  Future<void> _logout() async {
+    final token = _token;
+    if (token == null || _loggingOut || _logoutDialogOpen) return;
+
+    _logoutDialogOpen = true;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -123,46 +168,77 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
     );
+    _logoutDialogOpen = false;
     if (confirmed != true || !mounted) return;
 
+    await _performLogout(token);
+  }
+
+  Future<void> _performLogout(String token) async {
+    if (_loggingOut || _token != token) return;
     setState(() {
       _loggingOut = true;
       _profileError = null;
     });
 
     try {
-      await _authSession.clear();
-    } on Exception {
+      await _authApi.logout(token);
+    } on AuthApiException {
       if (!mounted) return;
-      setState(() {
-        _loggingOut = false;
-        _profileError = 'No s’ha pogut esborrar la sessió d’aquest dispositiu.';
-      });
+      setState(() => _loggingOut = false);
+      final choice = await showDialog<_LogoutFailureChoice>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('No s’ha pogut confirmar el tancament'),
+          content: const Text(
+            'El servidor pot mantenir activa aquesta sessió. Pots reintentar o tancar-la només en aquest dispositiu; en aquest cas el token remot podria continuar vàlid fins que caduqui.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, _LogoutFailureChoice.cancel),
+              child: const Text('Mantén la sessió'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, _LogoutFailureChoice.retry),
+              child: const Text('Reintenta'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, _LogoutFailureChoice.local),
+              child: const Text('Tanca només aquí'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      if (choice == _LogoutFailureChoice.retry) {
+        await _performLogout(token);
+      } else if (choice == _LogoutFailureChoice.local) {
+        await _clearLocalSession(token);
+      }
       return;
     }
 
-    if (!mounted) return;
+    if (mounted) await _clearLocalSession(token);
+  }
+
+  Future<void> _clearLocalSession(String token) async {
+    ++_accountRequestId;
+    String? errorMessage;
+    try {
+      if (await _authSession.readToken() == token) {
+        await _authSession.clear();
+      }
+    } on Exception {
+      errorMessage = 'No s’ha pogut esborrar la sessió desada al dispositiu.';
+    }
+    if (!mounted || _token != token) return;
     setState(() {
       _token = null;
       _profile = null;
-      _profileLoading = true;
+      _profileLoading = false;
+      _loggingOut = false;
+      _profileError = errorMessage;
     });
-
-    String? notice;
-    try {
-      await _authApi.logout(token);
-    } on AuthApiException {
-      notice = 'La sessió s’ha esborrat d’aquest dispositiu, però no s’ha pogut confirmar el tancament amb el servidor.';
-    } on Exception {
-      notice = 'La sessió s’ha esborrat d’aquest dispositiu, però no s’ha pogut contactar amb el servidor.';
-    }
-
-    if (!mounted) return;
-    setState(() => _profileLoading = false);
-    final loggedIn = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(builder: (_) => LoginScreen(notice: notice)),
-    );
-    if (loggedIn == true) await _loadAccount();
   }
 
   Future<void> _editUsername() async {
@@ -174,12 +250,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       builder: (_) => _EditUsernameDialog(
         username: profile.username,
+        onSessionExpired: () => _expireSession(token),
         onSave: (username) =>
             _authApi.updateProfile(token: token, username: username),
       ),
     );
 
-    if (updatedProfile != null && mounted) {
+    if (updatedProfile != null && mounted && _token == token) {
       setState(() {
         _profile = updatedProfile;
         _profileError = null;
@@ -311,6 +388,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     : 'Preferències: ${profile.preferences.join(', ')}',
                 style: TextStyle(color: CaliuColors.textMuted),
               ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _openPreferences,
+                icon: const Icon(Icons.tune),
+                label: const Text('Edita les preferències'),
+              ),
               if (_profileError case final error?) ...[
                 const SizedBox(height: 12),
                 Text(error, style: const TextStyle(color: CaliuColors.red)),
@@ -375,11 +458,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
+enum _LogoutFailureChoice { cancel, retry, local }
+
 class _EditUsernameDialog extends StatefulWidget {
-  const _EditUsernameDialog({required this.username, required this.onSave});
+  const _EditUsernameDialog({
+    required this.username,
+    required this.onSave,
+    required this.onSessionExpired,
+  });
 
   final String username;
   final Future<AuthenticatedProfile> Function(String username) onSave;
+  final VoidCallback onSessionExpired;
 
   @override
   State<_EditUsernameDialog> createState() => _EditUsernameDialogState();
@@ -415,6 +505,11 @@ class _EditUsernameDialogState extends State<_EditUsernameDialog> {
       if (mounted) Navigator.pop(context, updated);
     } on AuthApiException catch (error) {
       if (!mounted) return;
+      if (error.statusCode == 401) {
+        widget.onSessionExpired();
+        Navigator.of(context).pop();
+        return;
+      }
       setState(() {
         _saving = false;
         _errorMessage = error.message;
@@ -442,21 +537,13 @@ class _EditUsernameDialogState extends State<_EditUsernameDialog> {
             TextFormField(
               controller: _controller,
               autofocus: true,
-              maxLength: 30,
               textInputAction: TextInputAction.done,
               onFieldSubmitted: (_) => _saving ? null : _save(),
               decoration: const InputDecoration(
                 labelText: 'Nom d’usuari',
                 border: OutlineInputBorder(),
               ),
-              validator: (value) {
-                final username = value?.trim() ?? '';
-                if (username.isEmpty) {
-                  return 'El nom d’usuari és obligatori.';
-                }
-                if (username.length > 30) return 'Màxim 30 caràcters.';
-                return null;
-              },
+              validator: AuthValidators.username,
             ),
             if (_errorMessage case final message?) ...[
               const SizedBox(height: 8),

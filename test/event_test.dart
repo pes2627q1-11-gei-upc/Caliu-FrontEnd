@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:caliu/data/auth_api.dart';
 import 'package:caliu/data/event.dart';
 import 'package:caliu/data/event_query.dart';
@@ -6,242 +8,241 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+const _user = {
+  'id': '507f1f77bcf86cd799439011',
+  'username': 'marc',
+  'email': 'marc@example.com',
+  'preferences': <String>['Música'],
+};
+
+String _authBody() => jsonEncode({
+  'user': _user,
+  'token': 'jwt-token',
+  'tokenType': 'Bearer',
+  'expiresIn': 3600,
+});
+
+String _userBody({String username = 'marc'}) => jsonEncode({
+  ..._user,
+  'username': username,
+});
+
 void main() {
-  group('AuthApi.register', () {
-    test(
-      'envia les credencials i interpreta la resposta del backend',
-      () async {
-        final client = MockClient((request) async {
-          expect(request.method, 'POST');
-          expect(request.url.path, '/auth/register');
-          expect(request.headers['content-type'], 'application/json');
-          expect(
-            request.body,
-            '{"username":"marc","email":"marc@example.com","password":"contrasenya-segura"}',
-          );
-          return http.Response(
-            '{"token":"jwt-token","profile":{"username":"marc","email":"marc@example.com"}}',
-            201,
-            headers: {'content-type': 'application/json'},
-          );
-        });
-        final api = AuthApi(client: client, baseUrl: 'http://localhost:3000');
-
-        final result = await api.register(
-          username: ' marc ',
-          email: 'marc@example.com',
-          password: 'contrasenya-segura',
-        );
-
-        expect(result.token, 'jwt-token');
-        expect(result.username, 'marc');
-        expect(result.email, 'marc@example.com');
-      },
-    );
-
-    test('explica quan el nom o el correu ja estan en ús', () async {
+  group('AuthApi registre i login', () {
+    test('el registre envia els tres camps i processa user/token', () async {
       final client = MockClient((request) async {
-        return http.Response('{"error":"Username o email ja està en ús"}', 409);
+        expect(request.method, 'POST');
+        expect(request.url.path, '/auth/register');
+        expect(request.headers['content-type'], 'application/json');
+        expect(jsonDecode(request.body), {
+          'username': 'marc',
+          'email': 'marc@example.com',
+          'password': 'contrasenya-segura',
+        });
+        return http.Response(_authBody(), 201);
       });
       final api = AuthApi(client: client, baseUrl: 'http://localhost:3000');
 
-      await expectLater(
-        api.register(
-          username: 'marc',
-          email: 'marc@example.com',
-          password: 'contrasenya-segura',
-        ),
-        throwsA(
-          isA<AuthApiException>().having(
-            (error) => error.message,
-            'message',
-            'Aquest correu electrònic o nom d’usuari ja està en ús.',
-          ),
-        ),
+      final result = await api.register(
+        username: ' marc ',
+        email: 'marc@example.com',
+        password: 'contrasenya-segura',
       );
+
+      expect(result.token, 'jwt-token');
+      expect(result.user.id, _user['id']);
+      expect(result.user.username, 'marc');
+      expect(result.user.preferences, ['Música']);
     });
 
-    group('AuthApi.login', () {
-      test('envia email i contrasenya i retorna el token de sessió', () async {
-        final client = MockClient((request) async {
-          expect(request.method, 'POST');
-          expect(request.url.path, '/auth/login');
-          expect(
-            request.body,
-            '{"email":"marc@example.com","password":"contrasenya-segura"}',
-          );
-          return http.Response(
-            '{"token":"jwt-token","profile":{"username":"marc","email":"marc@example.com"}}',
-            200,
-          );
+    test('el login processa el mateix esquema d’autenticació', () async {
+      final client = MockClient((request) async {
+        expect(request.method, 'POST');
+        expect(request.url.path, '/auth/login');
+        expect(jsonDecode(request.body), {
+          'email': 'marc@example.com',
+          'password': 'contrasenya-segura',
         });
-        final api = AuthApi(client: client, baseUrl: 'http://localhost:3000');
-
-        final result = await api.login(
-          email: ' marc@example.com ',
-          password: 'contrasenya-segura',
-        );
-
-        expect(result.token, 'jwt-token');
-        expect(result.username, 'marc');
+        return http.Response(_authBody(), 200);
       });
+      final api = AuthApi(client: client, baseUrl: 'http://localhost:3000');
 
-      test(
-        'retorna un error clar quan les credencials són incorrectes',
-        () async {
-          final client = MockClient((request) async {
-            return http.Response('{"error":"Credencials incorrectes"}', 401);
-          });
-          final api = AuthApi(client: client, baseUrl: 'http://localhost:3000');
-
-          await expectLater(
-            api.login(
-              email: 'marc@example.com',
-              password: 'contrasenya-segura',
-            ),
-            throwsA(
-              isA<AuthApiException>()
-                  .having((error) => error.statusCode, 'statusCode', 401)
-                  .having(
-                    (error) => error.message,
-                    'message',
-                    'Credencials incorrectes',
-                  ),
-            ),
-          );
-        },
+      final result = await api.login(
+        email: ' marc@example.com ',
+        password: 'contrasenya-segura',
       );
+
+      expect(result.token, 'jwt-token');
+      expect(result.user.username, 'marc');
     });
 
-    group('AuthApi.fetchProfile', () {
-      test(
-        'envia el token i retorna les dades del perfil autenticat',
-        () async {
-          final client = MockClient((request) async {
-            expect(request.method, 'GET');
-            expect(request.url.path, '/profile');
-            expect(request.headers['authorization'], 'Bearer jwt-token');
-            return http.Response(
-              '{"id":"user-id","username":"marc","email":"marc@example.com","preferences":["Música"]}',
-              200,
-            );
-          });
-          final api = AuthApi(client: client, baseUrl: 'http://localhost:3000');
-
-          final profile = await api.fetchProfile('jwt-token');
-
-          expect(profile.id, 'user-id');
-          expect(profile.username, 'marc');
-          expect(profile.preferences, ['Música']);
-        },
-      );
-
-      test('rebutja el perfil si el token no és vàlid', () async {
-        final client = MockClient((request) async {
-          return http.Response('{"error":"Token absent o invàlid"}', 401);
-        });
-        final api = AuthApi(client: client, baseUrl: 'http://localhost:3000');
-
+    test('rebutja respostes d’autenticació incompletes o malformades', () async {
+      for (final body in [
+        '{"token":"jwt-token","profile":{}}',
+        '{"user":{},"token":"jwt-token","tokenType":"Bearer","expiresIn":3600}',
+        'no és json',
+      ]) {
+        final api = AuthApi(
+          client: MockClient((_) async => http.Response(body, 200)),
+          baseUrl: 'http://localhost:3000',
+        );
         await expectLater(
-          api.fetchProfile('invalid-token'),
+          api.login(email: 'marc@example.com', password: 'contrasenya-segura'),
+          throwsA(isA<AuthApiException>()),
+        );
+      }
+    });
+
+    test('gestiona explícitament els errors HTTP del backend', () async {
+      for (final status in [400, 401, 409, 429, 500]) {
+        final api = AuthApi(
+          client: MockClient(
+            (_) async => http.Response('{"error":"detall públic"}', status),
+          ),
+          baseUrl: 'http://localhost:3000',
+        );
+        await expectLater(
+          api.login(email: 'marc@example.com', password: 'contrasenya-segura'),
           throwsA(
             isA<AuthApiException>().having(
               (error) => error.statusCode,
               'statusCode',
-              401,
+              status,
             ),
           ),
         );
-      });
+      }
     });
 
-    group('AuthApi.updateProfile', () {
-      test('actualitza el username amb Bearer token', () async {
-        final client = MockClient((request) async {
-          expect(request.method, 'PATCH');
-          expect(request.url.path, '/profile');
-          expect(request.headers['authorization'], 'Bearer jwt-token');
-          expect(request.body, '{"username":"marc nou"}');
-          return http.Response(
-            '{"id":"user-id","username":"marc nou","email":"marc@example.com","preferences":[]}',
-            200,
-          );
-        });
-        final api = AuthApi(client: client, baseUrl: 'http://localhost:3000');
-
-        final profile = await api.updateProfile(
-          token: 'jwt-token',
-          username: ' marc nou ',
-        );
-
-        expect(profile.username, 'marc nou');
-        expect(profile.email, 'marc@example.com');
-      });
-
-      test('informa si el username ja està en ús', () async {
-        final client = MockClient((request) async {
-          return http.Response('{"error":"Username ja està en ús"}', 409);
-        });
-        final api = AuthApi(client: client, baseUrl: 'http://localhost:3000');
-
-        await expectLater(
-          api.updateProfile(token: 'jwt-token', username: 'existent'),
-          throwsA(
-            isA<AuthApiException>()
-                .having((error) => error.statusCode, 'statusCode', 409)
-                .having(
-                  (error) => error.message,
-                  'message',
-                  'Aquest nom d’usuari ja està en ús.',
-                ),
-          ),
-        );
-      });
-    });
-
-    test('mostra el detall de validació retornat pel backend', () async {
-      final client = MockClient((request) async {
-        return http.Response('{"error":"email no és vàlid"}', 400);
-      });
-      final api = AuthApi(client: client, baseUrl: 'http://localhost:3000');
-
+    test('no exposa detalls de connexió si la xarxa falla', () async {
+      final api = AuthApi(
+        client: MockClient((_) async => throw Exception('secret socket data')),
+        baseUrl: 'http://localhost:3000',
+      );
       await expectLater(
-        api.register(
-          username: 'marc',
-          email: 'incorrecte',
-          password: 'contrasenya-segura',
-        ),
+        api.login(email: 'marc@example.com', password: 'contrasenya-segura'),
         throwsA(
           isA<AuthApiException>().having(
             (error) => error.message,
             'message',
-            'email no és vàlid',
+            isNot(contains('secret socket data')),
           ),
         ),
       );
     });
   });
 
+  group('AuthApi perfil i preferències', () {
+    test('GET /users/me envia Bearer i parseja el perfil', () async {
+      final client = MockClient((request) async {
+        expect(request.method, 'GET');
+        expect(request.url.path, '/users/me');
+        expect(request.headers['authorization'], 'Bearer jwt-token');
+        return http.Response(_userBody(), 200);
+      });
+      final profile = await AuthApi(
+        client: client,
+        baseUrl: 'http://localhost:3000',
+      ).fetchProfile('jwt-token');
+      expect(profile.email, 'marc@example.com');
+    });
+
+    test('PATCH /users/me actualitza username amb Bearer', () async {
+      final client = MockClient((request) async {
+        expect(request.method, 'PATCH');
+        expect(request.url.path, '/users/me');
+        expect(request.headers['authorization'], 'Bearer jwt-token');
+        expect(jsonDecode(request.body), {'username': 'marc_nou'});
+        return http.Response(_userBody(username: 'marc_nou'), 200);
+      });
+      final profile = await AuthApi(
+        client: client,
+        baseUrl: 'http://localhost:3000',
+      ).updateProfile(token: 'jwt-token', username: ' marc_nou ');
+      expect(profile.username, 'marc_nou');
+    });
+
+    test('consulta preferències actuals', () async {
+      final client = MockClient((request) async {
+        expect(request.url.path, '/users/me/preferences');
+        expect(request.headers['authorization'], 'Bearer jwt-token');
+        return http.Response('{"preferences":["Música","Teatre"]}', 200);
+      });
+      final preferences = await AuthApi(
+        client: client,
+        baseUrl: 'http://localhost:3000',
+      ).fetchPreferences('jwt-token');
+      expect(preferences, ['Música', 'Teatre']);
+    });
+
+    test('substitueix preferències i permet una llista buida', () async {
+      final client = MockClient((request) async {
+        expect(request.method, 'PUT');
+        expect(request.url.path, '/users/me/preferences');
+        expect(request.headers['authorization'], 'Bearer jwt-token');
+        expect(jsonDecode(request.body), {'preferences': <String>[]});
+        return http.Response('{"preferences":[]}', 200);
+      });
+      final preferences = await AuthApi(
+        client: client,
+        baseUrl: 'http://localhost:3000',
+      ).updatePreferences(token: 'jwt-token', preferences: []);
+      expect(preferences, isEmpty);
+    });
+
+    test('categories provenen de GET /events/categories', () async {
+      final client = MockClient((request) async {
+        expect(request.method, 'GET');
+        expect(request.url.path, '/events/categories');
+        return http.Response('{"categories":["Música","Teatre"]}', 200);
+      });
+      final categories = await AuthApi(
+        client: client,
+        baseUrl: 'http://localhost:3000',
+      ).fetchCategories();
+      expect(categories, ['Música', 'Teatre']);
+    });
+  });
+
   group('AuthApi.logout', () {
-    test('revoca la sessió actual amb el token Bearer', () async {
+    test('accepta 204 amb cos buit i només envia el token actual', () async {
       final client = MockClient((request) async {
         expect(request.method, 'POST');
         expect(request.url.path, '/auth/logout');
         expect(request.headers['authorization'], 'Bearer jwt-token');
         return http.Response('', 204);
       });
-      final api = AuthApi(client: client, baseUrl: 'http://localhost:3000');
-
-      await expectLater(api.logout('jwt-token'), completes);
+      await expectLater(
+        AuthApi(client: client, baseUrl: 'http://localhost:3000').logout(
+          'jwt-token',
+        ),
+        completes,
+      );
     });
 
-    test('considera tancada una sessió ja no vàlida', () async {
-      final client = MockClient((request) async {
-        return http.Response('{"error":"Sessió no vàlida"}', 401);
-      });
-      final api = AuthApi(client: client, baseUrl: 'http://localhost:3000');
-
+    test('considera revocada una sessió que ja retorna 401', () async {
+      final api = AuthApi(
+        client: MockClient((_) async => http.Response('', 401)),
+        baseUrl: 'http://localhost:3000',
+      );
       await expectLater(api.logout('expired-token'), completes);
+    });
+
+    test('informa errors de xarxa sense revelar-ne els detalls', () async {
+      final api = AuthApi(
+        client: MockClient((_) async => throw Exception('internal detail')),
+        baseUrl: 'http://localhost:3000',
+      );
+      await expectLater(
+        api.logout('jwt-token'),
+        throwsA(
+          isA<AuthApiException>().having(
+            (error) => error.message,
+            'message',
+            isNot(contains('internal detail')),
+          ),
+        ),
+      );
     });
   });
 

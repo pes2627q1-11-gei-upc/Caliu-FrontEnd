@@ -2,25 +2,27 @@ import 'package:flutter/material.dart';
 
 import 'data/auth_api.dart';
 import 'data/auth_session.dart';
+import 'data/auth_validators.dart';
 import 'theme/caliu_colors.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, this.notice});
+  const LoginScreen({super.key, this.notice, this.authApi, this.authSession});
 
   final String? notice;
+  final AuthApi? authApi;
+  final AuthSessionStore? authSession;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  static final RegExp _emailPattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
-
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _authApi = AuthApi();
-  final _authSession = AuthSession();
+  late final AuthApi _authApi = widget.authApi ?? AuthApi();
+  late final AuthSessionStore _authSession =
+      widget.authSession ?? AuthSession();
 
   bool _isSubmitting = false;
   bool _obscurePassword = true;
@@ -34,6 +36,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _login() async {
+    if (_isSubmitting) return;
     if (!_formKey.currentState!.validate()) return;
     setState(() {
       _isSubmitting = true;
@@ -107,23 +110,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
                         textInputAction: TextInputAction.next,
-                        maxLength: 254,
                         decoration: const InputDecoration(
                           labelText: 'Correu electrònic',
                           prefixIcon: Icon(Icons.email_outlined),
                           border: OutlineInputBorder(),
                         ),
-                        validator: (value) {
-                          final email = value?.trim() ?? '';
-                          if (email.isEmpty) {
-                            return 'El correu electrònic és obligatori.';
-                          }
-                          if (email.length > 254 ||
-                              !_emailPattern.hasMatch(email)) {
-                            return 'Introdueix un correu electrònic vàlid.';
-                          }
-                          return null;
-                        },
+                        validator: AuthValidators.email,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -132,7 +124,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         textInputAction: TextInputAction.done,
                         onFieldSubmitted: (_) =>
                             _isSubmitting ? null : _login(),
-                        maxLength: 128,
                         decoration: InputDecoration(
                           labelText: 'Contrasenya',
                           prefixIcon: const Icon(Icons.lock_outline),
@@ -151,13 +142,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                         ),
-                        validator: (value) {
-                          final password = value ?? '';
-                          if (password.length < 8 || password.length > 128) {
-                            return 'La contrasenya ha de tenir entre 8 i 128 caràcters.';
-                          }
-                          return null;
-                        },
+                        validator: AuthValidators.password,
                       ),
                       if (_errorMessage case final message?) ...[
                         const SizedBox(height: 16),

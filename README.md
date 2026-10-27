@@ -19,7 +19,7 @@ App mòbil **Flutter** de **Caliu**: mapa i agenda d’esdeveniments culturals a
   <a href="docs/sprint-1.md"><b>Sprint 1</b></a> ·
   <a href="CONTRIBUTING.md"><b>Contribuir</b></a> ·
   <a href="https://github.com/pes2627q1-11-gei-upc/Caliu-Backend"><b>Backend</b></a> ·
-  <a href="https://github.com/pes2627q1-11-gei-upc/Caliu-Backend/blob/main/docs/openapi.yaml"><b>OpenAPI</b></a>
+  <a href="https://github.com/pes2627q1-11-gei-upc/Caliu-Backend/blob/development/docs/openapi.yaml"><b>OpenAPI</b></a>
 </p>
 
 ## Què fa
@@ -64,6 +64,10 @@ MAPS_API_KEY=la_teva_clau_aqui
 ## Backend local
 
 Cal el repo [Caliu-Backend](https://github.com/pes2627q1-11-gei-upc/Caliu-Backend) amb `.env` (copieu `.env.example` allà).
+
+Per al flux d'usuaris de Sprint 1, utilitza la branca `development` del backend
+i el desplegament de Render corresponent. El contracte actualitzat és a
+[`docs/openapi.yaml` de `development`](https://github.com/pes2627q1-11-gei-upc/Caliu-Backend/blob/development/docs/openapi.yaml).
 
 ```powershell
 cd Caliu-Backend
@@ -118,6 +122,15 @@ Més detall: [docs/onboarding.md](docs/onboarding.md).
 | Enllaços | `url_launcher` |
 | API | Caliu-Backend (`GET /events`, …) |
 
+### Compte i preferències
+
+- El registre (`POST /auth/register`) crea el compte i retorna `{ user, token, tokenType, expiresIn }`; l'app desa el JWT amb `flutter_secure_storage` i entra al perfil sense un segon login.
+- L'inici de sessió usa `POST /auth/login` amb email i contrasenya. En reiniciar l'app, es recupera el token segur i es consulta `GET /users/me`.
+- El perfil es consulta i modifica amb `GET /users/me` i `PATCH /users/me` (només username). No s'utilitza cap ruta `/profile`.
+- Les preferències es consulten i substitueixen amb `GET`/`PUT /users/me/preferences`; el selector obté el catàleg de `GET /events/categories`.
+- El logout envia `POST /auth/logout` amb el token actual i després l'elimina del dispositiu. Si no hi ha connexió, es pot reintentar o tancar només localment; aquesta segona opció no confirma la revocació remota.
+- Totes les peticions autenticades envien `Authorization: Bearer <token>`. Per ús públic, configura una URL HTTPS.
+
 ## Estructura (`lib/`)
 
 ```
@@ -146,15 +159,21 @@ lib/
 | Registre, inici de sessió i perfil | Formularis, sessió JWT segura, consulta/edició del perfil i tancament de sessió |
 | Desplegament públic + APK release | API a Render; APK pendents de compartir |
 
-El nom d’usuari és únic (el backend respon `409` si ja està en ús) i es pot
-editar des del perfil. La foto no forma part dels camps editables del contracte
-actual de `PATCH /profile`.
+El nom d’usuari és únic sense distingir majúscules (el backend respon `409` si
+ja està en ús) i es pot editar des del perfil. Les preferències només poden
+incloure categories del catàleg del backend. La foto i el correu no formen part
+dels camps editables de `PATCH /users/me`.
+
+Les validacions del client exigeixen usernames de 3–30 caràcters Unicode i
+contrasenyes d'almenys 8 caràcters Unicode, fins a 72 bytes UTF-8, sense controls
+ni valor buit o només d'espais. El servidor continua sent qui valida la
+unicitat i el contracte final.
 
 ## Com treballem
 
 - Canvis via **pull request** a `main`
 - Commits preferiblement en [Conventional Commits](https://www.conventionalcommits.org/) amb referència Taiga, p. ex. `feat(map): markers des de l’API` + `Refs: #85`
-- Contracte API: no inventar camps; seguir [`docs/openapi.yaml`](https://github.com/pes2627q1-11-gei-upc/Caliu-Backend/blob/main/docs/openapi.yaml) del backend
+- Contracte API: no inventar camps; seguir [`docs/openapi.yaml` de `development`](https://github.com/pes2627q1-11-gei-upc/Caliu-Backend/blob/development/docs/openapi.yaml)
 
 ## Equip
 

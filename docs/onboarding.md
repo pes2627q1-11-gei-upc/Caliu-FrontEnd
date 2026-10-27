@@ -7,6 +7,10 @@
 - Backend local ([Caliu-Backend](https://github.com/pes2627q1-11-gei-upc/Caliu-Backend)) amb Docker
 - Per mòbil físic: cable USB + depuració USB (`adb devices`)
 
+Per provar registre, login, perfil i preferències de Sprint 1, fes servir la
+branca `development` de Caliu-Backend i el desplegament de Render corresponent.
+Consulta el contracte a [`docs/openapi.yaml` de `development`](https://github.com/pes2627q1-11-gei-upc/Caliu-Backend/blob/development/docs/openapi.yaml).
+
 ## Passos
 
 ```powershell
@@ -72,10 +76,19 @@ Comprova: https://caliu-api.onrender.com/health
 
 ## Proves ràpides
 
+- Registre amb username, email i contrasenya: en acabar, el perfil ha d'aparèixer autenticat sense un segon login.
+- Tanca i torna a obrir l'app: el JWT es recupera de l'emmagatzematge segur i es consulta `GET /users/me`.
+- Edita username i preferències; aquestes últimes es carreguen des de `GET /events/categories`.
+- Tanca la sessió i comprova que el perfil desapareix. El logout remot revoca només el token actual.
 - Mapa amb pins (permisos d’ubicació)
 - Obrir una fitxa des d’un pin
 - Cerca per text (p. ex. un municipi o títol)
 - Si hi ha `url`, el botó de web oficial obre el navegador
+
+Les crides autenticades utilitzen `Authorization: Bearer <token>`. El token es
+desa només amb `flutter_secure_storage`; el client no persisteix contrasenyes.
+En un error de xarxa durant el logout, reintenta'l per confirmar la revocació o
+tria explícitament tancar només al dispositiu.
 
 ## Més
 
