@@ -46,8 +46,8 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       ]);
       if (!mounted) return;
       setState(() {
-        _categories = results[0] as List<String>;
-        _selected = (results[1] as List<String>).toSet();
+        _categories = results[0];
+        _selected = results[1].toSet();
         _loading = false;
       });
     } on AuthApiException catch (error) {
@@ -64,8 +64,7 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     } on Exception {
       if (!mounted) return;
       setState(() {
-        _errorMessage =
-            'No s’han pogut carregar les categories o preferències. Torna-ho a provar.';
+        _errorMessage = 'No s’han pogut carregar les categories o preferències. Torna-ho a provar.';
         _loading = false;
       });
     }
@@ -99,7 +98,8 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
       if (!mounted) return;
       setState(() {
         _saving = false;
-        _errorMessage = 'No s’han pogut desar les preferències. Torna-ho a provar.';
+        _errorMessage =
+            'No s’han pogut desar les preferències. Torna-ho a provar.';
       });
     }
   }
@@ -160,10 +160,11 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
                     children: [
                       Text(
                         'Tria les categories que t’interessen',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: CaliuColors.maroon,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              color: CaliuColors.maroon,
+                              fontWeight: FontWeight.w600,
+                            ),
                       ),
                       const SizedBox(height: 16),
                       Wrap(

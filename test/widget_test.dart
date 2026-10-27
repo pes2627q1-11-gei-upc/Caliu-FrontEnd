@@ -9,17 +9,13 @@ import 'package:caliu/register_screen.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
-const _profile = {
-  'id': 'test-user-id',
-  'username': 'Nuria_42',
-  'email': 'nuria@example.cat',
-  'preferences': <String>['Música'],
-};
-
 String _authResponse() =>
     '{"user":${_profileJson()},"token":"test-token","tokenType":"Bearer","expiresIn":3600}';
 
-String _profileJson({String username = 'Nuria_42', List<String>? preferences}) =>
+String _profileJson({
+  String username = 'Nuria_42',
+  List<String>? preferences,
+}) =>
     '{"id":"test-user-id","username":"$username","email":"nuria@example.cat","preferences":${_listJson(preferences ?? ['Música'])}}';
 
 String _listJson(List<String> values) =>
@@ -76,10 +72,8 @@ void main() {
                 onPressed: () => Navigator.push<bool>(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => RegisterScreen(
-                      authApi: api,
-                      authSession: session,
-                    ),
+                    builder: (_) =>
+                        RegisterScreen(authApi: api, authSession: session),
                   ),
                 ),
                 child: const Text('Obre registre'),
@@ -99,7 +93,7 @@ void main() {
     );
     await tester.enterText(find.byType(TextFormField).at(2), 'Exemple42');
     await tester.enterText(find.byType(TextFormField).at(3), 'Exemple42');
-    await tester.tap(find.text('Crear compte'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Crear compte'));
     await tester.pumpAndSettle();
 
     expect(session.token, 'test-token');
@@ -124,10 +118,8 @@ void main() {
                 onPressed: () => Navigator.push<bool>(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => LoginScreen(
-                      authApi: api,
-                      authSession: session,
-                    ),
+                    builder: (_) =>
+                        LoginScreen(authApi: api, authSession: session),
                   ),
                 ),
                 child: const Text('Obre login'),
@@ -140,9 +132,12 @@ void main() {
 
     await tester.tap(find.text('Obre login'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextFormField).at(0), 'nuria@example.cat');
+    await tester.enterText(
+      find.byType(TextFormField).at(0),
+      'nuria@example.cat',
+    );
     await tester.enterText(find.byType(TextFormField).at(1), 'Exemple42');
-    await tester.tap(find.text('Inicia sessió'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Inicia sessió'));
     await tester.pumpAndSettle();
 
     expect(session.token, 'test-token');
@@ -172,7 +167,10 @@ void main() {
         }
         if (request.url.path == '/users/me/preferences' &&
             request.method == 'GET') {
-          return http.Response('{"preferences":${_listJson(preferences)}}', 200);
+          return http.Response(
+            '{"preferences":${_listJson(preferences)}}',
+            200,
+          );
         }
         if (request.url.path == '/users/me/preferences' &&
             request.method == 'PUT') {
@@ -256,7 +254,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(session.token, isNull);
-    expect(find.text('La sessió ha caducat. Inicia sessió de nou.'), findsOneWidget);
+    expect(
+      find.text('La sessió ha caducat. Inicia sessió de nou.'),
+      findsOneWidget,
+    );
     expect(find.text('Accedeix al teu compte'), findsOneWidget);
   });
 }

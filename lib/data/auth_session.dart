@@ -13,10 +13,13 @@ class AuthSession implements AuthSessionStore {
   static const _tokenKey = 'auth_token';
   final FlutterSecureStorage _storage;
 
+  @override
   Future<String?> readToken() => _storage.read(key: _tokenKey);
 
+  @override
   Future<void> saveToken(String token) =>
       _storage.write(key: _tokenKey, value: token);
 
+  @override
   Future<void> clear() => _storage.delete(key: _tokenKey);
 }
