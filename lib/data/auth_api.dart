@@ -79,7 +79,7 @@ class AuthApi {
       response,
       201,
       'No s’ha pogut crear el compte.',
-      conflictMessage: 'Aquest correu electrònic ja està en ús.',
+      conflictMessage: 'Aquest correu electrònic o nom d’usuari ja està en ús.',
     );
 
     final result = await login(email: trimmedEmail, password: password);
