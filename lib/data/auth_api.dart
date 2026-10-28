@@ -24,6 +24,7 @@ class AuthenticatedProfile {
   });
 
   final String id;
+
   /// Pot ser null just després del registre (abans del PATCH /users/me).
   final String? username;
   final String email;
@@ -63,8 +64,7 @@ class AuthApi {
   final http.Client _client;
   final String _baseUrl;
 
-  /// Contracte OpenAPI: register només email+password (sense token).
-  /// Després fa login i, si hi ha username, PATCH /users/me.
+  /// El registre crea el compte, la sessió i retorna el perfil autenticat.
   Future<AuthResult> register({
     required String username,
     required String email,
@@ -72,6 +72,7 @@ class AuthApi {
   }) async {
     final trimmedEmail = email.trim();
     final response = await _sendCredentials('/auth/register', {
+      'username': username.trim(),
       'email': trimmedEmail,
       'password': password,
     });
@@ -82,15 +83,7 @@ class AuthApi {
       conflictMessage: 'Aquest correu electrònic o nom d’usuari ja està en ús.',
     );
 
-    final result = await login(email: trimmedEmail, password: password);
-    final trimmedUsername = username.trim();
-    if (trimmedUsername.isEmpty) return result;
-
-    final user = await updateProfile(
-      token: result.token,
-      username: trimmedUsername,
-    );
-    return AuthResult(user: user, token: result.token);
+    return _parseAuthResponse(response, expectedStatus: 201);
   }
 
   Future<AuthResult> login({
@@ -123,16 +116,8 @@ class AuthApi {
           headers: headers,
           body: body == null ? null : jsonEncode(body),
         ),
-        'PATCH' => _client.patch(
-          uri,
-          headers: headers,
-          body: jsonEncode(body),
-        ),
-        'PUT' => _client.put(
-          uri,
-          headers: headers,
-          body: jsonEncode(body),
-        ),
+        'PATCH' => _client.patch(uri, headers: headers, body: jsonEncode(body)),
+        'PUT' => _client.put(uri, headers: headers, body: jsonEncode(body)),
         _ => throw StateError('Mètode HTTP no admès'),
       };
       return await request.timeout(const Duration(seconds: 15));
@@ -210,11 +195,7 @@ class AuthApi {
   }
 
   Future<List<String>> fetchPreferences(String token) async {
-    final response = await _send(
-      'GET',
-      '/users/me/preferences',
-      token: token,
-    );
+    final response = await _send('GET', '/users/me/preferences', token: token);
     _requireSuccess(response, 200, 'No s’han pogut carregar les preferències.');
     return _parseStringList(_decode(response), 'preferences');
   }
@@ -272,11 +253,12 @@ class AuthApi {
     final statusCode = response.statusCode;
     final message = switch (statusCode) {
       400 => _errorMessage(response) ?? 'Revisa les dades introduïdes.',
-      401 => 'La sessió o les credencials no són vàlides. Inicia sessió de nou.',
+      401 =>
+        'La sessió o les credencials no són vàlides. Inicia sessió de nou.',
       409 =>
         _errorMessage(response) ??
-        conflictMessage ??
-        'Aquest nom d’usuari ja està en ús.',
+            conflictMessage ??
+            'Aquest nom d’usuari ja està en ús.',
       429 => 'S’han fet massa intents. Espera una estona i torna-ho a provar.',
       500 => 'El servidor ha tingut un problema. Torna-ho a provar més tard.',
       _ => fallback,

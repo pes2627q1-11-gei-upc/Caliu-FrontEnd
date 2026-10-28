@@ -22,14 +22,12 @@ String _authBody() => jsonEncode({
   'expiresIn': 3600,
 });
 
-String _userBody({String username = 'marc'}) => jsonEncode({
-  ..._user,
-  'username': username,
-});
+String _userBody({String username = 'marc'}) =>
+    jsonEncode({..._user, 'username': username});
 
 void main() {
   group('AuthApi registre i login', () {
-    test('el registre fa register → login → PATCH username', () async {
+    test('el registre envia username i processa la sessió retornada', () async {
       final paths = <String>[];
       final client = MockClient((request) async {
         paths.add('${request.method} ${request.url.path}');
@@ -37,13 +35,11 @@ void main() {
         switch (request.url.path) {
           case '/auth/register':
             expect(jsonDecode(request.body), {
+              'username': 'marc',
               'email': 'marc@example.com',
               'password': 'contrasenya-segura',
             });
-            return http.Response(
-              jsonEncode({'user': {..._user, 'username': null}}),
-              201,
-            );
+            return http.Response(_authBody(), 201);
           case '/auth/login':
             expect(jsonDecode(request.body), {
               'email': 'marc@example.com',
@@ -75,11 +71,7 @@ void main() {
         password: 'contrasenya-segura',
       );
 
-      expect(paths, [
-        'POST /auth/register',
-        'POST /auth/login',
-        'PATCH /users/me',
-      ]);
+      expect(paths, ['POST /auth/register']);
       expect(result.token, 'jwt-token');
       expect(result.user.id, _user['id']);
       expect(result.user.username, 'marc');
@@ -244,9 +236,10 @@ void main() {
         return http.Response('', 204);
       });
       await expectLater(
-        AuthApi(client: client, baseUrl: 'http://localhost:3000').logout(
-          'jwt-token',
-        ),
+        AuthApi(
+          client: client,
+          baseUrl: 'http://localhost:3000',
+        ).logout('jwt-token'),
         completes,
       );
     });
