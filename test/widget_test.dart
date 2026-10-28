@@ -60,10 +60,8 @@ void main() {
         switch (request.url.path) {
           case '/auth/register':
             expect(request.method, 'POST');
-            return http.Response(
-              '{"user":{"id":"test-user-id","username":null,"email":"nuria@example.cat","preferences":[]}}',
-              201,
-            );
+            expect(request.body, contains('"username":"Nuria_42"'));
+            return http.Response(_authResponse(), 201);
           case '/auth/login':
             expect(request.method, 'POST');
             return http.Response(_authResponse(), 200);
