@@ -256,9 +256,9 @@ class AuthApi {
       400 => _errorMessage(response) ?? 'Revisa les dades introduïdes.',
       401 => 'La sessió o les credencials no són vàlides. Inicia sessió de nou.',
       409 =>
-        _errorMessage(response) ??
         conflictMessage ??
-        'Aquest nom d’usuari ja està en ús.',
+        _errorMessage(response) ??
+        'Aquest correu electrònic o nom d’usuari ja està en ús.',
       429 => 'S’han fet massa intents. Espera una estona i torna-ho a provar.',
       500 => 'El servidor ha tingut un problema. Torna-ho a provar més tard.',
       _ => fallback,

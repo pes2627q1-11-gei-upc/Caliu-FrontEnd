@@ -76,6 +76,33 @@ void main() {
       expect(result.user.username, 'marc');
     });
 
+    test('un 409 de registre mostra conflicte i no error de username', () async {
+      final api = AuthApi(
+        client: MockClient(
+          (_) async =>
+              http.Response('{"error":"username no vàlid"}', 409),
+        ),
+        baseUrl: 'http://localhost:3000',
+      );
+
+      await expectLater(
+        api.register(
+          username: 'marc',
+          email: 'existent@example.com',
+          password: 'contrasenya-segura',
+        ),
+        throwsA(
+          isA<AuthApiException>()
+              .having((error) => error.statusCode, 'statusCode', 409)
+              .having(
+                (error) => error.message,
+                'message',
+                'Aquest correu electrònic o nom d’usuari ja està en ús.',
+              ),
+        ),
+      );
+    });
+
     test('rebutja respostes d’autenticació incompletes o malformades', () async {
       for (final body in [
         '{"token":"jwt-token","profile":{}}',
