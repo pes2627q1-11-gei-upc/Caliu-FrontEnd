@@ -171,8 +171,8 @@ unicitat i el contracte final.
 
 ## Com treballem
 
-- Canvis via **pull request** a `main`
-- Commits preferiblement en [Conventional Commits](https://www.conventionalcommits.org/) amb referència Taiga, p. ex. `feat(map): markers des de l’API` + `Refs: #85`
+- Branques `main` / `development` i `feature/<id>-<nom>` → PR (vegeu [CONTRIBUTING.md](CONTRIBUTING.md))
+- Commits: `task #<id>: resum en imperatiu` (≤ 50 caràcters el resum)
 - Contracte API: no inventar camps; seguir [`docs/openapi.yaml` de `development`](https://github.com/pes2627q1-11-gei-upc/Caliu-Backend/blob/development/docs/openapi.yaml)
 
 ## Equip
