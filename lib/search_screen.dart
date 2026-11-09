@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'data/date_range_filter.dart';
 import 'data/event.dart';
 import 'data/event_query.dart';
 import 'data/events_api.dart';
@@ -28,6 +29,7 @@ class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _municipalityController = TextEditingController();
 
   final Set<String> _selectedCategories = {};
+  DateRangeFilter? _dateFilter;
   List<String> _allCategories = [];
 
   List<Event> _results = [];
@@ -68,6 +70,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   EventQuery _buildQuery() {
     final categories = _selectedCategories.toList()..sort();
+    final range = _dateFilter?.rangeFor(DateTime.now());
     return EventQuery(
       q: _searchController.text,
       category: categories.isEmpty ? null : categories.join(','),
@@ -75,6 +78,8 @@ class _SearchScreenState extends State<SearchScreen> {
       municipality: _municipalityController.text,
       lat: widget.lat,
       lng: widget.lng,
+      from: range?.from,
+      to: range?.to,
       limit: 40,
     );
   }
@@ -264,6 +269,46 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  void _selectDateFilter(DateRangeFilter filter) {
+    setState(() {
+      _dateFilter = _dateFilter == filter ? null : filter;
+    });
+    _runSearch();
+  }
+
+  Widget _buildDateChips() {
+    return SizedBox(
+      height: 44,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        children: DateRangeFilter.values.map((filter) {
+          final selected = _dateFilter == filter;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(filter.label),
+              selected: selected,
+              onSelected: _loading ? null : (_) => _selectDateFilter(filter),
+              selectedColor: CaliuColors.red,
+              showCheckmark: false,
+              labelStyle: TextStyle(
+                color: selected ? Colors.white : CaliuColors.maroonDeep,
+                fontWeight: FontWeight.w600,
+              ),
+              backgroundColor: Colors.white,
+              side: BorderSide(
+                color: selected
+                    ? CaliuColors.red
+                    : CaliuColors.maroon.withValues(alpha: 0.3),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   void _openDetail(Event event) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -331,6 +376,7 @@ class _SearchScreenState extends State<SearchScreen> {
               onSubmitted: (_) => _runSearch(),
             ),
           ),
+          _buildDateChips(),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
