@@ -65,15 +65,22 @@ flutter run -d chrome --web-port 5000 --dart-define-from-file=.env
 
 ## 3. Google Maps a web
 
-A web el mapa fa servir la **Maps JavaScript API**, no l'SDK d'Android.
+Fem servir **la mateixa clau que l'app Android** (`MAPS_API_KEY` d'`android/local.properties`). Com a Android, **la clau no es puja mai al repo**:
 
-1. Qui administri el projecte de Google Cloud de l'equip activa la **Maps JavaScript API** i crea una **clau nova per a web** (no cal pagar res més: és el mateix projecte que la clau d'Android).
-2. La restringeix:
-    - *Restriccions d'aplicació* → **Referents HTTP**: `http://localhost:5000/*` i `https://pes2627q1-11-gei-upc.github.io/*`
-    - *Restriccions d'API* → només **Maps JavaScript API**
-3. A `web/index.html` ja hi ha el `<script>` de Maps: cal substituir `MAPS_WEB_API_KEY` per la clau i fer commit.
+- `web/index.html` carrega `web/maps_config.js` (ignorat per Git), que defineix `window.MAPS_API_KEY`, i amb aquesta clau carrega la Maps JavaScript API.
+- **En local**, `scripts/run-web.ps1` genera `maps_config.js` llegint `android/local.properties` i arrenca Chrome al port 5000:
+  ```powershell
+  .\scripts\run-web.ps1
+  .\scripts\run-web.ps1 -NoWebSecurity   # si el backend encara no té CORS
+  ```
+- **Al deploy**, el workflow genera `maps_config.js` a partir del secret de GitHub **`MAPS_API_KEY`**.
 
-> Una clau web sempre és visible (va dins de l'HTML que rep el navegador), així que pujar-la al repo no empitjora res. El que la protegeix és la **restricció per referent**: des d'un altre domini no funciona.
+**Requisits de la clau** (Google Cloud Console → *Credencials*, ho fa qui la va crear):
+- Al projecte hi ha d'estar activada la **Maps JavaScript API**, a més del *Maps SDK for Android*.
+- *Restriccions d'API*: si n'hi ha, cal afegir-hi la **Maps JavaScript API**.
+- *Restriccions d'aplicació*: si està limitada a **apps Android**, a web fallarà (`RefererNotAllowedMapError` / `ApiTargetBlockedMapError`). Una clau només admet un tipus de restricció d'aplicació, així que cal posar-la a **Cap**.
+
+> **Compromís:** al deploy públic la clau és visible a `maps_config.js`. Si està sense restricció d'aplicació, algú la podria copiar i gastar la quota del projecte. Per a un projecte d'assignatura amb poc trànsit és acceptable. L'alternativa segura és una clau web separada restringida per referent HTTP.
 
 ---
 
@@ -146,10 +153,10 @@ flutter build web --release --dart-define-from-file=.env
 
 | # | Qui | Tasca | Estat |
 |---|---|---|---|
-| 1 | Backend | Middleware CORS + tests + `CORS_ORIGINS` a `.env.example`, compose i `docs/deploy.md` | Fet (`feature/web-cors`) |
-| 2 | Admin Render | Afegir `CORS_ORIGINS` a les variables d'entorn de Render | Pendent |
-| 3 | Frontend | `.env.example` + `--dart-define-from-file` | Fet |
-| 4 | Admin Google Cloud | Activar Maps JavaScript API + clau web restringida | Pendent |
-| 5 | Frontend | Substituir `MAPS_WEB_API_KEY` a `web/index.html` | Pendent (falta la clau) |
+| 1 | Backend | Middleware CORS + tests + `CORS_ORIGINS` | PR `feature/web-cors` |
+| 2 | Admin Render | `CORS_ORIGINS` a les variables d'entorn de Render | Pendent |
+| 3 | Frontend | `.env.example` + `--dart-define-from-file` + `scripts/run-web.ps1` | Fet |
+| 4 | Admin Google Cloud | Maps JavaScript API activada + clau sense restricció d'app Android | Pendent |
+| 5 | Admin repo | Secret `MAPS_API_KEY` (*Settings → Secrets and variables → Actions*) | Pendent |
 | 6 | Frontend | Workflow `deploy-web.yml` | Fet |
 | 7 | Admin repo | Activar GitHub Pages (Source: GitHub Actions) | Pendent |

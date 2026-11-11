@@ -33,8 +33,18 @@
   <link rel="manifest" href="manifest.json">
 
   <!-- Google Maps per a Flutter Web (només testing; l'app final és Android).
-       Clau WEB restringida per referent HTTP: localhost:5000 i github.io. Vegeu docs/deploy-web.md. -->
-  <script src="https://maps.googleapis.com/maps/api/js?key=MAPS_WEB_API_KEY"></script>
+       La clau NO és al repo: maps_config.js el genera scripts/run-web.ps1 (des de
+       android/local.properties) o el workflow deploy-web.yml (secret MAPS_API_KEY).
+       Vegeu docs/deploy-web.md. -->
+  <script src="maps_config.js"></script>
+  <script>
+    if (window.MAPS_API_KEY) {
+      document.write('<script src="https://maps.googleapis.com/maps/api/js?key=' +
+        encodeURIComponent(window.MAPS_API_KEY) + '"><\/script>');
+    } else {
+      console.warn('[Caliu] Falta web/maps_config.js: el mapa no es carregarà. Usa scripts/run-web.ps1.');
+    }
+  </script>
 </head>
 <body>
   <!--
