@@ -17,6 +17,9 @@ coverage/
 # ==============================================================================
 .env
 .env.*
+!.env.example
+# Clau de Google Maps per a Flutter Web (generada per scripts/run-web.ps1)
+/web/maps_config.js
 *.jks
 *.keystore
 key.properties

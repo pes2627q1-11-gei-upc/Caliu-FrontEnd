@@ -1,0 +1,53 @@
+# Publica la versió web (NOMÉS per a testing) a GitHub Pages a cada push a main.
+# URL: https://pes2627q1-11-gei-upc.github.io/Caliu-FrontEnd/
+# Requisit: Settings → Pages → Source: GitHub Actions. Vegeu docs/deploy-web.md.
+name: Deploy web (testing)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      # Mateixa clau de Google Maps que l'app Android, guardada com a secret del repo.
+      - name: Genera web/maps_config.js
+        env:
+          MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
+        run: |
+          if [ -z "$MAPS_API_KEY" ]; then echo "::warning::Falta el secret MAPS_API_KEY: el mapa no es carregarà"; fi
+          printf 'window.MAPS_API_KEY = "%s";\n' "$MAPS_API_KEY" > web/maps_config.js
+      - run: >
+          flutter build web --release
+          --base-href /Caliu-FrontEnd/
+          --dart-define=API_BASE_URL=https://caliu-api.onrender.com
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
