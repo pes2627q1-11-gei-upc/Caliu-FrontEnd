@@ -10,7 +10,7 @@
 | **Sense emulador ni mòbil** | `flutter run -d chrome` arrenca en segons i consumeix molt menys que l'emulador d'Android Studio. |
 | **Hot reload** | Igual que al mòbil: guardes i veus el canvi a l'instant. |
 | **DevTools del navegador** | Pestanya *Network* per veure les peticions a l'API, *Console* per als errors i *Sensors* per simular una ubicació (p. ex. Barcelona). |
-| **Revisió de PRs més ràpida** | Amb el deploy web, qualsevol membre (o el professor) pot obrir un enllaç i provar l'última versió de `main` sense instal·lar l'APK. |
+| **Revisió de PRs més ràpida** | Amb el deploy web, qualsevol membre (o el professor) pot provar la versió integrada a `development` sense instal·lar l'APK. |
 | **Mateix codi** | No cal mantenir res a part: és el mateix projecte Flutter compilat per a un altre target. |
 
 **Limitacions (cal provar-les al mòbil abans de tancar una US):**
@@ -86,7 +86,7 @@ Fem servir **la mateixa clau que l'app Android** (`MAPS_API_KEY` d'`android/loca
 
 ## 4. Deploy web automàtic (GitHub Pages)
 
-Cada push a `main` compila la versió web i la publica a
+Cada push a `development` compila la versió web i la publica a
 `https://pes2627q1-11-gei-upc.github.io/Caliu-FrontEnd/`.
 
 **4.1. Fitxer `.github/workflows/deploy-web.yml`** (ja és al repo):
@@ -95,7 +95,7 @@ name: Deploy web (testing)
 
 on:
   push:
-    branches: [main]
+    branches: [development]
   workflow_dispatch:
 
 permissions:
@@ -148,6 +148,36 @@ flutter build web --release --dart-define-from-file=.env
 ```
 
 ---
+
+## Actualitzacions i memòria cau
+
+El workflow executa `scripts/version-web-build.mjs` després de compilar i abans
+de pujar l'artefacte. El JavaScript de l'app, el bootstrap i `maps_config.js`
+reben noms amb un hash del contingut, i l'HTML apunta a aquests noms. Quan canvia
+el codi, el navegador demana una URL diferent en lloc de reutilitzar el fitxer antic.
+No s'esborren cookies, tokens ni dades locals. Es conserva el service worker de
+retirada generat per l'SDK per desregistrar versions antigues.
+
+L'exemple YAML anterior és un esquema: el workflow del repositori també executa
+els tests del versionat i aquest pas de preparació abans de publicar.
+
+GitHub Pages pot conservar `index.html` a la cache durant uns 10 minuts. El
+versionat no invalida aquesta cache ni actualitza automàticament una pestanya
+oberta: després del deploy, recarrega la pàgina. Si encara es veu l'HTML anterior,
+espera aquest interval o prova una recàrrega forçada. No cal esborrar cookies.
+
+Verificació abans de publicar:
+
+```bash
+node --test scripts/version-web-build.test.mjs
+```
+
+Verificació del desplegament: obre la web, publica una versió amb un canvi visible
+i recarrega el mateix navegador sense esborrar dades. A Network, comprova que
+`index.html` referencia el bootstrap versionat i que aquest carrega el nou
+`main.dart.<hash>.js`. Comprova també que la sessió es conserva si segueix vigent.
+Una pestanya antiga pot requerir recarregar-se després de desplegar si intenta
+descarregar fitxers versionats que ja no existeixen al nou artefacte.
 
 ## Resum de tasques
 
