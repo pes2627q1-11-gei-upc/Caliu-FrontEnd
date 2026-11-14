@@ -125,8 +125,7 @@ class _MapViewState extends State<MapView> {
         return (
           focus: _barcelona,
           mode: _LocationMode.fallbackBarcelona,
-          banner:
-              'Els serveis d\'ubicació estan desactivats. Mostrem Barcelona.',
+          banner: 'Els serveis d\'ubicació estan desactivats.',
           deniedForever: false,
         );
       }
@@ -141,7 +140,7 @@ class _MapViewState extends State<MapView> {
           focus: _barcelona,
           mode: _LocationMode.fallbackBarcelona,
           banner:
-              'Permís d\'ubicació denegat. Mostrem Barcelona. Pots activar-lo amb el botó d\'ubicació.',
+              'Permís d\'ubicació denegat. Pots activar-lo amb el botó d\'ubicació.',
           deniedForever: false,
         );
       }
@@ -151,7 +150,7 @@ class _MapViewState extends State<MapView> {
           focus: _barcelona,
           mode: _LocationMode.fallbackBarcelona,
           banner:
-              'Permís d\'ubicació bloquejat. Mostrem Barcelona. Obre la configuració per activar-lo.',
+              'Permís d\'ubicació bloquejat. Obre la configuració per activar-lo.',
           deniedForever: true,
         );
       }
@@ -170,7 +169,7 @@ class _MapViewState extends State<MapView> {
       return (
         focus: _barcelona,
         mode: _LocationMode.fallbackBarcelona,
-        banner: 'No s\'ha pogut obtenir el GPS. Mostrem Barcelona.',
+        banner: 'No s\'ha pogut obtenir el GPS.',
         deniedForever: false,
       );
     }
@@ -196,7 +195,7 @@ class _MapViewState extends State<MapView> {
       builder: (context) => AlertDialog(
         title: const Text('Permís d\'ubicació'),
         content: const Text(
-          'Has bloquejat l\'accés a la ubicació. Sense aquest permís el mapa es centra a Barcelona.\n\nVols obrir la configuració de l\'app per activar-lo?',
+          'Has bloquejat l\'accés a la ubicació. Sense aquest permís no podem centrar el mapa a la teva posició.\n\nVols obrir la configuració de l\'app per activar-lo?',
         ),
         actions: [
           TextButton(
