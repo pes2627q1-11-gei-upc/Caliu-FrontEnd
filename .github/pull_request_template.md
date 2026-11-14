@@ -1,13 +1,19 @@
 ## Resum
 
-<!-- Explica què canvia i per què. Enumera només els canvis rellevants. -->
+<!-- Què canvia i per què (3–6 bullets). -->
+
+-
 
 ## Validació
 
-<!-- Indica les comprovacions executades i els resultats. -->
-<!-- Distingeix les proves locals de la CI i deixa explícit què queda pendent. -->
-<!-- Si canvia la interfície, indica les pantalles i els dispositius comprovats. -->
+<!-- Què has comprovat i què queda pendent. -->
+
+- [ ] `flutter analyze` / `flutter test` (o indica què has saltat i per què)
+- [ ] Prova manual (emulador / mòbil físic) si canvia UI
+- [ ] CI en verd a aquesta PR
 
 ## Tasca
 
-<!-- Enllaç o ID de Taiga i breu descripció. Indica dependències d’altres PRs, si n’hi ha. -->
+<!-- Ex.: Taiga #153 (HU #43). No tanca la tasca fins a … -->
+
+Taiga #
