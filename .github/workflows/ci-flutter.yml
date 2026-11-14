@@ -26,3 +26,4 @@ jobs:
         with:
           name: flutter-coverage
           path: coverage/lcov.info
+          retention-days: 7
