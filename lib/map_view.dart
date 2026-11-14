@@ -83,15 +83,15 @@ class _MapViewState extends State<MapView> {
   }
 
   Future<void> _bootstrap() async {
-    await _resolveAndApplyFocus(requestIfNeeded: true, showDialogs: true);
+    // Sense diàleg ni SnackBar: el banner ja informa; el diàleg surt al recentrar.
+    await _resolveAndApplyFocus(requestIfNeeded: true);
     if (!mounted) return;
     setState(() => _mapReadyToShow = true);
   }
 
-  /// #153: centra al GPS si es pot; si es denega el permís, Barcelona + missatge.
+  /// #153: centra al GPS si es pot; si es denega el permís, Barcelona + banner.
   Future<void> _resolveAndApplyFocus({
     required bool requestIfNeeded,
-    required bool showDialogs,
   }) async {
     setState(() => _locating = true);
     try {
@@ -104,14 +104,6 @@ class _MapViewState extends State<MapView> {
         _permissionDeniedForever = result.deniedForever;
         _locating = false;
       });
-
-      if (showDialogs && result.deniedForever) {
-        await _offerOpenSettings();
-      } else if (showDialogs &&
-          result.mode == _LocationMode.fallbackBarcelona &&
-          result.banner != null) {
-        _showMessage(result.banner!);
-      }
 
       await _moveCameraToFocus();
     } finally {
@@ -226,7 +218,12 @@ class _MapViewState extends State<MapView> {
 
   Future<void> _onRecenterPressed() async {
     if (_locating) return;
-    await _resolveAndApplyFocus(requestIfNeeded: true, showDialogs: true);
+    await _resolveAndApplyFocus(requestIfNeeded: true);
+    if (!mounted) return;
+    // Diàleg de configuració només si l'usuari ho demana i el permís està bloquejat.
+    if (_permissionDeniedForever) {
+      await _offerOpenSettings();
+    }
     if (!mounted) return;
     _loadedBounds = null;
     await _loadAroundFocus(focus: _focus, notifyIfEmpty: false);
