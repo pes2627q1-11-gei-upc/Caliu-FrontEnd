@@ -89,8 +89,8 @@ void main() {
       );
       final api = EventsApi(client: client, baseUrl: _baseUrl);
 
-      expect(
-        () => api.fetchEvents(const EventQuery()),
+      await expectLater(
+        api.fetchEvents(const EventQuery()),
         throwsA(
           isA<EventsApiException>().having(
             (e) => e.message,
@@ -111,8 +111,8 @@ void main() {
 
         // Comportament real: el 404 de _getJson sempre diu
         // "Esdeveniment no trobat", també a GET /events.
-        expect(
-          () => api.fetchEvents(const EventQuery()),
+        await expectLater(
+          api.fetchEvents(const EventQuery()),
           throwsA(
             isA<EventsApiException>().having(
               (e) => e.message,
@@ -131,8 +131,8 @@ void main() {
       final api = EventsApi(client: client, baseUrl: _baseUrl);
 
       // jsonDecode després del 200 no es captura a _getJson.
-      expect(
-        () => api.fetchEvents(const EventQuery()),
+      await expectLater(
+        api.fetchEvents(const EventQuery()),
         throwsA(isA<FormatException>()),
       );
     });
@@ -209,8 +209,8 @@ void main() {
       );
       final api = EventsApi(client: client, baseUrl: _baseUrl);
 
-      expect(
-        () => api.fetchById('inexistent'),
+      await expectLater(
+        api.fetchById('inexistent'),
         throwsA(
           isA<EventsApiException>().having(
             (e) => e.message,
@@ -243,6 +243,8 @@ void main() {
 
       expect(items, hasLength(1));
       expect(items.single.id, 'evt-1');
+      // Documenta el path real: avui va a /events (no a /events/nearby).
+      expect(seen.path, '/events');
       expect(seen.queryParameters['lat'], '41.39');
       expect(seen.queryParameters['lng'], '2.17');
       expect(seen.queryParameters['radiusKm'], '8.0');
