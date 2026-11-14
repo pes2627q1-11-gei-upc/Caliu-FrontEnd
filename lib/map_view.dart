@@ -21,6 +21,22 @@ const String _mapStyleNoPois = '''
 /// Marge fora de la finestra visible perquè els pins arribin abans de veure's.
 const double _viewportMargin = 0.4;
 
+/// Fallback quan no hi ha GPS / permís (Plaça Catalunya, BCN).
+const LatLng _barcelona = LatLng(41.3851, 2.1734);
+
+/// Límits aproximats de Catalunya (#117).
+final LatLngBounds _cataloniaBounds = LatLngBounds(
+  southwest: const LatLng(40.52, 0.15),
+  northeast: const LatLng(42.86, 3.33),
+);
+
+enum _LocationMode {
+  /// Centrat a la posició de l'usuari.
+  user,
+  /// Sense GPS usable: mostrem Barcelona.
+  fallbackBarcelona,
+}
+
 class MapView extends StatefulWidget {
   const MapView({super.key});
 
@@ -38,14 +54,21 @@ class _MapViewState extends State<MapView> {
   bool _eventsRequestInFlight = false;
   bool _mapReadyToShow = false;
   bool _acceptCameraIdleReloads = false;
+  bool _locating = false;
 
-  LatLng _focus = const LatLng(41.3851, 2.1734);
+  LatLng _focus = _barcelona;
+  _LocationMode _locationMode = _LocationMode.fallbackBarcelona;
+  String? _locationBanner;
+  bool _permissionDeniedForever = false;
+
   static const double _initialZoom = 14;
 
   CameraPosition? _lastCamera;
   LatLngBounds? _loadedBounds;
   Timer? _cameraIdleTimer;
   int _loadGeneration = 0;
+
+  bool get _hasUserLocation => _locationMode == _LocationMode.user;
 
   @override
   void dispose() {
@@ -60,45 +83,153 @@ class _MapViewState extends State<MapView> {
   }
 
   Future<void> _bootstrap() async {
-    _focus = await _resolveFocus();
+    await _resolveAndApplyFocus(requestIfNeeded: true, showDialogs: true);
     if (!mounted) return;
-    // Mostrem el mapa ja centrat al focus (GPS o Barcelona).
     setState(() => _mapReadyToShow = true);
   }
 
-  Future<LatLng> _resolveFocus() async {
+  /// #153: centra al GPS si es pot; si es denega el permís, Barcelona + missatge.
+  Future<void> _resolveAndApplyFocus({
+    required bool requestIfNeeded,
+    required bool showDialogs,
+  }) async {
+    setState(() => _locating = true);
+    try {
+      final result = await _resolveFocus(requestIfNeeded: requestIfNeeded);
+      if (!mounted) return;
+      setState(() {
+        _focus = result.focus;
+        _locationMode = result.mode;
+        _locationBanner = result.banner;
+        _permissionDeniedForever = result.deniedForever;
+        _locating = false;
+      });
+
+      if (showDialogs && result.deniedForever) {
+        await _offerOpenSettings();
+      } else if (showDialogs &&
+          result.mode == _LocationMode.fallbackBarcelona &&
+          result.banner != null) {
+        _showMessage(result.banner!);
+      }
+
+      await _moveCameraToFocus();
+    } finally {
+      if (mounted && _locating) {
+        setState(() => _locating = false);
+      }
+    }
+  }
+
+  Future<({
+    LatLng focus,
+    _LocationMode mode,
+    String? banner,
+    bool deniedForever,
+  })> _resolveFocus({required bool requestIfNeeded}) async {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        _showMessage('Serveis d\'ubicació desactivats. Usem Barcelona.');
-        return _focus;
+        return (
+          focus: _barcelona,
+          mode: _LocationMode.fallbackBarcelona,
+          banner:
+              'Els serveis d\'ubicació estan desactivats. Mostrem Barcelona.',
+          deniedForever: false,
+        );
       }
 
       var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
+      if (permission == LocationPermission.denied && requestIfNeeded) {
         permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          _showMessage('Permís d\'ubicació denegat. Usem Barcelona.');
-          return _focus;
-        }
+      }
+
+      if (permission == LocationPermission.denied) {
+        return (
+          focus: _barcelona,
+          mode: _LocationMode.fallbackBarcelona,
+          banner:
+              'Permís d\'ubicació denegat. Mostrem Barcelona. Pots activar-lo amb el botó d\'ubicació.',
+          deniedForever: false,
+        );
       }
 
       if (permission == LocationPermission.deniedForever) {
-        _showMessage('Permís d\'ubicació bloquejat. Usem Barcelona.');
-        return _focus;
+        return (
+          focus: _barcelona,
+          mode: _LocationMode.fallbackBarcelona,
+          banner:
+              'Permís d\'ubicació bloquejat. Mostrem Barcelona. Obre la configuració per activar-lo.',
+          deniedForever: true,
+        );
       }
 
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
         timeLimit: const Duration(seconds: 8),
       );
-      return LatLng(position.latitude, position.longitude);
+      return (
+        focus: LatLng(position.latitude, position.longitude),
+        mode: _LocationMode.user,
+        banner: null,
+        deniedForever: false,
+      );
     } catch (_) {
-      if (mounted) {
-        _showMessage('No s\'ha pogut obtenir el GPS. Usem Barcelona.');
-      }
-      return _focus;
+      return (
+        focus: _barcelona,
+        mode: _LocationMode.fallbackBarcelona,
+        banner: 'No s\'ha pogut obtenir el GPS. Mostrem Barcelona.',
+        deniedForever: false,
+      );
     }
+  }
+
+  Future<void> _moveCameraToFocus() async {
+    final controller = mapController;
+    if (controller == null) return;
+    _lastCamera = CameraPosition(target: _focus, zoom: _initialZoom);
+    try {
+      await controller.animateCamera(
+        CameraUpdate.newLatLngZoom(_focus, _initialZoom),
+      );
+    } catch (_) {
+      // El mapa pot no estar llest encara.
+    }
+  }
+
+  Future<void> _offerOpenSettings() async {
+    if (!mounted) return;
+    final open = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Permís d\'ubicació'),
+        content: const Text(
+          'Has bloquejat l\'accés a la ubicació. Sense aquest permís el mapa es centra a Barcelona.\n\nVols obrir la configuració de l\'app per activar-lo?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Ara no'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: CaliuColors.maroon),
+            child: const Text('Obrir configuració'),
+          ),
+        ],
+      ),
+    );
+    if (open == true) {
+      await Geolocator.openAppSettings();
+    }
+  }
+
+  Future<void> _onRecenterPressed() async {
+    if (_locating) return;
+    await _resolveAndApplyFocus(requestIfNeeded: true, showDialogs: true);
+    if (!mounted) return;
+    _loadedBounds = null;
+    await _loadAroundFocus(focus: _focus, notifyIfEmpty: false);
   }
 
   LatLngBounds _expandBounds(LatLngBounds bounds, double marginFraction) {
@@ -156,7 +287,6 @@ class _MapViewState extends State<MapView> {
   }
 
   LatLngBounds _boundsAround(LatLng center, double radiusKm) {
-    // ~111 km per grau de latitud; lng aproximat a Catalunya.
     final latDelta = radiusKm / 111.0;
     final lngDelta = radiusKm / 85.0;
     return LatLngBounds(
@@ -178,10 +308,7 @@ class _MapViewState extends State<MapView> {
       try {
         visible = await controller.getVisibleRegion();
         if (!_isUsableBounds(visible)) {
-          visible = _boundsAround(
-            _lastCamera?.target ?? _focus,
-            8,
-          );
+          visible = _boundsAround(_lastCamera?.target ?? _focus, 8);
         }
       } catch (_) {
         visible = _boundsAround(_lastCamera?.target ?? _focus, 8);
@@ -214,7 +341,6 @@ class _MapViewState extends State<MapView> {
     required LatLng focus,
     bool notifyIfEmpty = false,
   }) async {
-    // Radi inicial coherent amb zoom 14 + marge (abans que getVisibleRegion sigui fiable).
     const radiusKm = 12.0;
     final queryBounds = _expandBounds(
       _boundsAround(focus, radiusKm / (1 + _viewportMargin)),
@@ -347,11 +473,9 @@ class _MapViewState extends State<MapView> {
   Future<void> _onMapCreated(GoogleMapController controller) async {
     mapController = controller;
     _lastCamera = CameraPosition(target: _focus, zoom: _initialZoom);
-
-    // Carrega pins del focus actual (on està la càmera inicial).
+    await _moveCameraToFocus();
     await _loadAroundFocus(focus: _focus, notifyIfEmpty: false);
 
-    // Un fotograma perquè el mapa estabilitzí els bounds, després acceptem pan.
     await Future<void>.delayed(const Duration(milliseconds: 200));
     if (!mounted) return;
     await _reloadForVisibleRegion(force: true, notifyIfEmpty: true);
@@ -367,6 +491,26 @@ class _MapViewState extends State<MapView> {
         foregroundColor: Colors.white,
         title: const Text('Mapa'),
         actions: [
+          IconButton(
+            tooltip: _hasUserLocation
+                ? 'Centrar a la meva ubicació'
+                : 'Activar ubicació',
+            onPressed: _locating ? null : _onRecenterPressed,
+            icon: _locating
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Icon(
+                    _hasUserLocation
+                        ? Icons.my_location
+                        : Icons.location_disabled,
+                  ),
+          ),
           IconButton(
             tooltip: 'Cerca',
             onPressed: () {
@@ -391,21 +535,59 @@ class _MapViewState extends State<MapView> {
       ),
       body: !_mapReadyToShow
           ? const ColoredBox(color: CaliuColors.beige)
-          : GoogleMap(
-              onMapCreated: _onMapCreated,
-              style: _mapStyleNoPois,
-              initialCameraPosition: CameraPosition(
-                target: _focus,
-                zoom: _initialZoom,
-              ),
-              myLocationEnabled: true,
-              myLocationButtonEnabled: true,
-              mapToolbarEnabled: false,
-              compassEnabled: true,
-              markers: _markers,
-              onCameraMove: _onCameraMove,
-              onCameraIdle: _onCameraIdle,
-              onTap: (_) {},
+          : Column(
+              children: [
+                if (_locationBanner != null)
+                  Material(
+                    color: CaliuColors.beigeCard,
+                    child: ListTile(
+                      dense: true,
+                      leading: Icon(
+                        _permissionDeniedForever
+                            ? Icons.location_off
+                            : Icons.location_city,
+                        color: CaliuColors.maroon,
+                      ),
+                      title: Text(
+                        _locationBanner!,
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      trailing: _permissionDeniedForever
+                          ? TextButton(
+                              onPressed: () => Geolocator.openAppSettings(),
+                              child: const Text('Configuració'),
+                            )
+                          : TextButton(
+                              onPressed: _locating ? null : _onRecenterPressed,
+                              child: const Text('Reintentar'),
+                            ),
+                    ),
+                  ),
+                Expanded(
+                  child: GoogleMap(
+                    onMapCreated: _onMapCreated,
+                    style: _mapStyleNoPois,
+                    initialCameraPosition: CameraPosition(
+                      target: _focus,
+                      zoom: _initialZoom,
+                    ),
+                    // #117: càmera limitada a Catalunya.
+                    cameraTargetBounds:
+                        CameraTargetBounds(_cataloniaBounds),
+                    minMaxZoomPreference:
+                        const MinMaxZoomPreference(7, 18),
+                    // #153: només si tenim permís (evita comportaments estranys).
+                    myLocationEnabled: _hasUserLocation,
+                    myLocationButtonEnabled: false,
+                    mapToolbarEnabled: false,
+                    compassEnabled: true,
+                    markers: _markers,
+                    onCameraMove: _onCameraMove,
+                    onCameraIdle: _onCameraIdle,
+                    onTap: (_) {},
+                  ),
+                ),
+              ],
             ),
     );
   }
