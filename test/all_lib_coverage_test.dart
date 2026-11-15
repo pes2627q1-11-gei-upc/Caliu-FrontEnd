@@ -7,6 +7,7 @@ import 'package:caliu/data/auth_validators.dart';
 import 'package:caliu/data/date_range_filter.dart';
 import 'package:caliu/data/event.dart';
 import 'package:caliu/data/event_query.dart';
+import 'package:caliu/data/event_when.dart';
 import 'package:caliu/data/events_api.dart';
 import 'package:caliu/event_detail_screen.dart';
 import 'package:caliu/login_screen.dart';
@@ -19,6 +20,8 @@ import 'package:caliu/register_screen.dart';
 import 'package:caliu/search_screen.dart';
 import 'package:caliu/theme/caliu_colors.dart';
 import 'package:caliu/widgets/caliu_chip.dart';
+import 'package:caliu/widgets/event_preview_card.dart';
+import 'package:caliu/widgets/map_event_preview.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -31,6 +34,7 @@ void main() {
     expect(DateRangeFilter.values, isNotEmpty);
     expect(Event, isNotNull);
     expect(EventQuery, isNotNull);
+    expect(previewWhen, isA<Function>());
     expect(EventsApi, isNotNull);
     expect(EventDetailScreen, isNotNull);
     expect(LoginScreen, isNotNull);
@@ -43,5 +47,7 @@ void main() {
     expect(SearchScreen, isNotNull);
     expect(CaliuColors, isNotNull);
     expect(CaliuChip, isNotNull);
+    expect(EventPreviewCard, isNotNull);
+    expect(MapEventPreview, isNotNull);
   });
 }
