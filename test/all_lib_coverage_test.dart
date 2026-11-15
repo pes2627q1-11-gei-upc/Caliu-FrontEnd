@@ -21,6 +21,7 @@ import 'package:caliu/search_screen.dart';
 import 'package:caliu/theme/caliu_colors.dart';
 import 'package:caliu/widgets/caliu_chip.dart';
 import 'package:caliu/widgets/event_preview_card.dart';
+import 'package:caliu/widgets/map_event_preview.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -47,5 +48,6 @@ void main() {
     expect(CaliuColors, isNotNull);
     expect(CaliuChip, isNotNull);
     expect(EventPreviewCard, isNotNull);
+    expect(MapEventPreview, isNotNull);
   });
 }

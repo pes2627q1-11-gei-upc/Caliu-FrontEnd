@@ -9,7 +9,7 @@ import 'data/events_api.dart';
 import 'event_detail_screen.dart';
 import 'search_screen.dart';
 import 'theme/caliu_colors.dart';
-import 'widgets/event_preview_card.dart';
+import 'widgets/map_event_preview.dart';
 
 /// Amaga POIs i etiquetes de llocs de Google (feedback demo: sense info externa).
 const String _mapStyleNoPois = '''
@@ -40,7 +40,10 @@ enum _LocationMode {
 }
 
 class MapView extends StatefulWidget {
-  const MapView({super.key});
+  const MapView({super.key, this.isActive = true});
+
+  /// Si la pestanya Mapa és la visible (el mapa continua muntat a l'`IndexedStack`).
+  final bool isActive;
 
   @override
   State<MapView> createState() => _MapViewState();
@@ -479,152 +482,133 @@ class _MapViewState extends State<MapView> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: _selected == null,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _clearSelection();
-      },
-      child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: CaliuColors.maroonDeep,
-          foregroundColor: Colors.white,
-          title: const Text('Mapa'),
-          actions: [
-            IconButton(
-              tooltip: _hasUserLocation
-                  ? 'Centrar a la meva ubicació'
-                  : 'Activar ubicació',
-              onPressed: _locating ? null : _onRecenterPressed,
-              icon: _locating
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Icon(
-                      _hasUserLocation
-                          ? Icons.my_location
-                          : Icons.location_disabled,
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: CaliuColors.maroonDeep,
+        foregroundColor: Colors.white,
+        title: const Text('Mapa'),
+        actions: [
+          IconButton(
+            tooltip: _hasUserLocation
+                ? 'Centrar a la meva ubicació'
+                : 'Activar ubicació',
+            onPressed: _locating ? null : _onRecenterPressed,
+            icon: _locating
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
                     ),
-            ),
-            IconButton(
-              tooltip: 'Cerca',
-              onPressed: () {
-                final target = _lastCamera?.target ?? _focus;
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => SearchScreen(
-                      lat: target.latitude,
-                      lng: target.longitude,
-                    ),
+                  )
+                : Icon(
+                    _hasUserLocation
+                        ? Icons.my_location
+                        : Icons.location_disabled,
                   ),
-                );
-              },
-              icon: const Icon(Icons.search),
-            ),
-            IconButton(
-              tooltip: 'Actualitzar',
-              onPressed: _eventsRequestInFlight ? null : _refresh,
-              icon: const Icon(Icons.refresh),
-            ),
-          ],
-        ),
-        body: !_mapReadyToShow
-            ? const ColoredBox(color: CaliuColors.beige)
-            : Column(
-                children: [
-                  if (_locationBanner != null)
-                    Material(
-                      color: CaliuColors.beigeCard,
-                      child: ListTile(
-                        dense: true,
-                        leading: Icon(
-                          _permissionDeniedForever
-                              ? Icons.location_off
-                              : Icons.location_city,
-                          color: CaliuColors.maroon,
-                        ),
-                        title: Text(
-                          _locationBanner!,
-                          style: const TextStyle(fontSize: 13),
-                        ),
-                        trailing: _permissionDeniedForever
-                            ? TextButton(
-                                onPressed: () => Geolocator.openAppSettings(),
-                                child: const Text('Configuració'),
-                              )
-                            : TextButton(
-                                onPressed: _locating
-                                    ? null
-                                    : _onRecenterPressed,
-                                child: const Text('Reintentar'),
-                              ),
-                      ),
-                    ),
-                  Expanded(
-                    child: Stack(
-                      children: [
-                        Positioned.fill(
-                          child: GoogleMap(
-                            onMapCreated: _onMapCreated,
-                            style: _mapStyleNoPois,
-                            initialCameraPosition: CameraPosition(
-                              target: _focus,
-                              zoom: _initialZoom,
-                            ),
-                            // #117: càmera limitada a Catalunya.
-                            cameraTargetBounds: CameraTargetBounds(
-                              _cataloniaBounds,
-                            ),
-                            minMaxZoomPreference: const MinMaxZoomPreference(
-                              7,
-                              18,
-                            ),
-                            // #153: només si tenim permís (evita comportaments estranys).
-                            myLocationEnabled: _hasUserLocation,
-                            myLocationButtonEnabled: false,
-                            mapToolbarEnabled: false,
-                            compassEnabled: true,
-                            markers: _markers,
-                            onCameraMove: _onCameraMove,
-                            onCameraIdle: _onCameraIdle,
-                            // #44: tocar el mapa fora d'un marcador tanca la previsualització.
-                            onTap: (_) => _clearSelection(),
-                          ),
-                        ),
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 220),
-                            transitionBuilder: (child, animation) =>
-                                SlideTransition(
-                                  position: Tween<Offset>(
-                                    begin: const Offset(0, 1),
-                                    end: Offset.zero,
-                                  ).animate(animation),
-                                  child: child,
-                                ),
-                            child: _selected == null
-                                ? const SizedBox.shrink(key: ValueKey('none'))
-                                : EventPreviewCard(
-                                    key: ValueKey(_selected!.id),
-                                    event: _selected!,
-                                    onOpen: () => _openDetail(_selected!),
-                                    onClose: _clearSelection,
-                                  ),
-                          ),
-                        ),
-                      ],
-                    ),
+          ),
+          IconButton(
+            tooltip: 'Cerca',
+            onPressed: () {
+              final target = _lastCamera?.target ?? _focus;
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => SearchScreen(
+                    lat: target.latitude,
+                    lng: target.longitude,
                   ),
-                ],
-              ),
+                ),
+              );
+            },
+            icon: const Icon(Icons.search),
+          ),
+          IconButton(
+            tooltip: 'Actualitzar',
+            onPressed: _eventsRequestInFlight ? null : _refresh,
+            icon: const Icon(Icons.refresh),
+          ),
+        ],
       ),
+      body: !_mapReadyToShow
+          ? const ColoredBox(color: CaliuColors.beige)
+          : Column(
+              children: [
+                if (_locationBanner != null)
+                  Material(
+                    color: CaliuColors.beigeCard,
+                    child: ListTile(
+                      dense: true,
+                      leading: Icon(
+                        _permissionDeniedForever
+                            ? Icons.location_off
+                            : Icons.location_city,
+                        color: CaliuColors.maroon,
+                      ),
+                      title: Text(
+                        _locationBanner!,
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                      trailing: _permissionDeniedForever
+                          ? TextButton(
+                              onPressed: () => Geolocator.openAppSettings(),
+                              child: const Text('Configuració'),
+                            )
+                          : TextButton(
+                              onPressed: _locating
+                                  ? null
+                                  : _onRecenterPressed,
+                              child: const Text('Reintentar'),
+                            ),
+                    ),
+                  ),
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: GoogleMap(
+                          onMapCreated: _onMapCreated,
+                          style: _mapStyleNoPois,
+                          initialCameraPosition: CameraPosition(
+                            target: _focus,
+                            zoom: _initialZoom,
+                          ),
+                          // #117: càmera limitada a Catalunya.
+                          cameraTargetBounds: CameraTargetBounds(
+                            _cataloniaBounds,
+                          ),
+                          minMaxZoomPreference: const MinMaxZoomPreference(
+                            7,
+                            18,
+                          ),
+                          // #153: només si tenim permís (evita comportaments estranys).
+                          myLocationEnabled: _hasUserLocation,
+                          myLocationButtonEnabled: false,
+                          mapToolbarEnabled: false,
+                          compassEnabled: true,
+                          markers: _markers,
+                          onCameraMove: _onCameraMove,
+                          onCameraIdle: _onCameraIdle,
+                          // #44: tocar el mapa fora d'un marcador tanca la previsualització.
+                          onTap: (_) => _clearSelection(),
+                        ),
+                      ),
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: MapEventPreview(
+                          selected: _selected,
+                          active: widget.isActive,
+                          onOpen: _openDetail,
+                          onClose: _clearSelection,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }

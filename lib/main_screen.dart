@@ -19,10 +19,12 @@ class _MainScreenState extends State<MainScreen> {
 
   int _selectedIndex = 0;
 
-  static const List<Widget> _screens = [
-    SearchScreen(),
-    MapView(),
-    ProfileScreen(),
+  // MapView rep si és la pestanya visible: fora d'ella no ha d'interceptar el
+  // botó enrere (#44). L'IndexedStack conserva l'estat de cada pantalla.
+  List<Widget> get _screens => [
+    const SearchScreen(),
+    MapView(isActive: _selectedIndex == 1),
+    const ProfileScreen(),
   ];
 
   static const List<String> _labels = ['Inici', 'Mapa', 'Perfil'];
