@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'data/date_range_filter.dart';
 import 'data/event.dart';
 import 'data/event_query.dart';
 import 'data/events_api.dart';
@@ -28,6 +29,7 @@ class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _municipalityController = TextEditingController();
 
   final Set<String> _selectedCategories = {};
+  DateRangeFilter? _dateFilter;
   List<String> _allCategories = [];
 
   List<Event> _results = [];
@@ -68,6 +70,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   EventQuery _buildQuery() {
     final categories = _selectedCategories.toList()..sort();
+    final range = _dateFilter?.rangeFor(DateTime.now());
     return EventQuery(
       q: _searchController.text,
       category: categories.isEmpty ? null : categories.join(','),
@@ -75,6 +78,8 @@ class _SearchScreenState extends State<SearchScreen> {
       municipality: _municipalityController.text,
       lat: widget.lat,
       lng: widget.lng,
+      from: range?.from,
+      to: range?.to,
       limit: 40,
     );
   }
@@ -125,6 +130,8 @@ class _SearchScreenState extends State<SearchScreen> {
     final applied = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
+      useRootNavigator: true,
+      useSafeArea: true,
       backgroundColor: CaliuColors.beigeCard,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -132,12 +139,14 @@ class _SearchScreenState extends State<SearchScreen> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+            final bottomSafe = MediaQuery.viewPaddingOf(context).bottom;
             return Padding(
               padding: EdgeInsets.only(
                 left: 20,
                 right: 20,
                 top: 12,
-                bottom: MediaQuery.viewInsetsOf(context).bottom + 20,
+                bottom: bottomInset + bottomSafe + 20,
               ),
               child: SingleChildScrollView(
                 child: Column(
@@ -264,6 +273,46 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  void _selectDateFilter(DateRangeFilter filter) {
+    setState(() {
+      _dateFilter = _dateFilter == filter ? null : filter;
+    });
+    _runSearch();
+  }
+
+  Widget _buildDateChips() {
+    return SizedBox(
+      height: 44,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        children: DateRangeFilter.values.map((filter) {
+          final selected = _dateFilter == filter;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: ChoiceChip(
+              label: Text(filter.label),
+              selected: selected,
+              onSelected: _loading ? null : (_) => _selectDateFilter(filter),
+              selectedColor: CaliuColors.red,
+              showCheckmark: false,
+              labelStyle: TextStyle(
+                color: selected ? Colors.white : CaliuColors.maroonDeep,
+                fontWeight: FontWeight.w600,
+              ),
+              backgroundColor: Colors.white,
+              side: BorderSide(
+                color: selected
+                    ? CaliuColors.red
+                    : CaliuColors.maroon.withValues(alpha: 0.3),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   void _openDetail(Event event) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -331,6 +380,7 @@ class _SearchScreenState extends State<SearchScreen> {
               onSubmitted: (_) => _runSearch(),
             ),
           ),
+          _buildDateChips(),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -405,82 +455,101 @@ class _SearchScreenState extends State<SearchScreen> {
       separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final event = _results[index];
-        return Material(
-          color: CaliuColors.beigeCard,
-          borderRadius: BorderRadius.circular(14),
-          child: InkWell(
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white,
             borderRadius: BorderRadius.circular(14),
-            onTap: () => _openDetail(event),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: SizedBox(
-                      width: 64,
-                      height: 64,
-                      child: event.imageUrl != null
-                          ? Image.network(
-                              event.imageUrl!,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  _thumbPlaceholder(),
-                            )
-                          : _thumbPlaceholder(),
+            border: Border.all(
+              color: CaliuColors.maroon.withValues(alpha: 0.14),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: CaliuColors.maroonDeep.withValues(alpha: 0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: () => _openDetail(event),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: SizedBox(
+                        width: 64,
+                        height: 64,
+                        child: event.imageUrl != null
+                            ? Image.network(
+                                event.imageUrl!,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    _thumbPlaceholder(),
+                              )
+                            : _thumbPlaceholder(),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          event.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                            color: CaliuColors.maroonDeep,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            event.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                              color: CaliuColors.maroonDeep,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _subtitle(event),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: CaliuColors.textMuted,
-                            fontSize: 13,
+                          const SizedBox(height: 4),
+                          Text(
+                            _subtitle(event),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: CaliuColors.textMuted,
+                              fontSize: 13,
+                            ),
                           ),
-                        ),
-                        Builder(
-                          builder: (context) {
-                            final labels = <String>{
-                              ...event.categories,
-                              ...event.tags,
-                            }.take(3).toList();
-                            if (labels.isEmpty) {
-                              return const SizedBox.shrink();
-                            }
-                            return Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: Wrap(
-                                spacing: 6,
-                                runSpacing: 6,
-                                children: labels
-                                    .map((label) => CaliuChip(label: label))
-                                    .toList(),
-                              ),
-                            );
-                          },
-                        ),
-                      ],
+                          Builder(
+                            builder: (context) {
+                              final labels = <String>{
+                                ...event.categories,
+                                ...event.tags,
+                              }.take(3).toList();
+                              if (labels.isEmpty) {
+                                return const SizedBox.shrink();
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: Wrap(
+                                  spacing: 6,
+                                  runSpacing: 6,
+                                  children: labels
+                                      .map((label) => CaliuChip(label: label))
+                                      .toList(),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const Icon(Icons.chevron_right, color: CaliuColors.textMuted),
-                ],
+                    const Icon(
+                      Icons.chevron_right,
+                      color: CaliuColors.textMuted,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

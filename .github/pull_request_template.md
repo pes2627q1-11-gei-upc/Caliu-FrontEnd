@@ -1,19 +1,19 @@
-## Tasca Taiga
+## Resum
 
-- Enllaç / ID: #
+<!-- Què canvia i per què (3–6 bullets). -->
 
-## Què canvia i per què
+-
 
-<!-- Què s’ha fet i per què cal aquest canvi. -->
+## Validació
 
-## Com s’ha provat
+<!-- Què has comprovat i què queda pendent. -->
 
-<!-- Ex.: flutter analyze, flutter test, emulador/mòbil, captura si canvia UI. -->
+- [ ] `flutter analyze` / `flutter test` (o indica què has saltat i per què)
+- [ ] Prova manual (emulador / mòbil físic) si canvia UI
+- [ ] CI en verd a aquesta PR
 
-## Definició de fet
+## Tasca
 
-- [ ] Especificat (criteris d’acceptació clars a Taiga)
-- [ ] Implementat
-- [ ] Provat
-- [ ] Documentat (README / docs / comentaris si cal)
-- [ ] Diagrames actualitzats (si el canvi afecta arquitectura o flux)
+<!-- Ex.: Taiga #153 (HU #43). No tanca la tasca fins a … -->
+
+Taiga #

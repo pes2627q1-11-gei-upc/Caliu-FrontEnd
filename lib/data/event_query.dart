@@ -8,6 +8,8 @@ class EventQuery {
     this.lat,
     this.lng,
     this.radiusKm,
+    this.from,
+    this.to,
     this.page = 1,
     this.limit = 20,
   });
@@ -20,6 +22,10 @@ class EventQuery {
   final double? lat;
   final double? lng;
   final double? radiusKm;
+
+  /// Interval de dates (US5). S'envien a l'API en UTC (ISO 8601).
+  final DateTime? from;
+  final DateTime? to;
   final int page;
   final int limit;
 
@@ -29,7 +35,9 @@ class EventQuery {
         filled(category) ||
         filled(tag) ||
         filled(comarca) ||
-        filled(municipality);
+        filled(municipality) ||
+        from != null ||
+        to != null;
   }
 
   Map<String, String> toQueryParameters() {
@@ -51,6 +59,11 @@ class EventQuery {
     add('comarca', comarca);
     add('municipality', municipality);
 
+    // toUtc(): un DateTime local s'escriuria sense zona i el servidor
+    // l'interpretaria com a UTC (desfasament d'1-2 hores).
+    if (from != null) params['from'] = from!.toUtc().toIso8601String();
+    if (to != null) params['to'] = to!.toUtc().toIso8601String();
+
     if (lat != null && lng != null) {
       params['lat'] = lat.toString();
       params['lng'] = lng.toString();
@@ -71,12 +84,15 @@ class EventQuery {
     double? lat,
     double? lng,
     double? radiusKm,
+    DateTime? from,
+    DateTime? to,
     int? page,
     int? limit,
     bool clearCategory = false,
     bool clearComarca = false,
     bool clearMunicipality = false,
     bool clearQ = false,
+    bool clearDates = false,
   }) {
     return EventQuery(
       q: clearQ ? null : (q ?? this.q),
@@ -88,6 +104,8 @@ class EventQuery {
       lat: lat ?? this.lat,
       lng: lng ?? this.lng,
       radiusKm: radiusKm ?? this.radiusKm,
+      from: clearDates ? null : (from ?? this.from),
+      to: clearDates ? null : (to ?? this.to),
       page: page ?? this.page,
       limit: limit ?? this.limit,
     );
