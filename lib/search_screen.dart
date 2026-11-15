@@ -9,11 +9,7 @@ import 'theme/caliu_colors.dart';
 import 'widgets/caliu_chip.dart';
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({
-    super.key,
-    this.lat,
-    this.lng,
-  });
+  const SearchScreen({super.key, this.lat, this.lng});
 
   final double? lat;
   final double? lng;
@@ -196,8 +192,9 @@ class _SearchScreenState extends State<SearchScreen> {
                         spacing: 8,
                         runSpacing: 8,
                         children: _allCategories.map((category) {
-                          final selected =
-                              _selectedCategories.contains(category);
+                          final selected = _selectedCategories.contains(
+                            category,
+                          );
                           return FilterChip(
                             label: Text(category),
                             selected: selected,
@@ -316,10 +313,8 @@ class _SearchScreenState extends State<SearchScreen> {
   void _openDetail(Event event) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => EventDetailScreen(
-          eventId: event.id,
-          initialEvent: event,
-        ),
+        builder: (_) =>
+            EventDetailScreen(eventId: event.id, initialEvent: event),
       ),
     );
   }
@@ -337,7 +332,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final activeFilters = _selectedCategories.length +
+    final activeFilters =
+        _selectedCategories.length +
         (_comarcaController.text.trim().isEmpty ? 0 : 1) +
         (_municipalityController.text.trim().isEmpty ? 0 : 1);
 
@@ -390,8 +386,8 @@ class _SearchScreenState extends State<SearchScreen> {
                     _loading
                         ? 'Cercant…'
                         : _searched
-                            ? '$_total esdeveniments'
-                            : '',
+                        ? '$_total esdeveniments'
+                        : '',
                     style: const TextStyle(
                       color: CaliuColors.textMuted,
                       fontWeight: FontWeight.w600,
@@ -405,9 +401,7 @@ class _SearchScreenState extends State<SearchScreen> {
               ],
             ),
           ),
-          Expanded(
-            child: _buildBody(),
-          ),
+          Expanded(child: _buildBody()),
         ],
       ),
     );
