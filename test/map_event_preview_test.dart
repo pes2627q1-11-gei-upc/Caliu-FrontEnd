@@ -74,34 +74,34 @@ void main() {
       expect(find.byType(EventPreviewCard), findsNothing);
     });
 
-    testWidgets(
-      'tocar la targeta mentre desapareix obre el seu esdeveniment',
-      (tester) async {
-        final opened = <Event>[];
-        await tester.pumpWidget(_preview(selected: _event, onOpen: opened.add));
-        await tester.pumpAndSettle();
+    testWidgets('tocar la targeta mentre desapareix obre el seu esdeveniment', (
+      tester,
+    ) async {
+      final opened = <Event>[];
+      await tester.pumpWidget(_preview(selected: _event, onOpen: opened.add));
+      await tester.pumpAndSettle();
 
-        // Es tanca la selecció: la targeta comença l'animació de sortida.
-        await tester.pumpWidget(_preview(selected: null, onOpen: opened.add));
-        await tester.pump(const Duration(milliseconds: 40));
-        expect(find.byType(EventPreviewCard), findsOneWidget);
+      // Es tanca la selecció: la targeta comença l'animació de sortida.
+      await tester.pumpWidget(_preview(selected: null, onOpen: opened.add));
+      await tester.pump(const Duration(milliseconds: 40));
+      expect(find.byType(EventPreviewCard), findsOneWidget);
 
-        await tester.tap(
-          find.byKey(EventPreviewCard.openButtonKey),
-          warnIfMissed: false,
-        );
-        await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(EventPreviewCard.openButtonKey),
+        warnIfMissed: false,
+      );
+      await tester.pumpAndSettle();
 
-        expect(tester.takeException(), isNull);
-        expect(opened.single.id, 'evt-1');
-        expect(find.byType(EventPreviewCard), findsNothing);
-      },
-    );
+      expect(tester.takeException(), isNull);
+      expect(opened.single.id, 'evt-1');
+      expect(find.byType(EventPreviewCard), findsNothing);
+    });
   });
 
   group('MapEventPreview: botó enrere', () {
-    testWidgets('amb targeta oberta i pestanya activa, tanca la targeta',
-        (tester) async {
+    testWidgets('amb targeta oberta i pestanya activa, tanca la targeta', (
+      tester,
+    ) async {
       var closed = 0;
       await tester.pumpWidget(
         _app(
@@ -144,8 +144,9 @@ void main() {
       },
     );
 
-    testWidgets('sense targeta, el botó enrere funciona com sempre',
-        (tester) async {
+    testWidgets('sense targeta, el botó enrere funciona com sempre', (
+      tester,
+    ) async {
       var closed = 0;
       await tester.pumpWidget(
         _app(

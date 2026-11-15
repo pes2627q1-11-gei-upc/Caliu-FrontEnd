@@ -68,8 +68,10 @@ void main() {
   group('EventQuery amb dates', () {
     test('envia from/to en UTC i ISO 8601', () {
       final range = DateRangeFilter.tomorrow.rangeFor(wednesday);
-      final params =
-          EventQuery(from: range.from, to: range.to).toQueryParameters();
+      final params = EventQuery(
+        from: range.from,
+        to: range.to,
+      ).toQueryParameters();
       expect(params['from'], range.from.toUtc().toIso8601String());
       expect(params['to'], range.to.toUtc().toIso8601String());
       expect(params['from'], endsWith('Z'));

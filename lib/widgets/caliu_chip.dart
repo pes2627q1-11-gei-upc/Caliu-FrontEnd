@@ -1,12 +1,9 @@
 import 'package:flutter/material.dart';
+
 import '../theme/caliu_colors.dart';
 
 class CaliuChip extends StatelessWidget {
-  const CaliuChip({
-    super.key,
-    required this.label,
-    this.filled = true,
-  });
+  const CaliuChip({super.key, required this.label, this.filled = true});
 
   final String label;
   final bool filled;

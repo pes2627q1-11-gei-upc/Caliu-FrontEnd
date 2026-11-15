@@ -46,8 +46,8 @@ class ApiHealth {
 
 class EventsApi {
   EventsApi({http.Client? client, String? baseUrl})
-      : _client = client ?? http.Client(),
-        _baseUrl = baseUrl ?? apiBaseUrl;
+    : _client = client ?? http.Client(),
+      _baseUrl = baseUrl ?? apiBaseUrl;
 
   final http.Client _client;
   final String _baseUrl;
@@ -58,8 +58,9 @@ class EventsApi {
   Future<ApiHealth> fetchHealth() async {
     final uri = Uri.parse('$_baseUrl/health');
     try {
-      final response =
-          await _client.get(uri).timeout(const Duration(seconds: 8));
+      final response = await _client
+          .get(uri)
+          .timeout(const Duration(seconds: 8));
       if (response.statusCode != 200) {
         return ApiHealth(
           ok: false,
@@ -82,18 +83,13 @@ class EventsApi {
         service: decoded['service']?.toString(),
       );
     } on Exception catch (e) {
-      return ApiHealth(
-        ok: false,
-        baseUrl: _baseUrl,
-        error: e.toString(),
-      );
+      return ApiHealth(ok: false, baseUrl: _baseUrl, error: e.toString());
     }
   }
 
   Future<EventPageResult> fetchEvents(EventQuery query) async {
-    final uri = Uri.parse('$_baseUrl/events').replace(
-      queryParameters: query.toQueryParameters(),
-    );
+    final uri = Uri.parse('$_baseUrl/events')
+        .replace(queryParameters: query.toQueryParameters());
 
     final decoded = await _getJson(uri);
     if (decoded is! Map<String, dynamic>) {
@@ -102,10 +98,7 @@ class EventsApi {
 
     final items = decoded['items'];
     final list = items is List
-        ? items
-            .whereType<Map<String, dynamic>>()
-            .map(Event.fromJson)
-            .toList()
+        ? items.whereType<Map<String, dynamic>>().map(Event.fromJson).toList()
         : <Event>[];
 
     return EventPageResult(
@@ -114,7 +107,9 @@ class EventsApi {
       limit: decoded['limit'] is num
           ? (decoded['limit'] as num).toInt()
           : query.limit,
-      total: decoded['total'] is num ? (decoded['total'] as num).toInt() : list.length,
+      total: decoded['total'] is num
+          ? (decoded['total'] as num).toInt()
+          : list.length,
     );
   }
 
@@ -125,12 +120,7 @@ class EventsApi {
     int limit = 50,
   }) async {
     final page = await fetchEvents(
-      EventQuery(
-        lat: lat,
-        lng: lng,
-        radiusKm: radiusKm,
-        limit: limit,
-      ),
+      EventQuery(lat: lat, lng: lng, radiusKm: radiusKm, limit: limit),
     );
     return page.items;
   }

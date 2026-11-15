@@ -35,6 +35,7 @@ task #85: afegeix pins al mapa amb GET /events
 ## Abans del PR
 
 ```powershell
+dart format lib test
 flutter analyze --no-fatal-infos
 flutter test
 ```
