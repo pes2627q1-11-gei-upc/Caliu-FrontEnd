@@ -111,6 +111,45 @@ A l’app, pestanya **Perfil** → «Estat del servidor» (ha de sortir verd / C
 
 Més detall: [docs/onboarding.md](docs/onboarding.md).
 
+## Provar a la web
+
+L'app final és **només Android**, però també es compila per a web perquè la puguem provar des de l'ordinador sense emulador ni mòbil. Guia completa: [docs/deploy-web.md](docs/deploy-web.md).
+
+### Versió desplegada (sempre activa)
+
+**https://pes2627q1-11-gei-upc.github.io/Caliu-FrontEnd/**
+
+- Es publica automàticament a **cada merge a `development`** (workflow [`deploy-web.yml`](.github/workflows/deploy-web.yml), 3–5 min).
+- Fa servir l'API de Render (`https://caliu-api.onrender.com`).
+- Si no veus l'últim canvi: **Ctrl + Shift + R** (el navegador guarda la versió anterior uns minuts).
+
+### En local
+
+Des de l'arrel del repo:
+
+```powershell
+.\scripts\run-web.ps1
+```
+
+- Obre Chrome a `http://localhost:5000` amb hot reload (`r` a la terminal per recarregar, `R` per reiniciar).
+- Agafa la clau de Maps d'`android/local.properties` (genera `web/maps_config.js`, que no es puja).
+- Fa servir l'API de `.env` si existeix (copia `.env.example` → `.env`); si no, Render.
+
+Per comprovar que compila com al deploy:
+
+```powershell
+flutter build web --release --dart-define=API_BASE_URL=https://caliu-api.onrender.com
+python -m http.server 5000 --directory build\web   # obre http://localhost:5000
+```
+
+### Si no carreguen esdeveniments
+
+1. **Render s'adorm** (pla gratuït): obre https://caliu-api.onrender.com/health, espera `{"status":"ok"}` (fins a 1 min) i recarrega.
+2. **F12 → Console:** si surt un error de **CORS**, el port no és el 5000 o falta l'origen a `CORS_ORIGINS` de Render.
+3. **Mapa gris:** falta la clau a `android/local.properties` o la *Maps JavaScript API* no està activada.
+
+> Abans de tancar una H.U, prova-la també al mòbil: permisos, notificacions i rendiment real no es poden validar a web.
+
 ## Stack
 
 | Peça | Tecnologia |
