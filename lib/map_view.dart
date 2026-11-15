@@ -9,6 +9,7 @@ import 'data/events_api.dart';
 import 'event_detail_screen.dart';
 import 'search_screen.dart';
 import 'theme/caliu_colors.dart';
+import 'widgets/event_preview_card.dart';
 
 /// Amaga POIs i etiquetes de llocs de Google (feedback demo: sense info externa).
 const String _mapStyleNoPois = '''
@@ -49,6 +50,9 @@ class _MapViewState extends State<MapView> {
 
   GoogleMapController? mapController;
   Set<Marker> _markers = {};
+
+  /// #44: esdeveniment del marcador tocat (previsualització ràpida).
+  Event? _selected;
   final Map<String, Event> _eventsById = {};
 
   bool _eventsRequestInFlight = false;
@@ -401,25 +405,22 @@ class _MapViewState extends State<MapView> {
   }
 
   Marker _markerFor(Event event) {
-    final category =
-        event.categories.isNotEmpty ? event.categories.first : null;
-    final distanceKm = event.distanceMeters != null
-        ? '${(event.distanceMeters! / 1000).toStringAsFixed(1)} km'
-        : null;
-    final snippet = [
-      ?category,
-      ?distanceKm,
-    ].join(' · ');
-
     return Marker(
       markerId: MarkerId(event.id),
       position: event.location!,
-      infoWindow: InfoWindow(
-        title: event.title,
-        snippet: snippet.isEmpty ? null : snippet,
-      ),
-      onTap: () => _openDetail(event),
+      // Només el títol: la resta d'informació va a la previsualització (#44).
+      infoWindow: InfoWindow(title: event.title),
+      onTap: () => _selectEvent(event),
     );
+  }
+
+  void _selectEvent(Event event) {
+    setState(() => _selected = _eventsById[event.id] ?? event);
+  }
+
+  void _clearSelection() {
+    if (_selected == null) return;
+    setState(() => _selected = null);
   }
 
   void _openDetail(Event event) {
@@ -481,7 +482,12 @@ class _MapViewState extends State<MapView> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: _selected == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _clearSelection();
+      },
+      child: Scaffold(
       appBar: AppBar(
         backgroundColor: CaliuColors.maroonDeep,
         foregroundColor: Colors.white,
@@ -560,7 +566,10 @@ class _MapViewState extends State<MapView> {
                     ),
                   ),
                 Expanded(
-                  child: GoogleMap(
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: GoogleMap(
                     onMapCreated: _onMapCreated,
                     style: _mapStyleNoPois,
                     initialCameraPosition: CameraPosition(
@@ -580,11 +589,40 @@ class _MapViewState extends State<MapView> {
                     markers: _markers,
                     onCameraMove: _onCameraMove,
                     onCameraIdle: _onCameraIdle,
-                    onTap: (_) {},
+                    // #44: tocar el mapa fora d'un marcador tanca la previsualització.
+                    onTap: (_) => _clearSelection(),
+                  ),
+                      ),
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          transitionBuilder: (child, animation) =>
+                              SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0, 1),
+                              end: Offset.zero,
+                            ).animate(animation),
+                            child: child,
+                          ),
+                          child: _selected == null
+                              ? const SizedBox.shrink(key: ValueKey('none'))
+                              : EventPreviewCard(
+                                  key: ValueKey(_selected!.id),
+                                  event: _selected!,
+                                  onOpen: () => _openDetail(_selected!),
+                                  onClose: _clearSelection,
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
+      ),
     );
   }
 }
