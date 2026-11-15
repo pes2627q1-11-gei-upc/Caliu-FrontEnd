@@ -29,8 +29,16 @@ enum DateRangeFilter {
           return DateRange(now, _endOfDay(sunday));
         }
         final daysToSaturday = DateTime.saturday - now.weekday;
-        final saturday = DateTime(now.year, now.month, now.day + daysToSaturday);
-        final sunday = DateTime(saturday.year, saturday.month, saturday.day + 1);
+        final saturday = DateTime(
+          now.year,
+          now.month,
+          now.day + daysToSaturday,
+        );
+        final sunday = DateTime(
+          saturday.year,
+          saturday.month,
+          saturday.day + 1,
+        );
         return DateRange(saturday, _endOfDay(sunday));
     }
   }

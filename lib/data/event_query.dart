@@ -99,8 +99,9 @@ class EventQuery {
       category: clearCategory ? null : (category ?? this.category),
       tag: tag ?? this.tag,
       comarca: clearComarca ? null : (comarca ?? this.comarca),
-      municipality:
-          clearMunicipality ? null : (municipality ?? this.municipality),
+      municipality: clearMunicipality
+          ? null
+          : (municipality ?? this.municipality),
       lat: lat ?? this.lat,
       lng: lng ?? this.lng,
       radiusKm: radiusKm ?? this.radiusKm,

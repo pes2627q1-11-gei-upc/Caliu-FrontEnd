@@ -75,7 +75,10 @@ class Event {
 
     List<String> parseStringList(dynamic value) {
       if (value is List) {
-        return value.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+        return value
+            .map((e) => e.toString())
+            .where((e) => e.isNotEmpty)
+            .toList();
       }
       return const [];
     }

@@ -64,8 +64,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     } on Exception {
       if (!mounted) return;
       setState(() {
-        _errorMessage =
-            'El compte s’ha creat, però no s’ha pogut desar la sessió de forma segura. Inicia sessió per continuar.';
+        _errorMessage = 'El compte s’ha creat, però no s’ha pogut desar la sessió de forma segura. Inicia sessió per continuar.';
         _isSubmitting = false;
       });
     }
@@ -142,8 +141,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             textInputAction: TextInputAction.next,
             decoration: InputDecoration(
               labelText: 'Contrasenya',
-              helperText:
-                  'Mínim 8 caràcters Unicode i màxim 72 bytes UTF-8.',
+              helperText: 'Mínim 8 caràcters Unicode i màxim 72 bytes UTF-8.',
               prefixIcon: const Icon(Icons.lock_outline),
               border: const OutlineInputBorder(),
               suffixIcon: IconButton(

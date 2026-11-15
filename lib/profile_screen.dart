@@ -195,15 +195,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context, _LogoutFailureChoice.cancel),
+              onPressed: () =>
+                  Navigator.pop(context, _LogoutFailureChoice.cancel),
               child: const Text('Mantén la sessió'),
             ),
             TextButton(
-              onPressed: () => Navigator.pop(context, _LogoutFailureChoice.retry),
+              onPressed: () =>
+                  Navigator.pop(context, _LogoutFailureChoice.retry),
               child: const Text('Reintenta'),
             ),
             FilledButton(
-              onPressed: () => Navigator.pop(context, _LogoutFailureChoice.local),
+              onPressed: () =>
+                  Navigator.pop(context, _LogoutFailureChoice.local),
               child: const Text('Tanca només aquí'),
             ),
           ],
@@ -348,12 +351,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   CircleAvatar(
                     backgroundColor: CaliuColors.maroon,
                     foregroundColor: Colors.white,
-                    child: Text(
-                      () {
-                        final name = profile.username?.trim() ?? '';
-                        return name.isEmpty ? '?' : name[0].toUpperCase();
-                      }(),
-                    ),
+                    child: Text(() {
+                      final name = profile.username?.trim() ?? '';
+                      return name.isEmpty ? '?' : name[0].toUpperCase();
+                    }()),
                   ),
                   const SizedBox(width: 12),
                   Expanded(

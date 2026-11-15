@@ -77,9 +77,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         if (_event == null) _error = e.message;
       });
       if (_event != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
       }
     } catch (e) {
       if (!mounted) return;
@@ -99,8 +98,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     }
 
     final day = _weekdays[start.weekday - 1];
-    final date =
-        '$day, ${start.day} de ${_months[start.month - 1]}';
+    final date = '$day, ${start.day} de ${_months[start.month - 1]}';
     final time =
         '${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}';
     final schedule = event.schedule?.trim();
@@ -117,9 +115,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 
   void _stub(String label) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$label (properament)')),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('$label (properament)')));
   }
 
   Future<void> _openOfficialUrl(String rawUrl) async {
@@ -189,10 +186,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     final categoryLabel = event.categories.isNotEmpty
         ? event.categories.join(' | ').toUpperCase()
         : null;
-    final chips = <String>{
-      ...event.categories,
-      ...event.tags,
-    }.toList();
+    final chips = <String>{...event.categories, ...event.tags}.toList();
     final price = _priceLabel(event);
     final place = event.placeLine;
 
@@ -328,8 +322,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             SizedBox(
                               width: double.infinity,
                               child: OutlinedButton.icon(
-                                onPressed: () =>
-                                    _openOfficialUrl(event.url!),
+                                onPressed: () => _openOfficialUrl(event.url!),
                                 icon: const Icon(Icons.open_in_new),
                                 label: const Text('Web oficial'),
                                 style: OutlinedButton.styleFrom(

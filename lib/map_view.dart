@@ -514,10 +514,8 @@ class _MapViewState extends State<MapView> {
               final target = _lastCamera?.target ?? _focus;
               Navigator.of(context).push(
                 MaterialPageRoute(
-                  builder: (_) => SearchScreen(
-                    lat: target.latitude,
-                    lng: target.longitude,
-                  ),
+                  builder: (_) =>
+                      SearchScreen(lat: target.latitude, lng: target.longitude),
                 ),
               );
             },
@@ -555,9 +553,7 @@ class _MapViewState extends State<MapView> {
                               child: const Text('Configuració'),
                             )
                           : TextButton(
-                              onPressed: _locating
-                                  ? null
-                                  : _onRecenterPressed,
+                              onPressed: _locating ? null : _onRecenterPressed,
                               child: const Text('Reintentar'),
                             ),
                     ),
