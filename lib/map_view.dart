@@ -34,6 +34,7 @@ final LatLngBounds _cataloniaBounds = LatLngBounds(
 enum _LocationMode {
   /// Centrat a la posició de l'usuari.
   user,
+
   /// Sense GPS usable: mostrem Barcelona.
   fallbackBarcelona,
 }
@@ -94,9 +95,7 @@ class _MapViewState extends State<MapView> {
   }
 
   /// #153: centra al GPS si es pot; si es denega el permís, Barcelona + banner.
-  Future<void> _resolveAndApplyFocus({
-    required bool requestIfNeeded,
-  }) async {
+  Future<void> _resolveAndApplyFocus({required bool requestIfNeeded}) async {
     setState(() => _locating = true);
     try {
       final result = await _resolveFocus(requestIfNeeded: requestIfNeeded);
@@ -117,12 +116,10 @@ class _MapViewState extends State<MapView> {
     }
   }
 
-  Future<({
-    LatLng focus,
-    _LocationMode mode,
-    String? banner,
-    bool deniedForever,
-  })> _resolveFocus({required bool requestIfNeeded}) async {
+  Future<
+    ({LatLng focus, _LocationMode mode, String? banner, bool deniedForever})
+  >
+  _resolveFocus({required bool requestIfNeeded}) async {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
@@ -143,8 +140,7 @@ class _MapViewState extends State<MapView> {
         return (
           focus: _barcelona,
           mode: _LocationMode.fallbackBarcelona,
-          banner:
-              'Permís d\'ubicació denegat. Pots activar-lo amb el botó d\'ubicació.',
+          banner: 'Permís d\'ubicació denegat. Pots activar-lo amb el botó d\'ubicació.',
           deniedForever: false,
         );
       }
@@ -153,8 +149,7 @@ class _MapViewState extends State<MapView> {
         return (
           focus: _barcelona,
           mode: _LocationMode.fallbackBarcelona,
-          banner:
-              'Permís d\'ubicació bloquejat. Obre la configuració per activar-lo.',
+          banner: 'Permís d\'ubicació bloquejat. Obre la configuració per activar-lo.',
           deniedForever: true,
         );
       }
@@ -233,10 +228,10 @@ class _MapViewState extends State<MapView> {
   }
 
   LatLngBounds _expandBounds(LatLngBounds bounds, double marginFraction) {
-    final latSpan =
-        (bounds.northeast.latitude - bounds.southwest.latitude).abs();
-    final lngSpan =
-        (bounds.northeast.longitude - bounds.southwest.longitude).abs();
+    final latSpan = (bounds.northeast.latitude - bounds.southwest.latitude)
+        .abs();
+    final lngSpan = (bounds.northeast.longitude - bounds.southwest.longitude)
+        .abs();
     final latPad = latSpan * marginFraction;
     final lngPad = lngSpan * marginFraction;
     return LatLngBounds(
@@ -259,14 +254,11 @@ class _MapViewState extends State<MapView> {
   }
 
   bool _isUsableBounds(LatLngBounds bounds) {
-    final latSpan =
-        (bounds.northeast.latitude - bounds.southwest.latitude).abs();
-    final lngSpan =
-        (bounds.northeast.longitude - bounds.southwest.longitude).abs();
-    return latSpan > 0.002 &&
-        lngSpan > 0.002 &&
-        latSpan < 40 &&
-        lngSpan < 40;
+    final latSpan = (bounds.northeast.latitude - bounds.southwest.latitude)
+        .abs();
+    final lngSpan = (bounds.northeast.longitude - bounds.southwest.longitude)
+        .abs();
+    return latSpan > 0.002 && lngSpan > 0.002 && latSpan < 40 && lngSpan < 40;
   }
 
   LatLng _boundsCenter(LatLngBounds bounds) {
@@ -290,8 +282,14 @@ class _MapViewState extends State<MapView> {
     final latDelta = radiusKm / 111.0;
     final lngDelta = radiusKm / 85.0;
     return LatLngBounds(
-      southwest: LatLng(center.latitude - latDelta, center.longitude - lngDelta),
-      northeast: LatLng(center.latitude + latDelta, center.longitude + lngDelta),
+      southwest: LatLng(
+        center.latitude - latDelta,
+        center.longitude - lngDelta,
+      ),
+      northeast: LatLng(
+        center.latitude + latDelta,
+        center.longitude + lngDelta,
+      ),
     );
   }
 
@@ -436,9 +434,8 @@ class _MapViewState extends State<MapView> {
 
   void _showMessage(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _refresh() async {
@@ -488,140 +485,145 @@ class _MapViewState extends State<MapView> {
         if (!didPop) _clearSelection();
       },
       child: Scaffold(
-      appBar: AppBar(
-        backgroundColor: CaliuColors.maroonDeep,
-        foregroundColor: Colors.white,
-        title: const Text('Mapa'),
-        actions: [
-          IconButton(
-            tooltip: _hasUserLocation
-                ? 'Centrar a la meva ubicació'
-                : 'Activar ubicació',
-            onPressed: _locating ? null : _onRecenterPressed,
-            icon: _locating
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
+        appBar: AppBar(
+          backgroundColor: CaliuColors.maroonDeep,
+          foregroundColor: Colors.white,
+          title: const Text('Mapa'),
+          actions: [
+            IconButton(
+              tooltip: _hasUserLocation
+                  ? 'Centrar a la meva ubicació'
+                  : 'Activar ubicació',
+              onPressed: _locating ? null : _onRecenterPressed,
+              icon: _locating
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Icon(
+                      _hasUserLocation
+                          ? Icons.my_location
+                          : Icons.location_disabled,
                     ),
-                  )
-                : Icon(
-                    _hasUserLocation
-                        ? Icons.my_location
-                        : Icons.location_disabled,
-                  ),
-          ),
-          IconButton(
-            tooltip: 'Cerca',
-            onPressed: () {
-              final target = _lastCamera?.target ?? _focus;
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => SearchScreen(
-                    lat: target.latitude,
-                    lng: target.longitude,
-                  ),
-                ),
-              );
-            },
-            icon: const Icon(Icons.search),
-          ),
-          IconButton(
-            tooltip: 'Actualitzar',
-            onPressed: _eventsRequestInFlight ? null : _refresh,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
-      ),
-      body: !_mapReadyToShow
-          ? const ColoredBox(color: CaliuColors.beige)
-          : Column(
-              children: [
-                if (_locationBanner != null)
-                  Material(
-                    color: CaliuColors.beigeCard,
-                    child: ListTile(
-                      dense: true,
-                      leading: Icon(
-                        _permissionDeniedForever
-                            ? Icons.location_off
-                            : Icons.location_city,
-                        color: CaliuColors.maroon,
-                      ),
-                      title: Text(
-                        _locationBanner!,
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                      trailing: _permissionDeniedForever
-                          ? TextButton(
-                              onPressed: () => Geolocator.openAppSettings(),
-                              child: const Text('Configuració'),
-                            )
-                          : TextButton(
-                              onPressed: _locating ? null : _onRecenterPressed,
-                              child: const Text('Reintentar'),
-                            ),
-                    ),
-                  ),
-                Expanded(
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: GoogleMap(
-                    onMapCreated: _onMapCreated,
-                    style: _mapStyleNoPois,
-                    initialCameraPosition: CameraPosition(
-                      target: _focus,
-                      zoom: _initialZoom,
-                    ),
-                    // #117: càmera limitada a Catalunya.
-                    cameraTargetBounds:
-                        CameraTargetBounds(_cataloniaBounds),
-                    minMaxZoomPreference:
-                        const MinMaxZoomPreference(7, 18),
-                    // #153: només si tenim permís (evita comportaments estranys).
-                    myLocationEnabled: _hasUserLocation,
-                    myLocationButtonEnabled: false,
-                    mapToolbarEnabled: false,
-                    compassEnabled: true,
-                    markers: _markers,
-                    onCameraMove: _onCameraMove,
-                    onCameraIdle: _onCameraIdle,
-                    // #44: tocar el mapa fora d'un marcador tanca la previsualització.
-                    onTap: (_) => _clearSelection(),
-                  ),
-                      ),
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 220),
-                          transitionBuilder: (child, animation) =>
-                              SlideTransition(
-                            position: Tween<Offset>(
-                              begin: const Offset(0, 1),
-                              end: Offset.zero,
-                            ).animate(animation),
-                            child: child,
-                          ),
-                          child: _selected == null
-                              ? const SizedBox.shrink(key: ValueKey('none'))
-                              : EventPreviewCard(
-                                  key: ValueKey(_selected!.id),
-                                  event: _selected!,
-                                  onOpen: () => _openDetail(_selected!),
-                                  onClose: _clearSelection,
-                                ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ),
+            IconButton(
+              tooltip: 'Cerca',
+              onPressed: () {
+                final target = _lastCamera?.target ?? _focus;
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => SearchScreen(
+                      lat: target.latitude,
+                      lng: target.longitude,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.search),
+            ),
+            IconButton(
+              tooltip: 'Actualitzar',
+              onPressed: _eventsRequestInFlight ? null : _refresh,
+              icon: const Icon(Icons.refresh),
+            ),
+          ],
+        ),
+        body: !_mapReadyToShow
+            ? const ColoredBox(color: CaliuColors.beige)
+            : Column(
+                children: [
+                  if (_locationBanner != null)
+                    Material(
+                      color: CaliuColors.beigeCard,
+                      child: ListTile(
+                        dense: true,
+                        leading: Icon(
+                          _permissionDeniedForever
+                              ? Icons.location_off
+                              : Icons.location_city,
+                          color: CaliuColors.maroon,
+                        ),
+                        title: Text(
+                          _locationBanner!,
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                        trailing: _permissionDeniedForever
+                            ? TextButton(
+                                onPressed: () => Geolocator.openAppSettings(),
+                                child: const Text('Configuració'),
+                              )
+                            : TextButton(
+                                onPressed: _locating
+                                    ? null
+                                    : _onRecenterPressed,
+                                child: const Text('Reintentar'),
+                              ),
+                      ),
+                    ),
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        Positioned.fill(
+                          child: GoogleMap(
+                            onMapCreated: _onMapCreated,
+                            style: _mapStyleNoPois,
+                            initialCameraPosition: CameraPosition(
+                              target: _focus,
+                              zoom: _initialZoom,
+                            ),
+                            // #117: càmera limitada a Catalunya.
+                            cameraTargetBounds: CameraTargetBounds(
+                              _cataloniaBounds,
+                            ),
+                            minMaxZoomPreference: const MinMaxZoomPreference(
+                              7,
+                              18,
+                            ),
+                            // #153: només si tenim permís (evita comportaments estranys).
+                            myLocationEnabled: _hasUserLocation,
+                            myLocationButtonEnabled: false,
+                            mapToolbarEnabled: false,
+                            compassEnabled: true,
+                            markers: _markers,
+                            onCameraMove: _onCameraMove,
+                            onCameraIdle: _onCameraIdle,
+                            // #44: tocar el mapa fora d'un marcador tanca la previsualització.
+                            onTap: (_) => _clearSelection(),
+                          ),
+                        ),
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 220),
+                            transitionBuilder: (child, animation) =>
+                                SlideTransition(
+                                  position: Tween<Offset>(
+                                    begin: const Offset(0, 1),
+                                    end: Offset.zero,
+                                  ).animate(animation),
+                                  child: child,
+                                ),
+                            child: _selected == null
+                                ? const SizedBox.shrink(key: ValueKey('none'))
+                                : EventPreviewCard(
+                                    key: ValueKey(_selected!.id),
+                                    event: _selected!,
+                                    onOpen: () => _openDetail(_selected!),
+                                    onClose: _clearSelection,
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
       ),
     );
   }

@@ -16,17 +16,16 @@ Event _event({
   List<String> categories = const ['Música en directe'],
   String? venue = 'Parc del Fòrum',
   String? municipality = 'Barcelona',
-}) =>
-    Event(
-      id: id,
-      title: title,
-      startDate: start,
-      endDate: end,
-      categories: categories,
-      venue: venue,
-      municipality: municipality,
-      location: const LatLng(41.41, 2.22),
-    );
+}) => Event(
+  id: id,
+  title: title,
+  startDate: start,
+  endDate: end,
+  categories: categories,
+  venue: venue,
+  municipality: municipality,
+  location: const LatLng(41.41, 2.22),
+);
 
 Future<void> _pumpCard(
   WidgetTester tester,
@@ -93,10 +92,7 @@ void main() {
 
   group('EventPreviewCard', () {
     testWidgets('mostra categoria, títol, data i lloc', (tester) async {
-      await _pumpCard(
-        tester,
-        _event(start: DateTime(2026, 11, 15, 19, 30)),
-      );
+      await _pumpCard(tester, _event(start: DateTime(2026, 11, 15, 19, 30)));
 
       expect(find.text('MÚSICA EN DIRECTE'), findsOneWidget);
       expect(find.text('Festival Sonar Beats'), findsOneWidget);
@@ -104,8 +100,9 @@ void main() {
       expect(find.text('Parc del Fòrum, Barcelona'), findsOneWidget);
     });
 
-    testWidgets('sense categoria ni lloc no mostra aquestes línies',
-        (tester) async {
+    testWidgets('sense categoria ni lloc no mostra aquestes línies', (
+      tester,
+    ) async {
       await _pumpCard(
         tester,
         _event(categories: const [], venue: null, municipality: null),

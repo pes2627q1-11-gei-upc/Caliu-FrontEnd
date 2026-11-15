@@ -31,8 +31,9 @@ class EventPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final category =
-        event.categories.isNotEmpty ? event.categories.first : null;
+    final category = event.categories.isNotEmpty
+        ? event.categories.first
+        : null;
     final place = event.placeLine;
 
     return Material(
