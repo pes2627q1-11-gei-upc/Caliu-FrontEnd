@@ -37,10 +37,6 @@ de data; es tanca amb la creu o el botó enrere. El contingut es pot desplaçar
 i el botó d'aplicar queda fix a baix, dins de la zona segura.
 El radi s'aplica en deixar anar el lliscador de «Filtrar», i el botó
 «Aplicar filtres» mostra el total d'esdeveniments dels filtres seleccionats.
-Comarca i Municipi són selectors amb les localitats retornades per
-`GET /events/locations`. En escollir una comarca, el municipi es restableix
-i només s'ofereixen els seus municipis. Cal desplegar primer aquest endpoint
-al backend; si no està disponible, es mostra un error amb opció de reintentar.
 
 ## Arrencada ràpida
 
