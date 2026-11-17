@@ -260,11 +260,12 @@ void main() {
     expect(find.byType(Slider), findsNothing);
     await tester.tap(find.byTooltip('Filtres'));
     await tester.pumpAndSettle();
-    expect(find.text('Radi aplicat: 5,0 km'), findsOneWidget);
+    expect(find.text('Treure radi'), findsOneWidget);
+    expect(find.textContaining('Radi aplicat:'), findsNothing);
     await tester.tap(find.text('Restablir tot'));
     await tester.pumpAndSettle();
     expect(radius.radiusKm, isNull);
-    expect(find.text('Radi aplicat: 5,0 km'), findsNothing);
+    expect(find.text('Treure radi'), findsNothing);
     expect(tester.widget<Slider>(find.byType(Slider)).value, 5);
     await tester.ensureVisible(find.text('Aplicar filtres'));
     await tester.tap(find.text('Aplicar filtres'));
@@ -293,7 +294,8 @@ void main() {
     await tester.tap(find.byTooltip('Filtres'));
     await tester.pumpAndSettle();
     expect(tester.widget<Slider>(find.byType(Slider)).value, 50);
-    expect(find.text('Radi aplicat: 500,0 km'), findsOneWidget);
+    expect(radius.radiusKm, 500);
+    expect(find.textContaining('Radi aplicat:'), findsNothing);
     tester.widget<Slider>(find.byType(Slider)).onChangeEnd!(50);
     await tester.pumpAndSettle();
     expect(radius.radiusKm, 50);

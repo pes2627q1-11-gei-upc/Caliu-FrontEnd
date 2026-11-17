@@ -408,8 +408,6 @@ class _SearchScreenState extends State<SearchScreen> {
               ? null
               : (value) => _radius.apply(value),
         ),
-        if (_radius.radiusKm != null)
-          Text('Radi aplicat: ${distance(_radius.radiusKm!)}'),
         if (_radius.locating) const Text('Obtenint ubicació…'),
         if (_radius.radiusKm != null || _radius.locating)
           TextButton(
