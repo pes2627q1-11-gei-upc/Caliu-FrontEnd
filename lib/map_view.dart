@@ -86,8 +86,11 @@ class _MapViewState extends State<MapView> {
   int _clusterGeneration = 0;
   bool _clusteringEnabled = true;
 
-  /// En allunyar: refresca a l'idle sense bloquejar els pins de cache.
+  /// En allunyar: refresca a l'idle només si el mapa ha quedat buit.
   bool _pendingWideReload = false;
+
+  /// Zona on ja hem confirmat que no hi ha esdeveniments (evita bucle de fetch).
+  LatLngBounds? _confirmedEmptyBounds;
 
   bool get _hasUserLocation => _locationMode == _LocationMode.user;
 
@@ -241,6 +244,7 @@ class _MapViewState extends State<MapView> {
     if (!mounted) return;
     _loadedBounds = null;
     _loadedZoom = null;
+    _confirmedEmptyBounds = null;
     await _loadAroundFocus(focus: _focus, notifyIfEmpty: false);
   }
 
@@ -268,6 +272,22 @@ class _MapViewState extends State<MapView> {
         outer.southwest.longitude <= inner.southwest.longitude &&
         outer.northeast.latitude >= inner.northeast.latitude &&
         outer.northeast.longitude >= inner.northeast.longitude;
+  }
+
+  bool _pointInBounds(LatLngBounds bounds, LatLng point) {
+    return point.latitude >= bounds.southwest.latitude &&
+        point.latitude <= bounds.northeast.latitude &&
+        point.longitude >= bounds.southwest.longitude &&
+        point.longitude <= bounds.northeast.longitude;
+  }
+
+  /// True si no hi ha cap pin dins la zona visible (pantalla “buida”).
+  bool _screenLooksEmpty(LatLngBounds visible) {
+    if (_markers.isEmpty) return true;
+    for (final marker in _markers) {
+      if (_pointInBounds(visible, marker.position)) return false;
+    }
+    return true;
   }
 
   bool _isUsableBounds(LatLngBounds bounds) {
@@ -332,17 +352,23 @@ class _MapViewState extends State<MapView> {
       visible = _boundsAround(_lastCamera?.target ?? _focus, 8);
     }
 
-    final zoom = _lastCamera?.zoom ?? _initialZoom;
-    // Si hem allunyat des de l'última càrrega, la zona visible és més gran:
-    // no reutilitzar la cache (si no, queden mapa buit / sense clústers).
-    final zoomedOutSinceLoad =
-        _loadedZoom != null && zoom < (_loadedZoom! - 0.6);
+    final screenEmpty = _screenLooksEmpty(visible);
+    final alreadyConfirmedEmpty =
+        _confirmedEmptyBounds != null &&
+        _boundsContain(_confirmedEmptyBounds!, visible);
 
-    if (!force &&
-        !zoomedOutSinceLoad &&
-        _loadedBounds != null &&
-        _boundsContain(_loadedBounds!, visible)) {
-      return;
+    // Refresh / càrrega inicial (notifyIfEmpty): pot forçar sempre.
+    final userForced = force && notifyIfEmpty;
+
+    if (!userForced) {
+      // Hi ha pins a pantalla → no demanar xarxa.
+      if (!screenEmpty) return;
+      // Pantalla buida: només una actualització; si ja sabem que no hi ha res, res.
+      if (alreadyConfirmedEmpty || _eventsRequestInFlight) return;
+      // Zona ja carregada sense pins aquí → no insistir.
+      if (_loadedBounds != null && _boundsContain(_loadedBounds!, visible)) {
+        return;
+      }
     }
 
     final queryBounds = _expandBounds(visible, _viewportMargin);
@@ -406,6 +432,8 @@ class _MapViewState extends State<MapView> {
         ..addAll(byId);
       _loadedBounds = queryBounds;
       _loadedZoom = _lastCamera?.zoom ?? _initialZoom;
+      // Si no hi ha res: marcar la zona perquè no tornem a demanar en bucle.
+      _confirmedEmptyBounds = withLocation.isEmpty ? queryBounds : null;
 
       setState(() {
         _clusteringEnabled = shouldClusterAtZoom(
@@ -473,9 +501,11 @@ class _MapViewState extends State<MapView> {
       );
     });
     if (enablingClusters) {
-      // Allunyar: refresca en idle (evita un fetch síncron que deixa el mapa “pensant”).
+      // Allunyar: a l'idle només refresca si el mapa ha quedat buit.
       _pendingWideReload = true;
       _loadedZoom = null;
+      _loadedBounds = null;
+      _confirmedEmptyBounds = null;
     }
   }
 
@@ -506,6 +536,7 @@ class _MapViewState extends State<MapView> {
   }
 
   Future<void> _refresh() async {
+    _confirmedEmptyBounds = null;
     await _reloadForVisibleRegion(
       force: true,
       notifyIfEmpty: true,
