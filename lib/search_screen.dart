@@ -178,77 +178,87 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  Future<bool?> _showFilters(EventCountPreview preview) {
-    return showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      useRootNavigator: true,
-      useSafeArea: true,
-      backgroundColor: CaliuColors.beigeCard,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return ListenableBuilder(
-          listenable: Listenable.merge([_radius, preview]),
-          builder: (context, _) => StatefulBuilder(
-            builder: (context, setModalState) {
-              final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-              final bottomSafe = MediaQuery.viewPaddingOf(context).bottom;
-              return Padding(
-                padding: EdgeInsets.fromLTRB(
-                  20,
-                  12,
-                  20,
-                  bottomInset + bottomSafe + 20,
+  Future<bool?> _showFilters(EventCountPreview preview) async {
+    final route = MaterialPageRoute<bool>(
+      builder: (context) => ListenableBuilder(
+        listenable: Listenable.merge([_radius, preview]),
+        builder: (context, _) => StatefulBuilder(
+          builder: (context, setModalState) => Scaffold(
+            backgroundColor: const Color(0xFFF5EDD6),
+            appBar: AppBar(
+              backgroundColor: const Color(0xFFF5EDD6),
+              foregroundColor: CaliuColors.maroonDeep,
+              surfaceTintColor: Colors.transparent,
+              centerTitle: true,
+              toolbarHeight: 64,
+              title: const Text(
+                'Filtrar',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              leading: IconButton(
+                tooltip: 'Tancar filtres',
+                onPressed: () => Navigator.pop(context, false),
+                icon: const Icon(Icons.close),
+                style: IconButton.styleFrom(backgroundColor: Colors.white),
+              ),
+              actions: [
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 130),
+                  child: TextButton(
+                    onPressed: () => setModalState(() {
+                      _draftRadius = _initialRadiusKm;
+                      _searchController.clear();
+                      _resetFilters();
+                    }),
+                    child: const FittedBox(
+                      child: Text(
+                        'Restablir tot',
+                        style: TextStyle(color: CaliuColors.red),
+                      ),
+                    ),
+                  ),
                 ),
+              ],
+            ),
+            body: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
                 child: Column(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Flexible(
+                    Expanded(
                       child: SingleChildScrollView(
+                        padding: const EdgeInsets.only(top: 20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Row(
-                              children: [
+                            SearchBar(
+                              controller: _searchController,
+                              hintText: 'Cerca esdeveniments, llocs…',
+                              leading: const Icon(Icons.search),
+                              onChanged: (_) {
+                                setModalState(() {});
+                                _updateFilterPreview();
+                              },
+                              trailing: [
                                 IconButton(
-                                  onPressed: () =>
-                                      Navigator.pop(context, false),
-                                  icon: const Icon(Icons.close),
-                                ),
-                                const Expanded(
-                                  child: Text(
-                                    'Filtrar',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                                  ),
-                                ),
-                                Flexible(
-                                  child: TextButton(
-                                    onPressed: () {
-                                      setModalState(() {
-                                        _draftRadius = _initialRadiusKm;
-                                        _resetFilters();
-                                      });
-                                    },
-                                    child: const Text(
-                                      'Restablir tot',
-                                      textAlign: TextAlign.end,
-                                      style: TextStyle(color: CaliuColors.red),
-                                    ),
-                                  ),
+                                  tooltip: 'Esborrar cerca',
+                                  icon: const Icon(Icons.clear),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setModalState(() {});
+                                    _updateFilterPreview();
+                                  },
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 8),
+                            const SizedBox(height: 28),
                             const Text(
-                              'Categories',
-                              style: TextStyle(fontWeight: FontWeight.w700),
+                              'CATEGORIES',
+                              style: TextStyle(
+                                color: CaliuColors.red,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                             const SizedBox(height: 10),
                             if (_loadingCategories)
@@ -300,6 +310,7 @@ class _SearchScreenState extends State<SearchScreen> {
                               ),
                             const SizedBox(height: 20),
                             _buildRadiusFilter(setModalState),
+                            _buildFilterDates(setModalState),
                             const SizedBox(height: 20),
                             TextField(
                               controller: _comarcaController,
@@ -331,23 +342,87 @@ class _SearchScreenState extends State<SearchScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    const Divider(height: 24),
                     _buildApplyFiltersButton(context, preview),
                     if (preview.error != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          preview.error!,
-                          style: const TextStyle(color: CaliuColors.red),
-                        ),
+                      Text(
+                        preview.error!,
+                        style: const TextStyle(color: CaliuColors.red),
                       ),
                   ],
                 ),
-              );
-            },
+              ),
+            ),
           ),
-        );
-      },
+        ),
+      ),
+    );
+    final result = await Navigator.of(context, rootNavigator: true).push(route);
+    // Manté vius els notificadors fins que s'ha desmuntat la ruta de sortida.
+    await route.completed;
+    return result;
+  }
+
+  Widget _buildFilterDates(StateSetter setModalState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'DATA I HORA',
+          style: TextStyle(color: CaliuColors.red, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 12),
+        LayoutBuilder(
+          builder: (context, constraints) => Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: DateRangeFilter.values.map((filter) {
+              final selected = _dateFilter == filter;
+              return SizedBox(
+                width: (constraints.maxWidth - 12) / 2,
+                child: Material(
+                  color: selected ? CaliuColors.red : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () {
+                      setModalState(
+                        () => _dateFilter = selected ? null : filter,
+                      );
+                      _updateFilterPreview();
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today,
+                            size: 20,
+                            color: selected ? Colors.white : CaliuColors.maroon,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              filter.label,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: selected
+                                    ? Colors.white
+                                    : CaliuColors.maroonDeep,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        const Divider(height: 40),
+      ],
     );
   }
 

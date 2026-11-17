@@ -20,6 +20,86 @@ String? _countLabel(WidgetTester tester) =>
 
 void main() {
   testWidgets(
+    'Filtrar és una ruta normal i tanca sense errors amb un recompte pendent',
+    (tester) async {
+      final pending = Completer<http.Response>();
+      final radius = SearchRadius(locate: () async => const LatLng(42, 1));
+      final api = EventsApi(
+        client: MockClient((request) async {
+          if (request.url.queryParameters['limit'] == '1') {
+            return pending.future;
+          }
+          return http.Response('{"items":[],"categories":[]}', 200);
+        }),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SearchScreen(radius: radius, api: api),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Filtres'));
+      await _settleCount(tester);
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.byType(AppBar), findsOneWidget);
+      await tester.drag(find.text('Filtrar'), const Offset(0, 300));
+      await tester.pumpAndSettle();
+      expect(find.text('Filtrar'), findsOneWidget);
+      await tester.tap(find.byTooltip('Tancar filtres'));
+      await tester.pump(const Duration(milliseconds: 50));
+      pending.complete(http.Response('{"items":[],"total":18}', 200));
+      await tester.pumpAndSettle();
+      expect(find.text('Filtrar'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byTooltip('Filtres'));
+      await _settleCount(tester);
+      expect(_countLabel(tester), '18 esdeveniments');
+      await tester.tap(find.byTooltip('Tancar filtres'));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+      radius.dispose();
+    },
+  );
+
+  testWidgets(
+    'la cerca i les targetes de data de Filtrar actualitzen el recompte',
+    (tester) async {
+      final requests = <Uri>[];
+      final radius = SearchRadius(locate: () async => const LatLng(42, 1));
+      final api = EventsApi(
+        client: MockClient((request) async {
+          requests.add(request.url);
+          return http.Response('{"items":[],"categories":[],"total":18}', 200);
+        }),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SearchScreen(radius: radius, api: api),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Filtres'));
+      await _settleCount(tester);
+      await tester.enterText(find.byType(TextField).first, 'jazz');
+      await tester.ensureVisible(find.text('Demà'));
+      await tester.tap(find.text('Demà'));
+      await _settleCount(tester);
+      expect(requests.last.queryParameters['q'], 'jazz');
+      expect(requests.last.queryParameters['from'], isNotNull);
+      expect(requests.last.queryParameters['to'], isNotNull);
+      expect(_countLabel(tester), '18 esdeveniments');
+      await tester.tap(find.text('Restablir tot'));
+      await _settleCount(tester);
+      expect(requests.last.queryParameters.containsKey('q'), isFalse);
+      expect(requests.last.queryParameters.containsKey('from'), isFalse);
+      await tester.tap(find.byTooltip('Tancar filtres'));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+      radius.dispose();
+    },
+  );
+
+  testWidgets(
     'el botó compta categories, municipi i radi abans de tancar Filtrar',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(390, 844));
