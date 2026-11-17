@@ -3,17 +3,14 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'event.dart';
 
 /// Prefix de l'id del [ClusterManager] (#114).
+///
+/// A cada càrrega es regenera l'id (`caliu-events-1`, `caliu-events-2`, …)
+/// perquè el plugin natiu netegi clústers buits que, si només es buiden els
+/// markers, poden quedar dibuixats a la pantalla.
 const String kEventClusterManagerIdPrefix = 'caliu-events';
-
-/// A partir d'aquest zoom (inclòs) es mostren pins individuals.
-/// El ClusterManager natiu no exposa `maxZoom`/`minClusterSize`; sense això
-/// els clústers es mantenen massa temps en apropar el mapa.
-const double kStopClusteringZoom = 13.5;
 
 ClusterManagerId eventClusterManagerId(int generation) =>
     ClusterManagerId('$kEventClusterManagerIdPrefix-$generation');
-
-bool shouldClusterAtZoom(double zoom) => zoom < kStopClusteringZoom;
 
 /// Resultat d'aplicar una càrrega de pins (markers + managers).
 class EventMarkerSet {
@@ -23,35 +20,19 @@ class EventMarkerSet {
   final Set<ClusterManager> clusterManagers;
 }
 
-/// Construeix markers (+ ClusterManager si [cluster] és true).
+/// Construeix markers + ClusterManager per a una generació de càrrega.
 ///
 /// Sense `onClusterTap`: el zoom en tocar un clúster és la #115.
-/// Llista buida → conjunts buits (treu el manager; evita clúster fantasma).
+/// Si no hi ha events amb ubicació, retorna conjunts buits (treu el manager
+/// perquè no quedi un clúster fantasma).
 EventMarkerSet buildEventMarkerSet(
   Iterable<Event> events, {
   required int clusterGeneration,
-  required bool cluster,
   required void Function(Event event) onTap,
 }) {
   final withLocation = events.where((event) => event.hasLocation).toList();
   if (withLocation.isEmpty) {
     return const EventMarkerSet(markers: {}, clusterManagers: {});
-  }
-
-  if (!cluster) {
-    return EventMarkerSet(
-      clusterManagers: const {},
-      markers: withLocation
-          .map(
-            (event) => Marker(
-              markerId: MarkerId(event.id),
-              position: event.location!,
-              infoWindow: InfoWindow(title: event.title),
-              onTap: () => onTap(event),
-            ),
-          )
-          .toSet(),
-    );
   }
 
   final managerId = eventClusterManagerId(clusterGeneration);
@@ -63,6 +44,7 @@ EventMarkerSet buildEventMarkerSet(
             markerId: MarkerId(event.id),
             position: event.location!,
             clusterManagerId: managerId,
+            // Només el títol: la resta va a la previsualització (#154 / #44).
             infoWindow: InfoWindow(title: event.title),
             onTap: () => onTap(event),
           ),

@@ -7,70 +7,85 @@ Event _event({required String id, String title = 'Acte', LatLng? location}) =>
     Event(id: id, title: title, location: location);
 
 void main() {
-  group('shouldClusterAtZoom', () {
-    test('agrupa només per sota del llindar', () {
-      expect(shouldClusterAtZoom(kStopClusteringZoom - 0.1), isTrue);
-      expect(shouldClusterAtZoom(kStopClusteringZoom), isFalse);
-      expect(shouldClusterAtZoom(kStopClusteringZoom + 1), isFalse);
-    });
-  });
-
   group('buildEventMarkerSet (#114)', () {
-    test('amb cluster: vincula els pins al ClusterManager', () {
-      final tapped = <String>[];
-      final set = buildEventMarkerSet(
+    test(
+      'només inclou esdeveniments amb ubicació i els vincula al ClusterManager',
+      () {
+        final tapped = <String>[];
+        final set = buildEventMarkerSet(
+          [
+            _event(id: 'a', location: const LatLng(41.4, 2.1)),
+            _event(id: 'b'), // sense ubicació → no surt
+            _event(
+              id: 'c',
+              title: 'Concert',
+              location: const LatLng(41.41, 2.11),
+            ),
+          ],
+          clusterGeneration: 3,
+          onTap: (e) => tapped.add(e.id),
+        );
+
+        expect(set.markers, hasLength(2));
+        expect(set.markers.map((m) => m.markerId.value).toSet(), {'a', 'c'});
+        final expectedId = eventClusterManagerId(3);
+        expect(set.clusterManagers.single.clusterManagerId, expectedId);
+        expect(
+          set.markers.every((m) => m.clusterManagerId == expectedId),
+          isTrue,
+        );
+        // Sense onClusterTap: la #115 afegirà el zoom.
+        expect(set.clusterManagers.single.onClusterTap, isNull);
+
+        set.markers.singleWhere((m) => m.markerId.value == 'c').onTap!();
+        expect(tapped, ['c']);
+      },
+    );
+
+    test('una recàrrega amb nova generació substitueix ids (sense antics ni duplicats)', () {
+      final first = buildEventMarkerSet(
         [
-          _event(id: 'a', location: const LatLng(41.4, 2.1)),
-          _event(id: 'b'),
-          _event(
-            id: 'c',
-            title: 'Concert',
-            location: const LatLng(41.41, 2.11),
-          ),
+          _event(id: 'old', location: const LatLng(41.4, 2.1)),
+          _event(id: 'keep', location: const LatLng(41.41, 2.11)),
         ],
-        clusterGeneration: 3,
-        cluster: true,
-        onTap: (e) => tapped.add(e.id),
+        clusterGeneration: 1,
+        onTap: (_) {},
+      );
+      final second = buildEventMarkerSet(
+        [
+          _event(id: 'keep', location: const LatLng(41.41, 2.11)),
+          _event(id: 'new', location: const LatLng(41.42, 2.12)),
+        ],
+        clusterGeneration: 2,
+        onTap: (_) {},
       );
 
-      expect(set.markers, hasLength(2));
-      final expectedId = eventClusterManagerId(3);
-      expect(set.clusterManagers.single.clusterManagerId, expectedId);
+      expect(first.markers.map((m) => m.markerId.value).toSet(), {
+        'old',
+        'keep',
+      });
+      expect(second.markers.map((m) => m.markerId.value).toSet(), {
+        'keep',
+        'new',
+      });
       expect(
-        set.markers.every((m) => m.clusterManagerId == expectedId),
-        isTrue,
+        first.clusterManagers.single.clusterManagerId,
+        isNot(second.clusterManagers.single.clusterManagerId),
       );
-      expect(set.clusterManagers.single.onClusterTap, isNull);
-      set.markers.singleWhere((m) => m.markerId.value == 'c').onTap!();
-      expect(tapped, ['c']);
     });
 
-    test('sense cluster: pins individuals (dissolve anticipat)', () {
-      final set = buildEventMarkerSet(
-        [
-          _event(id: 'a', location: const LatLng(41.4, 2.1)),
-          _event(id: 'c', location: const LatLng(41.41, 2.11)),
-        ],
-        clusterGeneration: 1,
-        cluster: false,
-        onTap: (_) {},
-      );
-
-      expect(set.clusterManagers, isEmpty);
-      expect(set.markers, hasLength(2));
-      expect(set.markers.every((m) => m.clusterManagerId == null), isTrue);
-    });
-
-    test('llista buida → sense markers ni ClusterManager', () {
-      final set = buildEventMarkerSet(
-        const [],
-        clusterGeneration: 1,
-        cluster: true,
-        onTap: (_) {},
-      );
-      expect(set.markers, isEmpty);
-      expect(set.clusterManagers, isEmpty);
-    });
+    test(
+      'llista buida → sense markers ni ClusterManager (evita clúster fantasma)',
+      () {
+        final set = buildEventMarkerSet(
+          const [],
+          clusterGeneration: 1,
+          onTap: (_) {},
+        );
+        expect(set.markers, isEmpty);
+        expect(set.clusterManagers, isEmpty);
+      },
+    );
   });
 
   group('selectionAfterReload', () {
