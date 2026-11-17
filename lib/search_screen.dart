@@ -31,6 +31,11 @@ class _SearchScreenState extends State<SearchScreen> {
   SearchRadius? _editingRadius;
   SearchRadius get _filterRadius => _editingRadius ?? _radius;
   EventCountPreview? _filterPreview;
+  final _locationsVersion = ValueNotifier(0);
+  List<EventLocation> _locations = [];
+  bool _locationsLoaded = false;
+  bool _loadingLocations = false;
+  String? _locationsError;
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _comarcaController = TextEditingController();
   final TextEditingController _municipalityController = TextEditingController();
@@ -80,6 +85,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     _editingRadius?.dispose();
+    _locationsVersion.dispose();
     _filterPreview?.dispose();
     _radius.removeListener(_radiusChanged);
     if (widget.radius == null) _radius.dispose();
@@ -179,6 +185,7 @@ class _SearchScreenState extends State<SearchScreen> {
         .clamp(_selectorMinKm, _selectorMaxKm)
         .roundToDouble();
     draft.addListener(_updateFilterPreview);
+    if (!_locationsLoaded) _loadLocations();
     final preview = EventCountPreview(_api);
     _filterPreview = preview;
     _updateFilterPreview();
@@ -211,7 +218,7 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<bool?> _showFilters(EventCountPreview preview) async {
     final route = MaterialPageRoute<bool>(
       builder: (context) => ListenableBuilder(
-        listenable: Listenable.merge([_radius, preview]),
+        listenable: Listenable.merge([_filterRadius, preview, _locationsVersion]),
         builder: (context, _) => StatefulBuilder(
           builder: (context, setModalState) => Scaffold(
             backgroundColor: const Color(0xFFF5EDD8),
@@ -410,31 +417,7 @@ class _SearchScreenState extends State<SearchScreen> {
                             _buildRadiusFilter(setModalState),
                             _buildFilterDates(setModalState),
                             const SizedBox(height: 20),
-                            TextField(
-                              controller: _comarcaController,
-                              decoration: const InputDecoration(
-                                labelText: 'Comarca',
-                                hintText: 'Ex: Barcelonès',
-                                border: OutlineInputBorder(),
-                              ),
-                              onChanged: (_) {
-                                setModalState(() {});
-                                _updateFilterPreview();
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: _municipalityController,
-                              decoration: const InputDecoration(
-                                labelText: 'Municipi',
-                                hintText: 'Ex: Barcelona',
-                                border: OutlineInputBorder(),
-                              ),
-                              onChanged: (_) {
-                                setModalState(() {});
-                                _updateFilterPreview();
-                              },
-                            ),
+                            _buildLocations(setModalState),
                             const SizedBox(height: 20),
                           ],
                         ),
@@ -459,6 +442,130 @@ class _SearchScreenState extends State<SearchScreen> {
     // Manté vius els notificadors fins que s'ha desmuntat la ruta de sortida.
     await route.completed;
     return result;
+  }
+
+  Future<void> _loadLocations() async {
+    if (_loadingLocations) return;
+    _loadingLocations = true;
+    _locationsError = null;
+    _locationsVersion.value++;
+    try {
+      final locations = await _api.fetchLocations();
+      if (!mounted) return;
+      _locations = locations;
+      _locationsLoaded = true;
+    } catch (_) {
+      if (!mounted) return;
+      _locationsError =
+          'No s’han pogut carregar les comarques i els municipis.';
+    }
+    if (!mounted) return;
+    _loadingLocations = false;
+    _locationsVersion.value++;
+  }
+
+  Widget _buildLocations(StateSetter setModalState) {
+    final comarques =
+        _locations
+            .map((row) => row.comarca)
+            .where((name) => name.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    final municipis =
+        _locations
+            .where(
+              (row) =>
+                  _comarcaController.text.isEmpty ||
+                  row.comarca == _comarcaController.text,
+            )
+            .map((row) => row.municipality)
+            .where((name) => name.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    Widget selector(
+      String label,
+      TextEditingController controller,
+      List<String> options,
+    ) {
+      return DropdownButtonFormField<String>(
+        key: ValueKey('$label-${controller.text}'),
+        initialValue: controller.text,
+        isExpanded: true,
+        dropdownColor: Colors.white,
+        style: const TextStyle(color: CaliuColors.maroonDeep, fontSize: 16),
+        iconEnabledColor: CaliuColors.maroonDeep,
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(color: CaliuColors.maroonDeep),
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFE0D5C0)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: CaliuColors.red, width: 2),
+          ),
+        ),
+        items: [
+          DropdownMenuItem(
+            value: '',
+            child: Text(
+              label == 'Comarca' ? 'Totes les comarques' : 'Tots els municipis',
+            ),
+          ),
+          ...options.map(
+            (name) => DropdownMenuItem(value: name, child: Text(name)),
+          ),
+        ],
+        onChanged: !_locationsLoaded || _loadingLocations
+            ? null
+            : (value) {
+                setModalState(() {
+                  controller.text = value ?? '';
+                  if (label == 'Comarca') _municipalityController.clear();
+                });
+                _updateFilterPreview();
+              },
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        selector('Comarca', _comarcaController, comarques),
+        const SizedBox(height: 16),
+        selector('Municipi', _municipalityController, municipis),
+        if (_locationsLoaded && _locations.isEmpty)
+          const Text(
+            'No hi ha localitats disponibles.',
+            style: TextStyle(color: CaliuColors.maroonDeep),
+          ),
+        if (_loadingLocations)
+          const Padding(
+            padding: EdgeInsets.all(12),
+            child: LinearProgressIndicator(),
+          ),
+        if (_locationsError != null) ...[
+          Text(
+            _locationsError!,
+            style: const TextStyle(color: CaliuColors.red),
+          ),
+          TextButton(
+            onPressed: _loadLocations,
+            child: const Text('Tornar a carregar localitats'),
+          ),
+        ],
+      ],
+    );
   }
 
   Widget _buildFilterDates(StateSetter setModalState) {

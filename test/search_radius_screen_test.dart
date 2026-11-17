@@ -18,6 +18,19 @@ Future<void> _settleCount(WidgetTester tester) async {
 String? _countLabel(WidgetTester tester) =>
     tester.widget<Text>(find.byKey(const ValueKey('filter-result-count'))).data;
 
+Future<void> _chooseLocation(
+  WidgetTester tester,
+  String label,
+  String value,
+) async {
+  final field = find.widgetWithText(DropdownButtonFormField<String>, label);
+  await tester.ensureVisible(field);
+  await tester.tap(field);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(value).last);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets(
     'la creu descarta radi, text, categories i dates sense notificar el mapa',
@@ -153,6 +166,105 @@ void main() {
   });
 
   testWidgets(
+    'canviar de comarca neteja el municipi i restringeix les opcions',
+    (tester) async {
+      final requests = <Uri>[];
+      final radius = SearchRadius(locate: () async => const LatLng(42, 1));
+      final api = EventsApi(
+        client: MockClient((request) async {
+          requests.add(request.url);
+          if (request.url.path.endsWith('/locations')) {
+            return http.Response(
+              '{"locations":[{"comarca":"Garrotxa","municipality":"Olot"},{"comarca":"Barcelonès","municipality":"Barcelona"}]}',
+              200,
+            );
+          }
+          return http.Response('{"items":[],"categories":[],"total":18}', 200);
+        }),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SearchScreen(radius: radius, api: api),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Filtres'));
+      await _settleCount(tester);
+      await _chooseLocation(tester, 'Municipi', 'Olot');
+      await _settleCount(tester);
+      expect(requests.last.queryParameters['municipality'], 'Olot');
+      await _chooseLocation(tester, 'Comarca', 'Barcelonès');
+      await _settleCount(tester);
+      expect(requests.last.queryParameters['comarca'], 'Barcelonès');
+      expect(
+        requests.last.queryParameters.containsKey('municipality'),
+        isFalse,
+      );
+      await tester.tap(
+        find.widgetWithText(DropdownButtonFormField<String>, 'Municipi'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Olot'), findsNothing);
+      await tester.tap(find.text('Barcelona').last);
+      await _settleCount(tester);
+      expect(requests.last.queryParameters['municipality'], 'Barcelona');
+      await tester.tap(find.text('Restablir tot'));
+      await _settleCount(tester);
+      expect(requests.last.queryParameters.containsKey('comarca'), isFalse);
+      expect(
+        requests.last.queryParameters.containsKey('municipality'),
+        isFalse,
+      );
+      await tester.tap(find.byTooltip('Tancar filtres'));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+      radius.dispose();
+    },
+  );
+
+  testWidgets('error del catàleg desactiva els selectors i permet reintentar', (
+    tester,
+  ) async {
+    var calls = 0;
+    final radius = SearchRadius(locate: () async => const LatLng(42, 1));
+    final api = EventsApi(
+      client: MockClient((request) async {
+        if (request.url.path.endsWith('/locations')) {
+          calls++;
+          return calls == 1
+              ? http.Response('{}', 503)
+              : http.Response(
+                  '{"locations":[{"comarca":"Garrotxa","municipality":"Olot"}]}',
+                  200,
+                );
+        }
+        return http.Response('{"items":[],"categories":[]}', 200);
+      }),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SearchScreen(radius: radius, api: api),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Filtres'));
+    await _settleCount(tester);
+    expect(
+      find.text('No s’han pogut carregar les comarques i els municipis.'),
+      findsOneWidget,
+    );
+    await tester.ensureVisible(find.text('Tornar a carregar localitats'));
+    await tester.tap(find.text('Tornar a carregar localitats'));
+    await tester.pumpAndSettle();
+    await _chooseLocation(tester, 'Comarca', 'Garrotxa');
+    expect(calls, 2);
+    await tester.tap(find.byTooltip('Tancar filtres'));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox());
+    radius.dispose();
+  });
+
+  testWidgets(
     'Filtrar és una ruta normal i tanca sense errors amb un recompte pendent',
     (tester) async {
       final pending = Completer<http.Response>();
@@ -202,6 +314,12 @@ void main() {
       final api = EventsApi(
         client: MockClient((request) async {
           requests.add(request.url);
+          if (request.url.path.endsWith('/locations')) {
+            return http.Response(
+              '{"locations":[{"comarca":"Garrotxa","municipality":"Olot"},{"comarca":"Barcelonès","municipality":"Barcelona"}]}',
+              200,
+            );
+          }
           return http.Response('{"items":[],"categories":[],"total":18}', 200);
         }),
       );
@@ -243,6 +361,12 @@ void main() {
       final api = EventsApi(
         client: MockClient((request) async {
           requests.add(request.url);
+          if (request.url.path.endsWith('/locations')) {
+            return http.Response(
+              '{"locations":[{"comarca":"Garrotxa","municipality":"Olot"},{"comarca":"Barcelonès","municipality":"Barcelona"}]}',
+              200,
+            );
+          }
           if (request.url.path.endsWith('categories')) {
             return http.Response('{"categories":["Musica"]}', 200);
           }
@@ -283,11 +407,10 @@ void main() {
       expect(_countLabel(tester), 'Comptant…');
       await _settleCount(tester);
       expect(_countLabel(tester), '18 esdeveniments');
-      await tester.ensureVisible(find.widgetWithText(TextField, 'Municipi'));
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Municipi'),
-        'Olot',
+      await tester.ensureVisible(
+        find.widgetWithText(DropdownButtonFormField<String>, 'Municipi'),
       );
+      await _chooseLocation(tester, 'Municipi', 'Olot');
       await _settleCount(tester);
       expect(_countLabel(tester), '4 esdeveniments');
 
@@ -359,7 +482,9 @@ void main() {
         ),
       );
       expect(buttonRect.bottom, lessThanOrEqualTo(740 - 24));
-      await tester.ensureVisible(find.widgetWithText(TextField, 'Municipi'));
+      await tester.ensureVisible(
+        find.widgetWithText(DropdownButtonFormField<String>, 'Municipi'),
+      );
       await tester.pumpAndSettle();
       expect(
         tester
@@ -433,6 +558,12 @@ void main() {
     final api = EventsApi(
       client: MockClient((request) async {
         requests.add(request.url);
+        if (request.url.path.endsWith('/locations')) {
+          return http.Response(
+            '{"locations":[{"comarca":"Garrotxa","municipality":"Olot"},{"comarca":"Barcelonès","municipality":"Barcelona"}]}',
+            200,
+          );
+        }
         return http.Response(
           jsonEncode(
             request.url.path.endsWith('categories')
@@ -459,12 +590,11 @@ void main() {
     await tester.tap(find.byTooltip('Filtres'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Musica'));
-    await tester.enterText(
-      find.widgetWithText(TextField, 'Comarca'),
-      'Garrotxa',
+    await _chooseLocation(tester, 'Comarca', 'Garrotxa');
+    await tester.ensureVisible(
+      find.widgetWithText(DropdownButtonFormField<String>, 'Municipi'),
     );
-    await tester.ensureVisible(find.widgetWithText(TextField, 'Municipi'));
-    await tester.enterText(find.widgetWithText(TextField, 'Municipi'), 'Olot');
+    await _chooseLocation(tester, 'Municipi', 'Olot');
     await tester.ensureVisible(find.text('Aplicar filtres'));
     await tester.tap(find.text('Aplicar filtres'));
     await tester.pumpAndSettle();
