@@ -86,6 +86,9 @@ class _MapViewState extends State<MapView> {
   int _clusterGeneration = 0;
   bool _clusteringEnabled = true;
 
+  /// En allunyar: refresca a l'idle sense bloquejar els pins de cache.
+  bool _pendingWideReload = false;
+
   bool get _hasUserLocation => _locationMode == _LocationMode.user;
 
   @override
@@ -408,10 +411,11 @@ class _MapViewState extends State<MapView> {
         _clusteringEnabled = shouldClusterAtZoom(
           _lastCamera?.zoom ?? _initialZoom,
         );
+        // No recrear el ClusterManager a cada fetch: és lent i fa parpellejar.
         _applyMarkersFromEvents(
           withLocation,
           recreateClusterManager:
-              withLocation.isEmpty || _clusterManagers.isEmpty,
+              _clusteringEnabled && _clusterManagers.isEmpty,
         );
         _selected = selectionAfterReload(_selected, _eventsById);
         _eventsRequestInFlight = false;
@@ -462,24 +466,16 @@ class _MapViewState extends State<MapView> {
     final enablingClusters = shouldCluster;
     setState(() {
       _clusteringEnabled = shouldCluster;
-      // En desactivar: treu el manager → pins individuals de seguida.
-      // En activar: manager nou + pins de cache (la recàrrega completa ve després).
+      // Pins de cache de seguida (sense esperar la xarxa).
       _applyMarkersFromEvents(
         _eventsById.values,
         recreateClusterManager: enablingClusters,
       );
     });
     if (enablingClusters) {
-      // Allunyar: cal tornar a demanar la zona ampla (la cache pot ser d'un zoom proper).
-      _loadedBounds = null;
+      // Allunyar: refresca en idle (evita un fetch síncron que deixa el mapa “pensant”).
+      _pendingWideReload = true;
       _loadedZoom = null;
-      unawaited(
-        _reloadForVisibleRegion(
-          force: true,
-          notifyIfEmpty: false,
-          notifyErrors: false,
-        ),
-      );
     }
   }
 
@@ -518,13 +514,7 @@ class _MapViewState extends State<MapView> {
   }
 
   void _onCameraMove(CameraPosition position) {
-    final previousZoom = _lastCamera?.zoom;
     _lastCamera = position;
-    // Si allunyem, invalida la cache de bounds abans de l'idle.
-    if (previousZoom != null && position.zoom < previousZoom - 0.2) {
-      _loadedBounds = null;
-      _loadedZoom = null;
-    }
     // Dissolve / agrupa segons el zoom (el ClusterManager natiu no té maxZoom).
     _syncClusteringWithZoom(position.zoom);
   }
@@ -532,10 +522,12 @@ class _MapViewState extends State<MapView> {
   void _onCameraIdle() {
     if (!_acceptCameraIdleReloads) return;
     _cameraIdleTimer?.cancel();
-    _cameraIdleTimer = Timer(const Duration(milliseconds: 350), () {
+    _cameraIdleTimer = Timer(const Duration(milliseconds: 180), () {
+      final force = _pendingWideReload;
+      _pendingWideReload = false;
       unawaited(
         _reloadForVisibleRegion(
-          force: false,
+          force: force,
           notifyIfEmpty: false,
           notifyErrors: false,
         ),
