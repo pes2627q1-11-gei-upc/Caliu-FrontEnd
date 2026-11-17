@@ -57,6 +57,10 @@ void main() {
     await tester.tap(find.byTooltip('Filtres'));
     await tester.pumpAndSettle();
     expect(find.text('RADI DE DISTÀNCIA'), findsOneWidget);
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    expect(slider.min, 0.1);
+    expect(slider.max, 50);
+    expect(slider.value, 5);
     tester.widget<Slider>(find.byType(Slider)).onChanged!(5);
     await tester.pump();
     expect(find.text('5,0 km'), findsOneWidget);
@@ -146,11 +150,40 @@ void main() {
     await tester.pumpAndSettle();
     expect(radius.radiusKm, isNull);
     expect(find.text('Radi aplicat: 5,0 km'), findsNothing);
-    expect(tester.widget<Slider>(find.byType(Slider)).value, 15);
+    expect(tester.widget<Slider>(find.byType(Slider)).value, 5);
     await tester.ensureVisible(find.text('Aplicar filtres'));
     await tester.tap(find.text('Aplicar filtres'));
     await tester.pumpAndSettle();
     expect(find.byType(Slider), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    radius.dispose();
+  });
+
+  testWidgets('un radi anterior més gran no desborda el selector de 50 km', (
+    tester,
+  ) async {
+    final radius = SearchRadius(locate: () async => const LatLng(42, 1));
+    await radius.apply(500);
+    final api = EventsApi(
+      client: MockClient(
+        (_) async => http.Response('{"items":[],"categories":[]}', 200),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SearchScreen(radius: radius, api: api),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Filtres'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Slider>(find.byType(Slider)).value, 50);
+    expect(find.text('Radi aplicat: 500,0 km'), findsOneWidget);
+    await tester.ensureVisible(find.text('Aplicar radi'));
+    await tester.tap(find.text('Aplicar radi'));
+    await tester.pumpAndSettle();
+    expect(radius.radiusKm, 50);
+    expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     radius.dispose();
   });

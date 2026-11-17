@@ -20,9 +20,11 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
+  static const _initialRadiusKm = 5.0;
+  static const _selectorMaxKm = 50.0;
   late final EventsApi _api = widget.api ?? EventsApi();
   late final SearchRadius _radius = widget.radius ?? SearchRadius();
-  double _draftRadius = 15;
+  double _draftRadius = _initialRadiusKm;
   int _request = 0;
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _comarcaController = TextEditingController();
@@ -42,7 +44,10 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
-    _draftRadius = _radius.radiusKm ?? 15;
+    _draftRadius = (_radius.radiusKm ?? _initialRadiusKm).clamp(
+      SearchRadius.minKm,
+      _selectorMaxKm,
+    );
     _radius.addListener(_radiusChanged);
     _loadCategories();
     _runSearch();
@@ -52,7 +57,12 @@ class _SearchScreenState extends State<SearchScreen> {
     if (!mounted) return;
     ++_request;
     setState(() {
-      if (_radius.radiusKm != null) _draftRadius = _radius.radiusKm!;
+      if (_radius.radiusKm != null) {
+        _draftRadius = _radius.radiusKm!.clamp(
+          SearchRadius.minKm,
+          _selectorMaxKm,
+        );
+      }
     });
     if (!_radius.locating) _runSearch();
   }
@@ -191,7 +201,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           TextButton(
                             onPressed: () {
                               setModalState(() {
-                                _draftRadius = 15;
+                                _draftRadius = _initialRadiusKm;
                                 _resetFilters();
                               });
                             },
@@ -328,8 +338,8 @@ class _SearchScreenState extends State<SearchScreen> {
         ),
         Slider(
           min: SearchRadius.minKm,
-          max: SearchRadius.maxKm,
-          divisions: 4999,
+          max: _selectorMaxKm,
+          divisions: 499,
           value: _draftRadius,
           activeColor: CaliuColors.red,
           label: distance(_draftRadius),
