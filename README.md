@@ -29,6 +29,10 @@ App mòbil **Flutter** de **Caliu**: mapa i agenda d’esdeveniments culturals a
 - **Cerca i filtres** (text, categories/chips, radi).
 - Parla amb el backend **només** per HTTP/JSON; contracte: OpenAPI del repo backend.
 
+El selector de radi de la cerca permet aplicar entre 0,1 i 500 km des de la
+ubicació real. El filtre es comparteix amb el mapa i es pot treure sense
+perdre els altres filtres de cerca. Vegeu [ús i proves del selector de radi](docs/selector-radi.md).
+
 ## Arrencada ràpida
 
 Requisits: [Flutter](https://docs.flutter.dev/get-started/install) (stable), Android SDK, Docker Desktop (per l’API local), clau **Maps SDK for Android**.
