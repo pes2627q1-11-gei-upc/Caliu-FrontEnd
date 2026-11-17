@@ -24,6 +24,12 @@ class SearchRadius extends ChangeNotifier {
       throw ArgumentError.value(km, 'km');
     }
     final generation = ++_generation;
+    if (center != null) {
+      radiusKm = km;
+      error = null;
+      notifyListeners();
+      return;
+    }
     locating = true;
     radiusKm = null;
     center = null;

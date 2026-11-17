@@ -5,6 +5,22 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:caliu/data/search_radius.dart';
 
 void main() {
+  test('canviar el radi reutilitza la ubicació real ja obtinguda', () async {
+    var locations = 0;
+    final radius = SearchRadius(
+      locate: () async {
+        locations++;
+        return const LatLng(42, 1);
+      },
+    );
+    await radius.apply(5);
+    await radius.apply(10);
+    expect(locations, 1);
+    expect(radius.center, const LatLng(42, 1));
+    expect(radius.radiusKm, 10);
+    expect(radius.locating, isFalse);
+    radius.dispose();
+  });
   test('només aplica el radi després de rebre la ubicació real', () async {
     final pending = Completer<LatLng>();
     final radius = SearchRadius(locate: () => pending.future);
