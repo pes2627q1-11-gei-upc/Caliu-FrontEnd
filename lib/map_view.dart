@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'data/event.dart';
+import 'data/search_radius.dart';
 import 'data/events_api.dart';
 import 'event_detail_screen.dart';
 import 'search_screen.dart';
@@ -40,17 +41,20 @@ enum _LocationMode {
 }
 
 class MapView extends StatefulWidget {
-  const MapView({super.key, this.isActive = true});
+  const MapView({super.key, this.isActive = true, this.radius, this.eventsApi});
 
   /// Si la pestanya Mapa és la visible (el mapa continua muntat a l'`IndexedStack`).
   final bool isActive;
+  final SearchRadius? radius;
+  final EventsApi? eventsApi;
 
   @override
   State<MapView> createState() => _MapViewState();
 }
 
 class _MapViewState extends State<MapView> {
-  final EventsApi _eventsApi = EventsApi();
+  late final EventsApi _eventsApi = widget.eventsApi ?? EventsApi();
+  late final SearchRadius _radius = widget.radius ?? SearchRadius();
 
   GoogleMapController? mapController;
   Set<Marker> _markers = {};
@@ -81,13 +85,45 @@ class _MapViewState extends State<MapView> {
   @override
   void dispose() {
     _cameraIdleTimer?.cancel();
+    _radius.removeListener(_radiusChanged);
+    if (widget.radius == null) _radius.dispose();
     super.dispose();
   }
 
   @override
   void initState() {
     super.initState();
+    _radius.addListener(_radiusChanged);
     unawaited(_bootstrap());
+  }
+
+  void _radiusChanged() {
+    ++_loadGeneration;
+    _loadedBounds = null;
+    setState(() {
+      _markers = {};
+      _selected = null;
+      _eventsById.clear();
+      _eventsRequestInFlight = false;
+    });
+    if (!_radius.locating) {
+      unawaited(_showRadiusAndReload());
+    }
+  }
+
+  Future<void> _showRadiusAndReload() async {
+    final center = _radius.center;
+    final km = _radius.radiusKm;
+    if (center != null && km != null && mapController != null) {
+      try {
+        await mapController!.animateCamera(
+          CameraUpdate.newLatLngBounds(_boundsAround(center, km), 32),
+        );
+      } catch (_) {
+        // El mapa pot estar acabant de crear-se; el filtre continua actiu.
+      }
+    }
+    if (mounted) await _reloadForVisibleRegion(force: true);
   }
 
   Future<void> _bootstrap() async {
@@ -365,7 +401,13 @@ class _MapViewState extends State<MapView> {
     bool notifyIfEmpty = false,
     bool notifyErrors = true,
   }) async {
-    if (!mounted) return;
+    if (!mounted || _radius.locating) return;
+    final selectedCenter = _radius.center;
+    if (selectedCenter != null && _radius.radiusKm != null) {
+      lat = selectedCenter.latitude;
+      lng = selectedCenter.longitude;
+      radiusKm = _radius.radiusKm!;
+    }
     final generation = ++_loadGeneration;
     _eventsRequestInFlight = true;
 
@@ -511,11 +553,10 @@ class _MapViewState extends State<MapView> {
           IconButton(
             tooltip: 'Cerca',
             onPressed: () {
-              final target = _lastCamera?.target ?? _focus;
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) =>
-                      SearchScreen(lat: target.latitude, lng: target.longitude),
+                      SearchScreen(radius: _radius, api: _eventsApi),
                 ),
               );
             },

@@ -4,22 +4,26 @@ import 'data/date_range_filter.dart';
 import 'data/event.dart';
 import 'data/event_query.dart';
 import 'data/events_api.dart';
+import 'data/search_radius.dart';
 import 'event_detail_screen.dart';
 import 'theme/caliu_colors.dart';
 import 'widgets/caliu_chip.dart';
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key, this.lat, this.lng});
+  const SearchScreen({super.key, this.radius, this.api});
 
-  final double? lat;
-  final double? lng;
+  final SearchRadius? radius;
+  final EventsApi? api;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
 class _SearchScreenState extends State<SearchScreen> {
-  final EventsApi _api = EventsApi();
+  late final EventsApi _api = widget.api ?? EventsApi();
+  late final SearchRadius _radius = widget.radius ?? SearchRadius();
+  double _draftRadius = 15;
+  int _request = 0;
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _comarcaController = TextEditingController();
   final TextEditingController _municipalityController = TextEditingController();
@@ -38,12 +42,25 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
+    _draftRadius = _radius.radiusKm ?? 15;
+    _radius.addListener(_radiusChanged);
     _loadCategories();
     _runSearch();
   }
 
+  void _radiusChanged() {
+    if (!mounted) return;
+    ++_request;
+    setState(() {
+      if (_radius.radiusKm != null) _draftRadius = _radius.radiusKm!;
+    });
+    if (!_radius.locating) _runSearch();
+  }
+
   @override
   void dispose() {
+    _radius.removeListener(_radiusChanged);
+    if (widget.radius == null) _radius.dispose();
     _searchController.dispose();
     _comarcaController.dispose();
     _municipalityController.dispose();
@@ -72,8 +89,9 @@ class _SearchScreenState extends State<SearchScreen> {
       category: categories.isEmpty ? null : categories.join(','),
       comarca: _comarcaController.text,
       municipality: _municipalityController.text,
-      lat: widget.lat,
-      lng: widget.lng,
+      lat: _radius.center?.latitude,
+      lng: _radius.center?.longitude,
+      radiusKm: _radius.radiusKm,
       from: range?.from,
       to: range?.to,
       limit: 40,
@@ -81,6 +99,8 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _runSearch() async {
+    if (_radius.locating) return;
+    final request = ++_request;
     setState(() {
       _loading = true;
       _error = null;
@@ -89,14 +109,14 @@ class _SearchScreenState extends State<SearchScreen> {
 
     try {
       final page = await _api.fetchEvents(_buildQuery());
-      if (!mounted) return;
+      if (!mounted || request != _request) return;
       setState(() {
         _results = page.items;
         _total = page.total;
         _loading = false;
       });
     } on EventsApiException catch (e) {
-      if (!mounted) return;
+      if (!mounted || request != _request) return;
       setState(() {
         _loading = false;
         _error = e.message;
@@ -104,7 +124,7 @@ class _SearchScreenState extends State<SearchScreen> {
         _total = 0;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || request != _request) return;
       setState(() {
         _loading = false;
         _error = 'Error cercant esdeveniments';
@@ -120,6 +140,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _comarcaController.clear();
       _municipalityController.clear();
     });
+    _radius.clear();
   }
 
   Future<void> _openFilters() async {
@@ -376,6 +397,52 @@ class _SearchScreenState extends State<SearchScreen> {
               onSubmitted: (_) => _runSearch(),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _radius.radiusKm == null
+                            ? 'Radi de cerca (km)'
+                            : 'Radi aplicat: ${_radius.radiusKm!.toStringAsFixed(1)} km',
+                      ),
+                    ),
+                    if (_radius.radiusKm != null || _radius.locating)
+                      TextButton(
+                        onPressed: _radius.clear,
+                        child: const Text('Treure radi'),
+                      ),
+                  ],
+                ),
+                Slider(
+                  min: SearchRadius.minKm,
+                  max: SearchRadius.maxKm,
+                  divisions: 4999,
+                  value: _draftRadius,
+                  label: '${_draftRadius.toStringAsFixed(1)} km',
+                  onChanged: _radius.locating
+                      ? null
+                      : (value) => setState(() => _draftRadius = value),
+                ),
+                TextButton.icon(
+                  onPressed: _radius.locating
+                      ? null
+                      : () => _radius.apply(_draftRadius),
+                  icon: const Icon(Icons.my_location),
+                  label: Text(
+                    _radius.locating
+                        ? 'Obtenint ubicació…'
+                        : 'Aplicar radi: ${_draftRadius.toStringAsFixed(1)} km',
+                  ),
+                ),
+                if (_radius.error != null)
+                  Text(_radius.error!, textAlign: TextAlign.center),
+              ],
+            ),
+          ),
           _buildDateChips(),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -395,7 +462,7 @@ class _SearchScreenState extends State<SearchScreen> {
                   ),
                 ),
                 TextButton(
-                  onPressed: _loading ? null : _runSearch,
+                  onPressed: _loading || _radius.locating ? null : _runSearch,
                   child: const Text('Cercar'),
                 ),
               ],
