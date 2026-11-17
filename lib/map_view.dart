@@ -78,11 +78,13 @@ class _MapViewState extends State<MapView> {
 
   CameraPosition? _lastCamera;
   LatLngBounds? _loadedBounds;
+  double? _loadedZoom;
   Timer? _cameraIdleTimer;
   int _loadGeneration = 0;
 
-  /// Força un ClusterManager nou a cada càrrega (evita clústers buits fantasma).
+  /// Generació del ClusterManager (es renova en passar a mode clúster).
   int _clusterGeneration = 0;
+  bool _clusteringEnabled = true;
 
   bool get _hasUserLocation => _locationMode == _LocationMode.user;
 
@@ -235,6 +237,7 @@ class _MapViewState extends State<MapView> {
     }
     if (!mounted) return;
     _loadedBounds = null;
+    _loadedZoom = null;
     await _loadAroundFocus(focus: _focus, notifyIfEmpty: false);
   }
 
@@ -326,7 +329,14 @@ class _MapViewState extends State<MapView> {
       visible = _boundsAround(_lastCamera?.target ?? _focus, 8);
     }
 
+    final zoom = _lastCamera?.zoom ?? _initialZoom;
+    // Si hem allunyat des de l'última càrrega, la zona visible és més gran:
+    // no reutilitzar la cache (si no, queden mapa buit / sense clústers).
+    final zoomedOutSinceLoad =
+        _loadedZoom != null && zoom < (_loadedZoom! - 0.6);
+
     if (!force &&
+        !zoomedOutSinceLoad &&
         _loadedBounds != null &&
         _boundsContain(_loadedBounds!, visible)) {
       return;
@@ -392,17 +402,17 @@ class _MapViewState extends State<MapView> {
         ..clear()
         ..addAll(byId);
       _loadedBounds = queryBounds;
+      _loadedZoom = _lastCamera?.zoom ?? _initialZoom;
 
       setState(() {
-        // #114: regenera ClusterManager + markers (evita clústers buits a pantalla).
-        _clusterGeneration++;
-        final markerSet = buildEventMarkerSet(
-          withLocation,
-          clusterGeneration: _clusterGeneration,
-          onTap: _selectEvent,
+        _clusteringEnabled = shouldClusterAtZoom(
+          _lastCamera?.zoom ?? _initialZoom,
         );
-        _clusterManagers = markerSet.clusterManagers;
-        _markers = markerSet.markers;
+        _applyMarkersFromEvents(
+          withLocation,
+          recreateClusterManager:
+              withLocation.isEmpty || _clusterManagers.isEmpty,
+        );
         _selected = selectionAfterReload(_selected, _eventsById);
         _eventsRequestInFlight = false;
       });
@@ -420,6 +430,56 @@ class _MapViewState extends State<MapView> {
       if (notifyErrors) {
         _showMessage('No s\'han pogut carregar els esdeveniments.');
       }
+    }
+  }
+
+  /// Actualitza `_markers` / `_clusterManagers` a partir dels events en memòria.
+  ///
+  /// [recreateClusterManager]: true en càrregues noves o en tornar al mode
+  /// clúster (evita clústers fantasma); false si només canvien els pins.
+  void _applyMarkersFromEvents(
+    Iterable<Event> events, {
+    required bool recreateClusterManager,
+  }) {
+    if (_clusteringEnabled &&
+        (recreateClusterManager || _clusterManagers.isEmpty)) {
+      _clusterGeneration++;
+    }
+    final markerSet = buildEventMarkerSet(
+      events,
+      clusterGeneration: _clusterGeneration,
+      cluster: _clusteringEnabled,
+      onTap: _selectEvent,
+    );
+    _clusterManagers = markerSet.clusterManagers;
+    _markers = markerSet.markers;
+  }
+
+  void _syncClusteringWithZoom(double zoom) {
+    final shouldCluster = shouldClusterAtZoom(zoom);
+    if (shouldCluster == _clusteringEnabled) return;
+    if (!mounted) return;
+    final enablingClusters = shouldCluster;
+    setState(() {
+      _clusteringEnabled = shouldCluster;
+      // En desactivar: treu el manager → pins individuals de seguida.
+      // En activar: manager nou + pins de cache (la recàrrega completa ve després).
+      _applyMarkersFromEvents(
+        _eventsById.values,
+        recreateClusterManager: enablingClusters,
+      );
+    });
+    if (enablingClusters) {
+      // Allunyar: cal tornar a demanar la zona ampla (la cache pot ser d'un zoom proper).
+      _loadedBounds = null;
+      _loadedZoom = null;
+      unawaited(
+        _reloadForVisibleRegion(
+          force: true,
+          notifyIfEmpty: false,
+          notifyErrors: false,
+        ),
+      );
     }
   }
 
@@ -458,7 +518,15 @@ class _MapViewState extends State<MapView> {
   }
 
   void _onCameraMove(CameraPosition position) {
+    final previousZoom = _lastCamera?.zoom;
     _lastCamera = position;
+    // Si allunyem, invalida la cache de bounds abans de l'idle.
+    if (previousZoom != null && position.zoom < previousZoom - 0.2) {
+      _loadedBounds = null;
+      _loadedZoom = null;
+    }
+    // Dissolve / agrupa segons el zoom (el ClusterManager natiu no té maxZoom).
+    _syncClusteringWithZoom(position.zoom);
   }
 
   void _onCameraIdle() {
