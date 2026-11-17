@@ -20,6 +20,139 @@ String? _countLabel(WidgetTester tester) =>
 
 void main() {
   testWidgets(
+    'la creu descarta radi, text, categories i dates sense notificar el mapa',
+    (tester) async {
+      final radius = SearchRadius(locate: () async => const LatLng(42, 1));
+      await radius.apply(5);
+      var notifications = 0;
+      radius.addListener(() => notifications++);
+      final requests = <Uri>[];
+      final api = EventsApi(
+        client: MockClient((request) async {
+          requests.add(request.url);
+          return http.Response(
+            '{"items":[],"categories":["Musica"],"total":18}',
+            200,
+          );
+        }),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SearchScreen(radius: radius, api: api),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Filtres'));
+      await _settleCount(tester);
+      await tester.enterText(find.byType(TextField).first, 'provisional');
+      await tester.tap(find.text('Musica'));
+      await tester.ensureVisible(find.text('Demà'));
+      await tester.tap(find.text('Demà'));
+      final slider = tester.widget<Slider>(find.byType(Slider));
+      slider.onChanged!(10);
+      slider.onChangeEnd!(10);
+      await _settleCount(tester);
+      expect(requests.last.queryParameters['radiusKm'], '10.0');
+      expect(requests.last.queryParameters['q'], 'provisional');
+      expect(radius.radiusKm, 5);
+      expect(notifications, 0);
+      expect(
+        requests.where((uri) => uri.queryParameters['limit'] == '40').length,
+        1,
+      );
+      await tester.tap(find.byTooltip('Tancar filtres'));
+      await tester.pumpAndSettle();
+      expect(radius.radiusKm, 5);
+      expect(notifications, 0);
+      await tester.tap(find.byTooltip('Filtres'));
+      await _settleCount(tester);
+      final query = requests.last.queryParameters;
+      expect(query['radiusKm'], '5.0');
+      for (final key in ['q', 'category', 'from', 'to']) {
+        expect(query.containsKey(key), isFalse);
+      }
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(notifications, 0);
+      await tester.pumpWidget(const SizedBox());
+      radius.dispose();
+    },
+  );
+
+  testWidgets('Aplicar filtres confirma una vegada el radi i la cerca', (
+    tester,
+  ) async {
+    final radius = SearchRadius(locate: () async => const LatLng(42, 1));
+    await radius.apply(5);
+    var notifications = 0;
+    radius.addListener(() => notifications++);
+    final requests = <Uri>[];
+    final api = EventsApi(
+      client: MockClient((request) async {
+        requests.add(request.url);
+        return http.Response('{"items":[],"categories":[],"total":18}', 200);
+      }),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SearchScreen(radius: radius, api: api),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Filtres'));
+    await _settleCount(tester);
+    await tester.enterText(find.byType(TextField).first, 'jazz');
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    slider.onChanged!(8);
+    slider.onChangeEnd!(8);
+    await _settleCount(tester);
+    expect(notifications, 0);
+    await tester.tap(find.text('Aplicar filtres'));
+    await tester.pumpAndSettle();
+    expect(radius.radiusKm, 8);
+    expect(notifications, 1);
+    final searches = requests
+        .where((uri) => uri.queryParameters['limit'] == '40')
+        .toList();
+    expect(searches.length, 2);
+    expect(searches.last.queryParameters['q'], 'jazz');
+    expect(searches.last.queryParameters['radiusKm'], '8.0');
+    await tester.pumpWidget(const SizedBox());
+    radius.dispose();
+  });
+
+  testWidgets('cancel·lar amb GPS pendent no aplica la resposta tardana', (
+    tester,
+  ) async {
+    final pending = Completer<LatLng>();
+    final radius = SearchRadius(locate: () => pending.future);
+    final api = EventsApi(
+      client: MockClient(
+        (_) async => http.Response('{"items":[],"categories":[]}', 200),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SearchScreen(radius: radius, api: api),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Filtres'));
+    await _settleCount(tester);
+    tester.widget<Slider>(find.byType(Slider)).onChangeEnd!(8);
+    await tester.pump();
+    await tester.tap(find.byTooltip('Tancar filtres'));
+    await tester.pumpAndSettle();
+    pending.complete(const LatLng(42, 1));
+    await tester.pumpAndSettle();
+    expect(radius.radiusKm, isNull);
+    expect(radius.center, isNull);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    radius.dispose();
+  });
+
+  testWidgets(
     'Filtrar és una ruta normal i tanca sense errors amb un recompte pendent',
     (tester) async {
       final pending = Completer<http.Response>();
@@ -431,13 +564,14 @@ void main() {
     expect(find.textContaining('Radi aplicat:'), findsNothing);
     await tester.tap(find.text('Restablir tot'));
     await tester.pumpAndSettle();
-    expect(radius.radiusKm, isNull);
+    expect(radius.radiusKm, 5);
     expect(find.text('Treure radi'), findsNothing);
     expect(tester.widget<Slider>(find.byType(Slider)).value, 5);
     await tester.ensureVisible(find.text('Aplicar filtres'));
     await tester.tap(find.text('Aplicar filtres'));
     await tester.pumpAndSettle();
     expect(find.byType(Slider), findsNothing);
+    expect(radius.radiusKm, isNull);
     await tester.pumpWidget(const SizedBox());
     radius.dispose();
   });
@@ -464,6 +598,9 @@ void main() {
     expect(radius.radiusKm, 500);
     expect(find.textContaining('Radi aplicat:'), findsNothing);
     tester.widget<Slider>(find.byType(Slider)).onChangeEnd!(50);
+    await tester.pumpAndSettle();
+    expect(radius.radiusKm, 500);
+    await tester.tap(find.text('Aplicar filtres'));
     await tester.pumpAndSettle();
     expect(radius.radiusKm, 50);
     expect(tester.takeException(), isNull);

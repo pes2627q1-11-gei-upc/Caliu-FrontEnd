@@ -35,8 +35,10 @@ mapa i es pot treure sense perdre els altres filtres de cerca.
 «Filtrar» s'obre com una pantalla completa, amb cerca, categories i targetes
 de data; es tanca amb la creu o el botó enrere. El contingut es pot desplaçar
 i el botó d'aplicar queda fix a baix, dins de la zona segura.
-El radi s'aplica en deixar anar el lliscador de «Filtrar», i el botó
-«Aplicar filtres» mostra el total d'esdeveniments dels filtres seleccionats.
+El lliscador actualitza només la previsualització i el recompte. «Aplicar
+filtres» confirma tots els canvis a la cerca i al mapa; la creu i el botó
+enrere els descarten. Els límits de l'API continuen sent 0,1–500 km;
+el selector de la interfície ofereix 1–50 km.
 
 ## Arrencada ràpida
 

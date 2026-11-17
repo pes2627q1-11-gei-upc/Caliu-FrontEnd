@@ -28,6 +28,8 @@ class _SearchScreenState extends State<SearchScreen> {
   late final SearchRadius _radius = widget.radius ?? SearchRadius();
   double _draftRadius = _initialRadiusKm;
   int _request = 0;
+  SearchRadius? _editingRadius;
+  SearchRadius get _filterRadius => _editingRadius ?? _radius;
   EventCountPreview? _filterPreview;
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _comarcaController = TextEditingController();
@@ -70,11 +72,14 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _updateFilterPreview() {
-    _filterPreview?.update(_radius.locating ? null : _buildQuery());
+    _filterPreview?.update(
+      _filterRadius.locating ? null : _buildQuery(preview: true),
+    );
   }
 
   @override
   void dispose() {
+    _editingRadius?.dispose();
     _filterPreview?.dispose();
     _radius.removeListener(_radiusChanged);
     if (widget.radius == null) _radius.dispose();
@@ -98,7 +103,8 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  EventQuery _buildQuery() {
+  EventQuery _buildQuery({bool preview = false}) {
+    final radius = preview ? _filterRadius : _radius;
     final categories = _selectedCategories.toList()..sort();
     final range = _dateFilter?.rangeFor(DateTime.now());
     return EventQuery(
@@ -106,9 +112,9 @@ class _SearchScreenState extends State<SearchScreen> {
       category: categories.isEmpty ? null : categories.join(','),
       comarca: _comarcaController.text,
       municipality: _municipalityController.text,
-      lat: _radius.center?.latitude,
-      lng: _radius.center?.longitude,
-      radiusKm: _radius.radiusKm,
+      lat: radius.center?.latitude,
+      lng: radius.center?.longitude,
+      radiusKm: radius.radiusKm,
       from: range?.from,
       to: range?.to,
       limit: 40,
@@ -158,22 +164,47 @@ class _SearchScreenState extends State<SearchScreen> {
       _comarcaController.clear();
       _municipalityController.clear();
     });
-    _radius.clear();
+    _filterRadius.clear();
   }
 
   Future<void> _openFilters() async {
+    final originalText = _searchController.text;
+    final originalComarca = _comarcaController.text;
+    final originalMunicipality = _municipalityController.text;
+    final originalCategories = Set<String>.of(_selectedCategories);
+    final originalDate = _dateFilter;
+    final draft = _radius.fork();
+    _editingRadius = draft;
+    _draftRadius = (draft.radiusKm ?? _initialRadiusKm)
+        .clamp(_selectorMinKm, _selectorMaxKm)
+        .roundToDouble();
+    draft.addListener(_updateFilterPreview);
     final preview = EventCountPreview(_api);
     _filterPreview = preview;
     _updateFilterPreview();
-    bool? applied;
     try {
-      applied = await _showFilters(preview);
+      final applied = await _showFilters(preview);
+      if (!mounted) return;
+      if (applied == true) {
+        // Una única confirmació notifica la llista i el mapa.
+        _radius.adopt(draft);
+      } else {
+        setState(() {
+          _searchController.text = originalText;
+          _comarcaController.text = originalComarca;
+          _municipalityController.text = originalMunicipality;
+          _selectedCategories
+            ..clear()
+            ..addAll(originalCategories);
+          _dateFilter = originalDate;
+        });
+      }
     } finally {
+      draft.removeListener(_updateFilterPreview);
+      if (identical(_editingRadius, draft)) _editingRadius = null;
+      draft.dispose();
       if (identical(_filterPreview, preview)) _filterPreview = null;
       preview.dispose();
-    }
-    if (applied == true && mounted) {
-      await _runSearch();
     }
   }
 
@@ -506,7 +537,9 @@ class _SearchScreenState extends State<SearchScreen> {
       width: double.infinity,
       height: 56,
       child: FilledButton(
-        onPressed: _radius.locating ? null : () => Navigator.pop(context, true),
+        onPressed: _filterRadius.locating
+            ? null
+            : () => Navigator.pop(context, true),
         style: FilledButton.styleFrom(
           backgroundColor: CaliuColors.red,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
@@ -568,24 +601,27 @@ class _SearchScreenState extends State<SearchScreen> {
             divisions: 49,
             value: _draftRadius,
             activeColor: CaliuColors.red,
-            onChanged: _radius.locating
+            onChanged: _filterRadius.locating
                 ? null
                 : (value) {
                     setModalState(() => _draftRadius = value.roundToDouble());
                   },
-            onChangeEnd: _radius.locating
+            onChangeEnd: _filterRadius.locating
                 ? null
-                : (value) => _radius.apply(value.roundToDouble()),
+                : (value) => _filterRadius.apply(value.roundToDouble()),
           ),
         ),
-        if (_radius.locating) const Text('Obtenint ubicació…'),
-        if (_radius.radiusKm != null || _radius.locating)
+        if (_filterRadius.locating) const Text('Obtenint ubicació…'),
+        if (_filterRadius.radiusKm != null || _filterRadius.locating)
           TextButton(
-            onPressed: _radius.clear,
+            onPressed: _filterRadius.clear,
             child: const Text('Treure radi'),
           ),
-        if (_radius.error != null)
-          Text(_radius.error!, style: const TextStyle(color: CaliuColors.red)),
+        if (_filterRadius.error != null)
+          Text(
+            _filterRadius.error!,
+            style: const TextStyle(color: CaliuColors.red),
+          ),
         const Divider(height: 32),
       ],
     );

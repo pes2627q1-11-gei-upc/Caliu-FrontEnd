@@ -19,6 +19,20 @@ class SearchRadius extends ChangeNotifier {
   bool _disposed = false;
   int _generation = 0;
 
+  /// Còpia d'edició: comparteix el proveïdor de GPS, però no notifica el mapa.
+  SearchRadius fork() => SearchRadius(locate: _locate)
+    ..center = center
+    ..radiusKm = radiusKm;
+
+  void adopt(SearchRadius draft) {
+    ++_generation;
+    center = draft.center;
+    radiusKm = draft.radiusKm;
+    locating = false;
+    error = null;
+    notifyListeners();
+  }
+
   Future<void> apply(double km) async {
     if (!km.isFinite || km < minKm || km > maxKm) {
       throw ArgumentError.value(km, 'km');
@@ -79,6 +93,7 @@ class SearchRadius extends ChangeNotifier {
 
   @override
   void dispose() {
+    if (_disposed) return;
     _disposed = true;
     super.dispose();
   }
