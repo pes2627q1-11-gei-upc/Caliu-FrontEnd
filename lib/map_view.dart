@@ -6,6 +6,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'data/event.dart';
 import 'data/events_api.dart';
+import 'data/map_event_markers.dart';
 import 'event_detail_screen.dart';
 import 'search_screen.dart';
 import 'theme/caliu_colors.dart';
@@ -40,20 +41,24 @@ enum _LocationMode {
 }
 
 class MapView extends StatefulWidget {
-  const MapView({super.key, this.isActive = true});
+  const MapView({super.key, this.isActive = true, this.eventsApi});
 
   /// Si la pestanya Mapa és la visible (el mapa continua muntat a l'`IndexedStack`).
   final bool isActive;
+
+  /// Injectable per als tests (MockClient); en producció usa l'API per defecte.
+  final EventsApi? eventsApi;
 
   @override
   State<MapView> createState() => _MapViewState();
 }
 
 class _MapViewState extends State<MapView> {
-  final EventsApi _eventsApi = EventsApi();
+  late final EventsApi _eventsApi = widget.eventsApi ?? EventsApi();
 
   GoogleMapController? mapController;
   Set<Marker> _markers = {};
+  final Set<ClusterManager> _clusterManagers = eventClusterManagers();
 
   /// #44: esdeveniment del marcador tocat (previsualització ràpida).
   Event? _selected;
@@ -379,13 +384,16 @@ class _MapViewState extends State<MapView> {
       if (!mounted || generation != _loadGeneration) return;
 
       final withLocation = events.where((e) => e.hasLocation).toList();
+      final byId = indexEventsWithLocation(withLocation);
       _eventsById
         ..clear()
-        ..addEntries(withLocation.map((e) => MapEntry(e.id, e)));
+        ..addAll(byId);
       _loadedBounds = queryBounds;
 
       setState(() {
-        _markers = withLocation.map(_markerFor).toSet();
+        // #114: pins amb ClusterManager (substitució completa, sense duplicats).
+        _markers = markersForEvents(withLocation, onTap: _selectEvent);
+        _selected = selectionAfterReload(_selected, _eventsById);
         _eventsRequestInFlight = false;
       });
 
@@ -403,16 +411,6 @@ class _MapViewState extends State<MapView> {
         _showMessage('No s\'han pogut carregar els esdeveniments.');
       }
     }
-  }
-
-  Marker _markerFor(Event event) {
-    return Marker(
-      markerId: MarkerId(event.id),
-      position: event.location!,
-      // Només el títol: la resta d'informació va a la previsualització (#44).
-      infoWindow: InfoWindow(title: event.title),
-      onTap: () => _selectEvent(event),
-    );
   }
 
   void _selectEvent(Event event) {
@@ -582,6 +580,8 @@ class _MapViewState extends State<MapView> {
                           myLocationButtonEnabled: false,
                           mapToolbarEnabled: false,
                           compassEnabled: true,
+                          // #114: agrupació nativa (Android / iOS / web amb MarkerClusterer).
+                          clusterManagers: _clusterManagers,
                           markers: _markers,
                           onCameraMove: _onCameraMove,
                           onCameraIdle: _onCameraIdle,
