@@ -56,6 +56,30 @@ class Event {
     return parts.join(', ');
   }
 
+  /// Lloc en una línia curta (espai i municipi), per al popup del marcador.
+  /// No repeteix el municipi si ja surt al nom de l'espai o a l'adreça.
+  String get shortPlace {
+    String? clean(String? value) =>
+        value == null || value.trim().isEmpty ? null : value.trim();
+    final where = clean(venue) ?? clean(address);
+    final town = clean(municipality) ?? clean(comarca);
+    if (where == null) return town ?? '';
+    if (town == null || where.toLowerCase().contains(town.toLowerCase())) {
+      return where;
+    }
+    return '$where, $town';
+  }
+
+  /// Enllaç per obrir la ubicació a Google Maps (null si no té coordenades).
+  Uri? get googleMapsUri {
+    final point = location;
+    if (point == null) return null;
+    return Uri.https('www.google.com', '/maps/search/', {
+      'api': '1',
+      'query': '${point.latitude},${point.longitude}',
+    });
+  }
+
   factory Event.fromJson(Map<String, dynamic> json) {
     LatLng? location;
     final rawLocation = json['location'];

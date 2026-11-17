@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'data/event.dart';
 import 'data/events_api.dart';
@@ -409,8 +410,15 @@ class _MapViewState extends State<MapView> {
     return Marker(
       markerId: MarkerId(event.id),
       position: event.location!,
-      // Només el títol: la resta d'informació va a la previsualització (#44).
-      infoWindow: InfoWindow(title: event.title),
+      // Popup curt: títol i lloc. Tocar-lo obre la ubicació a Google Maps.
+      // La resta d'informació va a la previsualització (#44).
+      infoWindow: InfoWindow(
+        title: event.title,
+        snippet: event.shortPlace.isEmpty
+            ? 'Obrir a Google Maps ↗'
+            : '${event.shortPlace} ↗',
+        onTap: () => _openInGoogleMaps(event),
+      ),
       onTap: () => _selectEvent(event),
     );
   }
@@ -433,6 +441,13 @@ class _MapViewState extends State<MapView> {
         ),
       ),
     );
+  }
+
+  Future<void> _openInGoogleMaps(Event event) async {
+    final uri = event.googleMapsUri;
+    if (uri == null) return;
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok) _showMessage('No s\'ha pogut obrir Google Maps');
   }
 
   void _showMessage(String message) {
