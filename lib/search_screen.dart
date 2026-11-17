@@ -223,16 +223,19 @@ class _SearchScreenState extends State<SearchScreen> {
                               ),
                             ),
                           ),
-                          TextButton(
-                            onPressed: () {
-                              setModalState(() {
-                                _draftRadius = _initialRadiusKm;
-                                _resetFilters();
-                              });
-                            },
-                            child: const Text(
-                              'Restablir tot',
-                              style: TextStyle(color: CaliuColors.red),
+                          Flexible(
+                            child: TextButton(
+                              onPressed: () {
+                                setModalState(() {
+                                  _draftRadius = _initialRadiusKm;
+                                  _resetFilters();
+                                });
+                              },
+                              child: const Text(
+                                'Restablir tot',
+                                textAlign: TextAlign.end,
+                                style: TextStyle(color: CaliuColors.red),
+                              ),
                             ),
                           ),
                         ],
@@ -323,7 +326,10 @@ class _SearchScreenState extends State<SearchScreen> {
                               : () => Navigator.pop(context, true),
                           style: FilledButton.styleFrom(
                             backgroundColor: CaliuColors.red,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 14,
+                            ),
                           ),
                           child: Row(
                             children: [

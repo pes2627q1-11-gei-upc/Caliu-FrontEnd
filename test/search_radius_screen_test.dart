@@ -54,6 +54,16 @@ void main() {
       await _settleCount(tester);
       expect(_countLabel(tester), '125 esdeveniments');
       expect(find.text('Aplicar radi'), findsNothing);
+      final buttonRect = tester.getRect(
+        find.ancestor(
+          of: find.text('Aplicar filtres'),
+          matching: find.byType(FilledButton),
+        ),
+      );
+      expect(
+        tester.getRect(find.text('Aplicar filtres')).left - buttonRect.left,
+        greaterThanOrEqualTo(20),
+      );
 
       await tester.tap(find.text('Musica'));
       await tester.pump();
@@ -94,6 +104,59 @@ void main() {
       await tester.tap(find.text('Aplicar filtres'));
       await tester.pumpAndSettle();
       expect(find.text('4 esdeveniments'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      radius.dispose();
+    },
+  );
+
+  testWidgets(
+    'el text del botó queda dins la forma arrodonida en pantalla estreta',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 740));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final radius = SearchRadius(locate: () async => const LatLng(42, 1));
+      final api = EventsApi(
+        client: MockClient(
+          (_) async =>
+              http.Response('{"items":[],"categories":[],"total":221}', 200),
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context)
+                .copyWith(textScaler: const TextScaler.linear(1.3)),
+            child: child!,
+          ),
+          home: SearchScreen(radius: radius, api: api),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Filtres'));
+      await _settleCount(tester);
+      await tester.ensureVisible(find.text('Aplicar filtres'));
+      await tester.pumpAndSettle();
+      final buttonRect = tester.getRect(
+        find.ancestor(
+          of: find.text('Aplicar filtres'),
+          matching: find.byType(FilledButton),
+        ),
+      );
+      for (final finder in [
+        find.text('Aplicar filtres'),
+        find.byKey(const ValueKey('filter-result-count')),
+      ]) {
+        final textRect = tester.getRect(finder);
+        expect(textRect.left, greaterThanOrEqualTo(buttonRect.left + 20));
+        expect(textRect.right, lessThanOrEqualTo(buttonRect.right - 20));
+        expect(textRect.top, greaterThan(buttonRect.top));
+        expect(textRect.bottom, lessThan(buttonRect.bottom));
+      }
+      expect(_countLabel(tester), '221 esdeveniments');
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.text('Aplicar filtres'));
+      await tester.pumpAndSettle();
+      expect(find.text('Filtrar'), findsNothing);
       await tester.pumpWidget(const SizedBox());
       radius.dispose();
     },
