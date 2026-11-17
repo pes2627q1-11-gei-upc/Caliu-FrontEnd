@@ -8,16 +8,15 @@ Event _event({
   String? municipality,
   String? comarca,
   LatLng? location,
-}) =>
-    Event(
-      id: 'evt-1',
-      title: 'Exposició',
-      venue: venue,
-      address: address,
-      municipality: municipality,
-      comarca: comarca,
-      location: location,
-    );
+}) => Event(
+  id: 'evt-1',
+  title: 'Exposició',
+  venue: venue,
+  address: address,
+  municipality: municipality,
+  comarca: comarca,
+  location: location,
+);
 
 void main() {
   group('Event.shortPlace (popup del marcador)', () {
@@ -31,7 +30,10 @@ void main() {
     });
 
     test('sense espai fa servir l\'adreça', () {
-      final e = _event(address: 'Rambla d\'Ègara, 340', municipality: 'Terrassa');
+      final e = _event(
+        address: 'Rambla d\'Ègara, 340',
+        municipality: 'Terrassa',
+      );
       expect(e.shortPlace, 'Rambla d\'Ègara, 340, Terrassa');
     });
 
@@ -49,14 +51,18 @@ void main() {
     });
 
     test('ignora camps en blanc i sense dades retorna buit', () {
-      expect(_event(venue: '  ', municipality: ' Girona ').shortPlace, 'Girona');
+      expect(
+        _event(venue: '  ', municipality: ' Girona ').shortPlace,
+        'Girona',
+      );
       expect(_event().shortPlace, isEmpty);
     });
   });
 
   group('Event.googleMapsUri', () {
     test('enllaç de cerca de Google Maps amb les coordenades', () {
-      final uri = _event(location: const LatLng(41.3851, 2.1734)).googleMapsUri!;
+      final uri = _event(location: const LatLng(41.3851, 2.1734))
+          .googleMapsUri!;
       expect(uri.scheme, 'https');
       expect(uri.host, 'www.google.com');
       expect(uri.path, '/maps/search/');
