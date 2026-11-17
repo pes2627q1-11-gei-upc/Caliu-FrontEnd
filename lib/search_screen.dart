@@ -218,7 +218,11 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<bool?> _showFilters(EventCountPreview preview) async {
     final route = MaterialPageRoute<bool>(
       builder: (context) => ListenableBuilder(
-        listenable: Listenable.merge([_filterRadius, preview, _locationsVersion]),
+        listenable: Listenable.merge([
+          _filterRadius,
+          preview,
+          _locationsVersion,
+        ]),
         builder: (context, _) => StatefulBuilder(
           builder: (context, setModalState) => Scaffold(
             backgroundColor: const Color(0xFFF5EDD8),
