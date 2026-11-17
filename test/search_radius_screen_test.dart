@@ -339,12 +339,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('RADI DE DISTÀNCIA'), findsOneWidget);
     final slider = tester.widget<Slider>(find.byType(Slider));
-    expect(slider.min, 0.1);
+    expect(slider.min, 1);
     expect(slider.max, 50);
+    expect(slider.divisions, 49);
     expect(slider.value, 5);
     tester.widget<Slider>(find.byType(Slider)).onChanged!(5);
     await tester.pump();
-    expect(find.text('5,0 km'), findsOneWidget);
+    expect(find.text('5 km'), findsOneWidget);
     expect(find.text('Aplicar radi'), findsNothing);
     tester.widget<Slider>(find.byType(Slider)).onChangeEnd!(5);
     await tester.pump(const Duration(milliseconds: 350));

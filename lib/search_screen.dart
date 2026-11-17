@@ -22,6 +22,7 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   static const _initialRadiusKm = 5.0;
+  static const _selectorMinKm = 1.0;
   static const _selectorMaxKm = 50.0;
   late final EventsApi _api = widget.api ?? EventsApi();
   late final SearchRadius _radius = widget.radius ?? SearchRadius();
@@ -46,10 +47,9 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
-    _draftRadius = (_radius.radiusKm ?? _initialRadiusKm).clamp(
-      SearchRadius.minKm,
-      _selectorMaxKm,
-    );
+    _draftRadius = (_radius.radiusKm ?? _initialRadiusKm)
+        .clamp(_selectorMinKm, _selectorMaxKm)
+        .roundToDouble();
     _radius.addListener(_radiusChanged);
     _loadCategories();
     _runSearch();
@@ -60,10 +60,9 @@ class _SearchScreenState extends State<SearchScreen> {
     ++_request;
     setState(() {
       if (_radius.radiusKm != null) {
-        _draftRadius = _radius.radiusKm!.clamp(
-          SearchRadius.minKm,
-          _selectorMaxKm,
-        );
+        _draftRadius = _radius.radiusKm!
+            .clamp(_selectorMinKm, _selectorMaxKm)
+            .roundToDouble();
       }
     });
     _updateFilterPreview();
@@ -535,8 +534,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildRadiusFilter(StateSetter setModalState) {
-    String distance(double km) =>
-        '${km.toStringAsFixed(1).replaceAll('.', ',')} km';
+    String distance(double km) => '${km.toStringAsFixed(0)} km';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -565,19 +563,19 @@ class _SearchScreenState extends State<SearchScreen> {
           data: SliderTheme.of(context)
               .copyWith(showValueIndicator: ShowValueIndicator.never),
           child: Slider(
-            min: SearchRadius.minKm,
+            min: _selectorMinKm,
             max: _selectorMaxKm,
-            divisions: 499,
+            divisions: 49,
             value: _draftRadius,
             activeColor: CaliuColors.red,
             onChanged: _radius.locating
                 ? null
                 : (value) {
-                    setModalState(() => _draftRadius = value);
+                    setModalState(() => _draftRadius = value.roundToDouble());
                   },
             onChangeEnd: _radius.locating
                 ? null
-                : (value) => _radius.apply(value),
+                : (value) => _radius.apply(value.roundToDouble()),
           ),
         ),
         if (_radius.locating) const Text('Obtenint ubicació…'),
