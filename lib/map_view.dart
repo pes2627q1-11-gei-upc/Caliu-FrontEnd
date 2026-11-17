@@ -86,7 +86,7 @@ class _MapViewState extends State<MapView> {
   int _clusterGeneration = 0;
   bool _clusteringEnabled = true;
 
-  /// En allunyar: refresca a l'idle només si el mapa ha quedat buit.
+  /// En allunyar: força refresca a l'idle (zona visible més gran).
   bool _pendingWideReload = false;
 
   /// Zona on ja hem confirmat que no hi ha esdeveniments (evita bucle de fetch).
@@ -274,22 +274,6 @@ class _MapViewState extends State<MapView> {
         outer.northeast.longitude >= inner.northeast.longitude;
   }
 
-  bool _pointInBounds(LatLngBounds bounds, LatLng point) {
-    return point.latitude >= bounds.southwest.latitude &&
-        point.latitude <= bounds.northeast.latitude &&
-        point.longitude >= bounds.southwest.longitude &&
-        point.longitude <= bounds.northeast.longitude;
-  }
-
-  /// True si no hi ha cap pin dins la zona visible (pantalla “buida”).
-  bool _screenLooksEmpty(LatLngBounds visible) {
-    if (_markers.isEmpty) return true;
-    for (final marker in _markers) {
-      if (_pointInBounds(visible, marker.position)) return false;
-    }
-    return true;
-  }
-
   bool _isUsableBounds(LatLngBounds bounds) {
     final latSpan = (bounds.northeast.latitude - bounds.southwest.latitude)
         .abs();
@@ -352,21 +336,23 @@ class _MapViewState extends State<MapView> {
       visible = _boundsAround(_lastCamera?.target ?? _focus, 8);
     }
 
-    final screenEmpty = _screenLooksEmpty(visible);
+    final zoom = _lastCamera?.zoom ?? _initialZoom;
+    // Allunyar: la finestra creix; el marge carregat pot continuar “contenint”
+    // la vista i cal forçar fetch (si no, zones noves sense pins).
+    final zoomedOutSinceLoad =
+        _loadedZoom != null && zoom < (_loadedZoom! - 0.6);
+
     final alreadyConfirmedEmpty =
         _confirmedEmptyBounds != null &&
         _boundsContain(_confirmedEmptyBounds!, visible);
 
-    // Refresh / càrrega inicial (notifyIfEmpty): pot forçar sempre.
-    final userForced = force && notifyIfEmpty;
-
-    if (!userForced) {
-      // Hi ha pins a pantalla → no demanar xarxa.
-      if (!screenEmpty) return;
-      // Pantalla buida: només una actualització; si ja sabem que no hi ha res, res.
-      if (alreadyConfirmedEmpty || _eventsRequestInFlight) return;
-      // Zona ja carregada sense pins aquí → no insistir.
-      if (_loadedBounds != null && _boundsContain(_loadedBounds!, visible)) {
+    if (!force) {
+      // Zona ja sabuda buida → no insistir (el refresh manual sí que força).
+      if (alreadyConfirmedEmpty) return;
+      if (_eventsRequestInFlight) return;
+      if (!zoomedOutSinceLoad &&
+          _loadedBounds != null &&
+          _boundsContain(_loadedBounds!, visible)) {
         return;
       }
     }
@@ -501,7 +487,7 @@ class _MapViewState extends State<MapView> {
       );
     });
     if (enablingClusters) {
-      // Allunyar: a l'idle només refresca si el mapa ha quedat buit.
+      // Allunyar: pins de cache ja visibles; a l'idle força fetch de la zona ampla.
       _pendingWideReload = true;
       _loadedZoom = null;
       _loadedBounds = null;
