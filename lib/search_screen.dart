@@ -183,9 +183,9 @@ class _SearchScreenState extends State<SearchScreen> {
         listenable: Listenable.merge([_radius, preview]),
         builder: (context, _) => StatefulBuilder(
           builder: (context, setModalState) => Scaffold(
-            backgroundColor: const Color(0xFFE0D4C0),
+            backgroundColor: const Color(0xFFF5EDD8),
             appBar: AppBar(
-              backgroundColor: const Color(0xFFE0D4C0),
+              backgroundColor: const Color(0xFFF5EDD8),
               foregroundColor: CaliuColors.maroonDeep,
               surfaceTintColor: Colors.transparent,
               centerTitle: true,
