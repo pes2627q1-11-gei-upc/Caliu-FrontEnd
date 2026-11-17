@@ -154,134 +154,142 @@ class _SearchScreenState extends State<SearchScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-            final bottomSafe = MediaQuery.viewPaddingOf(context).bottom;
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 12,
-                bottom: bottomInset + bottomSafe + 20,
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        IconButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          icon: const Icon(Icons.close),
-                        ),
-                        const Expanded(
-                          child: Text(
-                            'Filtrar',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700,
+        return ListenableBuilder(
+          listenable: _radius,
+          builder: (context, _) => StatefulBuilder(
+            builder: (context, setModalState) {
+              final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+              final bottomSafe = MediaQuery.viewPaddingOf(context).bottom;
+              return Padding(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 12,
+                  bottom: bottomInset + bottomSafe + 20,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          IconButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            icon: const Icon(Icons.close),
+                          ),
+                          const Expanded(
+                            child: Text(
+                              'Filtrar',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            setModalState(_resetFilters);
-                          },
-                          child: const Text(
-                            'Restablir tot',
-                            style: TextStyle(color: CaliuColors.red),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Categories',
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 10),
-                    if (_loadingCategories)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Center(child: CircularProgressIndicator()),
-                      )
-                    else
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _allCategories.map((category) {
-                          final selected = _selectedCategories.contains(
-                            category,
-                          );
-                          return FilterChip(
-                            label: Text(category),
-                            selected: selected,
-                            onSelected: (value) {
+                          TextButton(
+                            onPressed: () {
                               setModalState(() {
-                                if (value) {
-                                  _selectedCategories.add(category);
-                                } else {
-                                  _selectedCategories.remove(category);
-                                }
+                                _draftRadius = 15;
+                                _resetFilters();
                               });
                             },
-                            selectedColor: CaliuColors.red,
-                            checkmarkColor: Colors.white,
-                            labelStyle: TextStyle(
-                              color: selected
-                                  ? Colors.white
-                                  : CaliuColors.maroonDeep,
-                              fontWeight: FontWeight.w600,
+                            child: const Text(
+                              'Restablir tot',
+                              style: TextStyle(color: CaliuColors.red),
                             ),
-                            backgroundColor: Colors.white,
-                            side: BorderSide(
-                              color: selected
-                                  ? CaliuColors.red
-                                  : CaliuColors.maroon.withValues(alpha: 0.3),
-                            ),
-                          );
-                        }).toList(),
+                          ),
+                        ],
                       ),
-                    const SizedBox(height: 20),
-                    TextField(
-                      controller: _comarcaController,
-                      decoration: const InputDecoration(
-                        labelText: 'Comarca',
-                        hintText: 'Ex: Barcelonès',
-                        border: OutlineInputBorder(),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Categories',
+                        style: TextStyle(fontWeight: FontWeight.w700),
                       ),
-                      onChanged: (_) => setModalState(() {}),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: _municipalityController,
-                      decoration: const InputDecoration(
-                        labelText: 'Municipi',
-                        hintText: 'Ex: Barcelona',
-                        border: OutlineInputBorder(),
-                      ),
-                      onChanged: (_) => setModalState(() {}),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: CaliuColors.red,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                      const SizedBox(height: 10),
+                      if (_loadingCategories)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _allCategories.map((category) {
+                            final selected = _selectedCategories.contains(
+                              category,
+                            );
+                            return FilterChip(
+                              label: Text(category),
+                              selected: selected,
+                              onSelected: (value) {
+                                setModalState(() {
+                                  if (value) {
+                                    _selectedCategories.add(category);
+                                  } else {
+                                    _selectedCategories.remove(category);
+                                  }
+                                });
+                              },
+                              selectedColor: CaliuColors.red,
+                              checkmarkColor: Colors.white,
+                              labelStyle: TextStyle(
+                                color: selected
+                                    ? Colors.white
+                                    : CaliuColors.maroonDeep,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              backgroundColor: Colors.white,
+                              side: BorderSide(
+                                color: selected
+                                    ? CaliuColors.red
+                                    : CaliuColors.maroon.withValues(alpha: 0.3),
+                              ),
+                            );
+                          }).toList(),
                         ),
-                        child: const Text('Aplicar filtres'),
+                      const SizedBox(height: 20),
+                      _buildRadiusFilter(setModalState),
+                      const SizedBox(height: 20),
+                      TextField(
+                        controller: _comarcaController,
+                        decoration: const InputDecoration(
+                          labelText: 'Comarca',
+                          hintText: 'Ex: Barcelonès',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (_) => setModalState(() {}),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _municipalityController,
+                        decoration: const InputDecoration(
+                          labelText: 'Municipi',
+                          hintText: 'Ex: Barcelona',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (_) => setModalState(() {}),
+                      ),
+                      const SizedBox(height: 20),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: CaliuColors.red,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                          child: const Text('Aplicar filtres'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         );
       },
     );
@@ -289,6 +297,74 @@ class _SearchScreenState extends State<SearchScreen> {
     if (applied == true) {
       await _runSearch();
     }
+  }
+
+  Widget _buildRadiusFilter(StateSetter setModalState) {
+    String distance(double km) =>
+        '${km.toStringAsFixed(1).replaceAll('.', ',')} km';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(height: 32),
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'RADI DE DISTÀNCIA',
+                style: TextStyle(
+                  color: CaliuColors.red,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Text(
+              distance(_draftRadius),
+              style: const TextStyle(
+                color: CaliuColors.red,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        Slider(
+          min: SearchRadius.minKm,
+          max: SearchRadius.maxKm,
+          divisions: 4999,
+          value: _draftRadius,
+          activeColor: CaliuColors.red,
+          label: distance(_draftRadius),
+          onChanged: _radius.locating
+              ? null
+              : (value) {
+                  setModalState(() => _draftRadius = value);
+                },
+        ),
+        if (_radius.radiusKm != null)
+          Text('Radi aplicat: ${distance(_radius.radiusKm!)}'),
+        Wrap(
+          spacing: 8,
+          children: [
+            TextButton.icon(
+              onPressed: _radius.locating
+                  ? null
+                  : () => _radius.apply(_draftRadius),
+              icon: const Icon(Icons.my_location),
+              label: Text(
+                _radius.locating ? 'Obtenint ubicació…' : 'Aplicar radi',
+              ),
+            ),
+            if (_radius.radiusKm != null || _radius.locating)
+              TextButton(
+                onPressed: _radius.clear,
+                child: const Text('Treure radi'),
+              ),
+          ],
+        ),
+        if (_radius.error != null)
+          Text(_radius.error!, style: const TextStyle(color: CaliuColors.red)),
+        const Divider(height: 32),
+      ],
+    );
   }
 
   void _selectDateFilter(DateRangeFilter filter) {
@@ -356,7 +432,8 @@ class _SearchScreenState extends State<SearchScreen> {
     final activeFilters =
         _selectedCategories.length +
         (_comarcaController.text.trim().isEmpty ? 0 : 1) +
-        (_municipalityController.text.trim().isEmpty ? 0 : 1);
+        (_municipalityController.text.trim().isEmpty ? 0 : 1) +
+        (_radius.radiusKm == null ? 0 : 1);
 
     return Scaffold(
       backgroundColor: CaliuColors.beige,
@@ -395,52 +472,6 @@ class _SearchScreenState extends State<SearchScreen> {
               ],
               onChanged: (_) => setState(() {}),
               onSubmitted: (_) => _runSearch(),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _radius.radiusKm == null
-                            ? 'Radi de cerca (km)'
-                            : 'Radi aplicat: ${_radius.radiusKm!.toStringAsFixed(1)} km',
-                      ),
-                    ),
-                    if (_radius.radiusKm != null || _radius.locating)
-                      TextButton(
-                        onPressed: _radius.clear,
-                        child: const Text('Treure radi'),
-                      ),
-                  ],
-                ),
-                Slider(
-                  min: SearchRadius.minKm,
-                  max: SearchRadius.maxKm,
-                  divisions: 4999,
-                  value: _draftRadius,
-                  label: '${_draftRadius.toStringAsFixed(1)} km',
-                  onChanged: _radius.locating
-                      ? null
-                      : (value) => setState(() => _draftRadius = value),
-                ),
-                TextButton.icon(
-                  onPressed: _radius.locating
-                      ? null
-                      : () => _radius.apply(_draftRadius),
-                  icon: const Icon(Icons.my_location),
-                  label: Text(
-                    _radius.locating
-                        ? 'Obtenint ubicació…'
-                        : 'Aplicar radi: ${_draftRadius.toStringAsFixed(1)} km',
-                  ),
-                ),
-                if (_radius.error != null)
-                  Text(_radius.error!, textAlign: TextAlign.center),
-              ],
             ),
           ),
           _buildDateChips(),
