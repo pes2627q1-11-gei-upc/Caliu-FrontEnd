@@ -10,7 +10,122 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 
+Future<void> _settleCount(WidgetTester tester) async {
+  await tester.pump(const Duration(milliseconds: 350));
+  await tester.pumpAndSettle();
+}
+
+String? _countLabel(WidgetTester tester) =>
+    tester.widget<Text>(find.byKey(const ValueKey('filter-result-count'))).data;
+
 void main() {
+  testWidgets(
+    'el botó compta categories, municipi i radi abans de tancar Filtrar',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final pending = Completer<LatLng>();
+      final radius = SearchRadius(locate: () => pending.future);
+      final requests = <Uri>[];
+      final api = EventsApi(
+        client: MockClient((request) async {
+          requests.add(request.url);
+          if (request.url.path.endsWith('categories')) {
+            return http.Response('{"categories":["Musica"]}', 200);
+          }
+          final query = request.url.queryParameters;
+          final total = query.containsKey('radiusKm')
+              ? 2
+              : query.containsKey('municipality')
+              ? 4
+              : query.containsKey('category')
+              ? 18
+              : 125;
+          return http.Response('{"items":[],"total":$total}', 200);
+        }),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SearchScreen(radius: radius, api: api),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Filtres'));
+      await _settleCount(tester);
+      expect(_countLabel(tester), '125 esdeveniments');
+      expect(find.text('Aplicar radi'), findsNothing);
+
+      await tester.tap(find.text('Musica'));
+      await tester.pump();
+      expect(_countLabel(tester), 'Comptant…');
+      await _settleCount(tester);
+      expect(_countLabel(tester), '18 esdeveniments');
+      await tester.ensureVisible(find.widgetWithText(TextField, 'Municipi'));
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Municipi'),
+        'Olot',
+      );
+      await _settleCount(tester);
+      expect(_countLabel(tester), '4 esdeveniments');
+
+      final slider = tester.widget<Slider>(find.byType(Slider));
+      slider.onChanged!(3);
+      slider.onChangeEnd!(3);
+      await tester.pump();
+      expect(_countLabel(tester), 'Comptant…');
+      expect(
+        requests.any((uri) => uri.queryParameters.containsKey('radiusKm')),
+        isFalse,
+      );
+      pending.complete(const LatLng(42, 1));
+      await tester.pump();
+      await _settleCount(tester);
+      expect(_countLabel(tester), '2 esdeveniments');
+      expect(requests.last.queryParameters['radiusKm'], '3.0');
+      expect(requests.last.queryParameters['category'], 'Musica');
+      expect(requests.last.queryParameters['municipality'], 'Olot');
+      expect(requests.last.queryParameters['limit'], '1');
+
+      await tester.ensureVisible(find.text('Treure radi'));
+      await tester.tap(find.text('Treure radi'));
+      await _settleCount(tester);
+      expect(_countLabel(tester), '4 esdeveniments');
+      await tester.ensureVisible(find.text('Aplicar filtres'));
+      await tester.tap(find.text('Aplicar filtres'));
+      await tester.pumpAndSettle();
+      expect(find.text('4 esdeveniments'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      radius.dispose();
+    },
+  );
+
+  testWidgets(
+    'un error de recompte es mostra com a no disponible i no com a zero',
+    (tester) async {
+      final radius = SearchRadius(locate: () async => const LatLng(42, 1));
+      final api = EventsApi(
+        client: MockClient((request) async {
+          if (request.url.queryParameters['limit'] == '1') {
+            return http.Response('{}', 503);
+          }
+          return http.Response('{"items":[],"categories":[],"total":0}', 200);
+        }),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SearchScreen(radius: radius, api: api),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Filtres'));
+      await _settleCount(tester);
+      expect(_countLabel(tester), 'No disponible');
+      expect(find.text('No s’ha pogut calcular el recompte.'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      radius.dispose();
+    },
+  );
+
   testWidgets('envia radi i ubicació, conserva text i permet treure el radi', (
     tester,
   ) async {
@@ -64,8 +179,9 @@ void main() {
     tester.widget<Slider>(find.byType(Slider)).onChanged!(5);
     await tester.pump();
     expect(find.text('5,0 km'), findsOneWidget);
-    await tester.ensureVisible(find.text('Aplicar radi'));
-    await tester.tap(find.text('Aplicar radi'));
+    expect(find.text('Aplicar radi'), findsNothing);
+    tester.widget<Slider>(find.byType(Slider)).onChangeEnd!(5);
+    await tester.pump(const Duration(milliseconds: 350));
     await tester.pumpAndSettle();
     final query = requests.last.queryParameters;
     expect(query['q'], 'jazz');
@@ -110,8 +226,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Filtres'));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Aplicar radi'));
-    await tester.tap(find.text('Aplicar radi'));
+    tester.widget<Slider>(find.byType(Slider)).onChangeEnd!(5);
     await tester.pump();
     expect(find.text('Obtenint ubicació…'), findsOneWidget);
     expect(tester.widget<Slider>(find.byType(Slider)).onChanged, isNull);
@@ -179,8 +294,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.widget<Slider>(find.byType(Slider)).value, 50);
     expect(find.text('Radi aplicat: 500,0 km'), findsOneWidget);
-    await tester.ensureVisible(find.text('Aplicar radi'));
-    await tester.tap(find.text('Aplicar radi'));
+    tester.widget<Slider>(find.byType(Slider)).onChangeEnd!(50);
     await tester.pumpAndSettle();
     expect(radius.radiusKm, 50);
     expect(tester.takeException(), isNull);

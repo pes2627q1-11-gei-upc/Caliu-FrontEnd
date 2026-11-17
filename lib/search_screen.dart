@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'data/date_range_filter.dart';
 import 'data/event.dart';
+import 'data/event_count_preview.dart';
 import 'data/event_query.dart';
 import 'data/events_api.dart';
 import 'data/search_radius.dart';
@@ -26,6 +27,7 @@ class _SearchScreenState extends State<SearchScreen> {
   late final SearchRadius _radius = widget.radius ?? SearchRadius();
   double _draftRadius = _initialRadiusKm;
   int _request = 0;
+  EventCountPreview? _filterPreview;
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _comarcaController = TextEditingController();
   final TextEditingController _municipalityController = TextEditingController();
@@ -64,11 +66,17 @@ class _SearchScreenState extends State<SearchScreen> {
         );
       }
     });
+    _updateFilterPreview();
     if (!_radius.locating) _runSearch();
+  }
+
+  void _updateFilterPreview() {
+    _filterPreview?.update(_radius.locating ? null : _buildQuery());
   }
 
   @override
   void dispose() {
+    _filterPreview?.dispose();
     _radius.removeListener(_radiusChanged);
     if (widget.radius == null) _radius.dispose();
     _searchController.dispose();
@@ -147,6 +155,7 @@ class _SearchScreenState extends State<SearchScreen> {
   void _resetFilters() {
     setState(() {
       _selectedCategories.clear();
+      _dateFilter = null;
       _comarcaController.clear();
       _municipalityController.clear();
     });
@@ -154,7 +163,23 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Future<void> _openFilters() async {
-    final applied = await showModalBottomSheet<bool>(
+    final preview = EventCountPreview(_api);
+    _filterPreview = preview;
+    _updateFilterPreview();
+    bool? applied;
+    try {
+      applied = await _showFilters(preview);
+    } finally {
+      if (identical(_filterPreview, preview)) _filterPreview = null;
+      preview.dispose();
+    }
+    if (applied == true && mounted) {
+      await _runSearch();
+    }
+  }
+
+  Future<bool?> _showFilters(EventCountPreview preview) {
+    return showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useRootNavigator: true,
@@ -165,7 +190,7 @@ class _SearchScreenState extends State<SearchScreen> {
       ),
       builder: (context) {
         return ListenableBuilder(
-          listenable: _radius,
+          listenable: Listenable.merge([_radius, preview]),
           builder: (context, _) => StatefulBuilder(
             builder: (context, setModalState) {
               final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
@@ -242,6 +267,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                     _selectedCategories.remove(category);
                                   }
                                 });
+                                _updateFilterPreview();
                               },
                               selectedColor: CaliuColors.red,
                               checkmarkColor: Colors.white,
@@ -270,7 +296,10 @@ class _SearchScreenState extends State<SearchScreen> {
                           hintText: 'Ex: Barcelonès',
                           border: OutlineInputBorder(),
                         ),
-                        onChanged: (_) => setModalState(() {}),
+                        onChanged: (_) {
+                          setModalState(() {});
+                          _updateFilterPreview();
+                        },
                       ),
                       const SizedBox(height: 12),
                       TextField(
@@ -280,20 +309,51 @@ class _SearchScreenState extends State<SearchScreen> {
                           hintText: 'Ex: Barcelona',
                           border: OutlineInputBorder(),
                         ),
-                        onChanged: (_) => setModalState(() {}),
+                        onChanged: (_) {
+                          setModalState(() {});
+                          _updateFilterPreview();
+                        },
                       ),
                       const SizedBox(height: 20),
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton(
-                          onPressed: () => Navigator.pop(context, true),
+                          onPressed: _radius.locating
+                              ? null
+                              : () => Navigator.pop(context, true),
                           style: FilledButton.styleFrom(
                             backgroundColor: CaliuColors.red,
                             padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
-                          child: const Text('Aplicar filtres'),
+                          child: Row(
+                            children: [
+                              const Expanded(child: Text('Aplicar filtres')),
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: Text(
+                                  preview.loading
+                                      ? 'Comptant…'
+                                      : preview.error != null
+                                      ? 'No disponible'
+                                      : '${preview.total} ${preview.total == 1 ? 'esdeveniment' : 'esdeveniments'}',
+                                  key: const ValueKey('filter-result-count'),
+                                  textAlign: TextAlign.end,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              const Icon(Icons.arrow_forward, size: 20),
+                            ],
+                          ),
                         ),
                       ),
+                      if (preview.error != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            preview.error!,
+                            style: const TextStyle(color: CaliuColors.red),
+                          ),
+                        ),
                     ],
                   ),
                 ),
@@ -303,10 +363,6 @@ class _SearchScreenState extends State<SearchScreen> {
         );
       },
     );
-
-    if (applied == true) {
-      await _runSearch();
-    }
   }
 
   Widget _buildRadiusFilter(StateSetter setModalState) {
@@ -348,28 +404,18 @@ class _SearchScreenState extends State<SearchScreen> {
               : (value) {
                   setModalState(() => _draftRadius = value);
                 },
+          onChangeEnd: _radius.locating
+              ? null
+              : (value) => _radius.apply(value),
         ),
         if (_radius.radiusKm != null)
           Text('Radi aplicat: ${distance(_radius.radiusKm!)}'),
-        Wrap(
-          spacing: 8,
-          children: [
-            TextButton.icon(
-              onPressed: _radius.locating
-                  ? null
-                  : () => _radius.apply(_draftRadius),
-              icon: const Icon(Icons.my_location),
-              label: Text(
-                _radius.locating ? 'Obtenint ubicació…' : 'Aplicar radi',
-              ),
-            ),
-            if (_radius.radiusKm != null || _radius.locating)
-              TextButton(
-                onPressed: _radius.clear,
-                child: const Text('Treure radi'),
-              ),
-          ],
-        ),
+        if (_radius.locating) const Text('Obtenint ubicació…'),
+        if (_radius.radiusKm != null || _radius.locating)
+          TextButton(
+            onPressed: _radius.clear,
+            child: const Text('Treure radi'),
+          ),
         if (_radius.error != null)
           Text(_radius.error!, style: const TextStyle(color: CaliuColors.red)),
         const Divider(height: 32),

@@ -32,6 +32,8 @@ App mòbil **Flutter** de **Caliu**: mapa i agenda d’esdeveniments culturals a
 El selector de radi de la cerca permet aplicar entre 0,1 i 50 km des de la
 ubicació real, amb un valor inicial de 5 km. El filtre es comparteix amb el
 mapa i es pot treure sense perdre els altres filtres de cerca.
+El radi s'aplica en deixar anar el lliscador del menú «Filtrar», i el botó
+«Aplicar filtres» mostra el total d'esdeveniments dels filtres seleccionats.
 
 ## Arrencada ràpida
 
