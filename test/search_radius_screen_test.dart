@@ -124,8 +124,11 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           builder: (context, child) => MediaQuery(
-            data: MediaQuery.of(context)
-                .copyWith(textScaler: const TextScaler.linear(1.3)),
+            data: MediaQuery.of(context).copyWith(
+              textScaler: const TextScaler.linear(1.3),
+              viewPadding: const EdgeInsets.only(bottom: 24),
+              padding: const EdgeInsets.only(bottom: 24),
+            ),
             child: child!,
           ),
           home: SearchScreen(radius: radius, api: api),
@@ -142,6 +145,20 @@ void main() {
           matching: find.byType(FilledButton),
         ),
       );
+      expect(buttonRect.bottom, lessThanOrEqualTo(740 - 24));
+      await tester.ensureVisible(find.widgetWithText(TextField, 'Municipi'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .getRect(
+              find.ancestor(
+                of: find.text('Aplicar filtres'),
+                matching: find.byType(FilledButton),
+              ),
+            )
+            .top,
+        closeTo(buttonRect.top, 0.1),
+      );
       for (final finder in [
         find.text('Aplicar filtres'),
         find.byKey(const ValueKey('filter-result-count')),
@@ -151,8 +168,14 @@ void main() {
         expect(textRect.right, lessThanOrEqualTo(buttonRect.right - 20));
         expect(textRect.top, greaterThan(buttonRect.top));
         expect(textRect.bottom, lessThan(buttonRect.bottom));
+        expect(tester.getSize(finder).height, lessThan(28));
       }
       expect(_countLabel(tester), '221 esdeveniments');
+      final sliderContext = tester.element(find.byType(Slider));
+      expect(
+        SliderTheme.of(sliderContext).showValueIndicator,
+        ShowValueIndicator.never,
+      );
       expect(tester.takeException(), isNull);
       await tester.tap(find.text('Aplicar filtres'));
       await tester.pumpAndSettle();

@@ -196,178 +196,198 @@ class _SearchScreenState extends State<SearchScreen> {
               final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
               final bottomSafe = MediaQuery.viewPaddingOf(context).bottom;
               return Padding(
-                padding: EdgeInsets.only(
-                  left: 20,
-                  right: 20,
-                  top: 12,
-                  bottom: bottomInset + bottomSafe + 20,
+                padding: EdgeInsets.fromLTRB(
+                  20,
+                  12,
+                  20,
+                  bottomInset + bottomSafe + 20,
                 ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          IconButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            icon: const Icon(Icons.close),
-                          ),
-                          const Expanded(
-                            child: Text(
-                              'Filtrar',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                              ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Row(
+                              children: [
+                                IconButton(
+                                  onPressed: () =>
+                                      Navigator.pop(context, false),
+                                  icon: const Icon(Icons.close),
+                                ),
+                                const Expanded(
+                                  child: Text(
+                                    'Filtrar',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                Flexible(
+                                  child: TextButton(
+                                    onPressed: () {
+                                      setModalState(() {
+                                        _draftRadius = _initialRadiusKm;
+                                        _resetFilters();
+                                      });
+                                    },
+                                    child: const Text(
+                                      'Restablir tot',
+                                      textAlign: TextAlign.end,
+                                      style: TextStyle(color: CaliuColors.red),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          Flexible(
-                            child: TextButton(
-                              onPressed: () {
-                                setModalState(() {
-                                  _draftRadius = _initialRadiusKm;
-                                  _resetFilters();
-                                });
-                              },
-                              child: const Text(
-                                'Restablir tot',
-                                textAlign: TextAlign.end,
-                                style: TextStyle(color: CaliuColors.red),
-                              ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Categories',
+                              style: TextStyle(fontWeight: FontWeight.w700),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Categories',
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 10),
-                      if (_loadingCategories)
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12),
-                          child: Center(child: CircularProgressIndicator()),
-                        )
-                      else
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: _allCategories.map((category) {
-                            final selected = _selectedCategories.contains(
-                              category,
-                            );
-                            return FilterChip(
-                              label: Text(category),
-                              selected: selected,
-                              onSelected: (value) {
-                                setModalState(() {
-                                  if (value) {
-                                    _selectedCategories.add(category);
-                                  } else {
-                                    _selectedCategories.remove(category);
-                                  }
-                                });
+                            const SizedBox(height: 10),
+                            if (_loadingCategories)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                child: Center(
+                                  child: CircularProgressIndicator(),
+                                ),
+                              )
+                            else
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: _allCategories.map((category) {
+                                  final selected = _selectedCategories.contains(
+                                    category,
+                                  );
+                                  return FilterChip(
+                                    label: Text(category),
+                                    selected: selected,
+                                    onSelected: (value) {
+                                      setModalState(() {
+                                        if (value) {
+                                          _selectedCategories.add(category);
+                                        } else {
+                                          _selectedCategories.remove(category);
+                                        }
+                                      });
+                                      _updateFilterPreview();
+                                    },
+                                    selectedColor: CaliuColors.red,
+                                    checkmarkColor: Colors.white,
+                                    labelStyle: TextStyle(
+                                      color: selected
+                                          ? Colors.white
+                                          : CaliuColors.maroonDeep,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    backgroundColor: Colors.white,
+                                    side: BorderSide(
+                                      color: selected
+                                          ? CaliuColors.red
+                                          : CaliuColors.maroon.withValues(
+                                              alpha: 0.3,
+                                            ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            const SizedBox(height: 20),
+                            _buildRadiusFilter(setModalState),
+                            const SizedBox(height: 20),
+                            TextField(
+                              controller: _comarcaController,
+                              decoration: const InputDecoration(
+                                labelText: 'Comarca',
+                                hintText: 'Ex: Barcelonès',
+                                border: OutlineInputBorder(),
+                              ),
+                              onChanged: (_) {
+                                setModalState(() {});
                                 _updateFilterPreview();
                               },
-                              selectedColor: CaliuColors.red,
-                              checkmarkColor: Colors.white,
-                              labelStyle: TextStyle(
-                                color: selected
-                                    ? Colors.white
-                                    : CaliuColors.maroonDeep,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              backgroundColor: Colors.white,
-                              side: BorderSide(
-                                color: selected
-                                    ? CaliuColors.red
-                                    : CaliuColors.maroon.withValues(alpha: 0.3),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      const SizedBox(height: 20),
-                      _buildRadiusFilter(setModalState),
-                      const SizedBox(height: 20),
-                      TextField(
-                        controller: _comarcaController,
-                        decoration: const InputDecoration(
-                          labelText: 'Comarca',
-                          hintText: 'Ex: Barcelonès',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (_) {
-                          setModalState(() {});
-                          _updateFilterPreview();
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: _municipalityController,
-                        decoration: const InputDecoration(
-                          labelText: 'Municipi',
-                          hintText: 'Ex: Barcelona',
-                          border: OutlineInputBorder(),
-                        ),
-                        onChanged: (_) {
-                          setModalState(() {});
-                          _updateFilterPreview();
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton(
-                          onPressed: _radius.locating
-                              ? null
-                              : () => Navigator.pop(context, true),
-                          style: FilledButton.styleFrom(
-                            backgroundColor: CaliuColors.red,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 14,
                             ),
-                          ),
-                          child: Row(
-                            children: [
-                              const Expanded(child: Text('Aplicar filtres')),
-                              const SizedBox(width: 8),
-                              Flexible(
-                                child: Text(
-                                  preview.loading
-                                      ? 'Comptant…'
-                                      : preview.error != null
-                                      ? 'No disponible'
-                                      : '${preview.total} ${preview.total == 1 ? 'esdeveniment' : 'esdeveniments'}',
-                                  key: const ValueKey('filter-result-count'),
-                                  textAlign: TextAlign.end,
-                                ),
+                            const SizedBox(height: 12),
+                            TextField(
+                              controller: _municipalityController,
+                              decoration: const InputDecoration(
+                                labelText: 'Municipi',
+                                hintText: 'Ex: Barcelona',
+                                border: OutlineInputBorder(),
                               ),
-                              const SizedBox(width: 6),
-                              const Icon(Icons.arrow_forward, size: 20),
-                            ],
-                          ),
+                              onChanged: (_) {
+                                setModalState(() {});
+                                _updateFilterPreview();
+                              },
+                            ),
+                            const SizedBox(height: 20),
+                          ],
                         ),
                       ),
-                      if (preview.error != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: Text(
-                            preview.error!,
-                            style: const TextStyle(color: CaliuColors.red),
-                          ),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildApplyFiltersButton(context, preview),
+                    if (preview.error != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          preview.error!,
+                          style: const TextStyle(color: CaliuColors.red),
                         ),
-                    ],
-                  ),
+                      ),
+                  ],
                 ),
               );
             },
           ),
         );
       },
+    );
+  }
+
+  Widget _buildApplyFiltersButton(
+    BuildContext context,
+    EventCountPreview preview,
+  ) {
+    final count = preview.loading
+        ? 'Comptant…'
+        : preview.error != null
+        ? 'No disponible'
+        : '${preview.total} ${preview.total == 1 ? 'esdeveniment' : 'esdeveniments'}';
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: FilledButton(
+        onPressed: _radius.locating ? null : () => Navigator.pop(context, true),
+        style: FilledButton.styleFrom(
+          backgroundColor: CaliuColors.red,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        ),
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Aplicar filtres', maxLines: 1, softWrap: false),
+              const SizedBox(width: 20),
+              Text(
+                count,
+                key: const ValueKey('filter-result-count'),
+                maxLines: 1,
+                softWrap: false,
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.arrow_forward, size: 20),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -398,21 +418,24 @@ class _SearchScreenState extends State<SearchScreen> {
             ),
           ],
         ),
-        Slider(
-          min: SearchRadius.minKm,
-          max: _selectorMaxKm,
-          divisions: 499,
-          value: _draftRadius,
-          activeColor: CaliuColors.red,
-          label: distance(_draftRadius),
-          onChanged: _radius.locating
-              ? null
-              : (value) {
-                  setModalState(() => _draftRadius = value);
-                },
-          onChangeEnd: _radius.locating
-              ? null
-              : (value) => _radius.apply(value),
+        SliderTheme(
+          data: SliderTheme.of(context)
+              .copyWith(showValueIndicator: ShowValueIndicator.never),
+          child: Slider(
+            min: SearchRadius.minKm,
+            max: _selectorMaxKm,
+            divisions: 499,
+            value: _draftRadius,
+            activeColor: CaliuColors.red,
+            onChanged: _radius.locating
+                ? null
+                : (value) {
+                    setModalState(() => _draftRadius = value);
+                  },
+            onChangeEnd: _radius.locating
+                ? null
+                : (value) => _radius.apply(value),
+          ),
         ),
         if (_radius.locating) const Text('Obtenint ubicació…'),
         if (_radius.radiusKm != null || _radius.locating)
