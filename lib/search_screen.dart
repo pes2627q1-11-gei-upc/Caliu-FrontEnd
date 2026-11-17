@@ -232,25 +232,62 @@ class _SearchScreenState extends State<SearchScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            SearchBar(
-                              controller: _searchController,
-                              hintText: 'Cerca esdeveniments, llocs…',
-                              leading: const Icon(Icons.search),
-                              onChanged: (_) {
-                                setModalState(() {});
-                                _updateFilterPreview();
-                              },
-                              trailing: [
-                                IconButton(
-                                  tooltip: 'Esborrar cerca',
-                                  icon: const Icon(Icons.clear),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setModalState(() {});
-                                    _updateFilterPreview();
-                                  },
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(18),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF806B43)
+                                        .withValues(alpha: 0.12),
+                                    blurRadius: 24,
+                                    offset: const Offset(0, 10),
+                                  ),
+                                ],
+                              ),
+                              child: SearchBar(
+                                elevation: const WidgetStatePropertyAll(0),
+                                backgroundColor: const WidgetStatePropertyAll(
+                                  Colors.white,
                                 ),
-                              ],
+                                surfaceTintColor: const WidgetStatePropertyAll(
+                                  Colors.transparent,
+                                ),
+                                shape: WidgetStatePropertyAll(
+                                  RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(18),
+                                    side: const BorderSide(
+                                      color: Color(0xFFE0D5C0),
+                                    ),
+                                  ),
+                                ),
+                                padding: const WidgetStatePropertyAll(
+                                  EdgeInsets.symmetric(horizontal: 16),
+                                ),
+                                controller: _searchController,
+                                hintText: 'Cerca esdeveniments, llocs…',
+                                leading: const Icon(
+                                  Icons.search,
+                                  color: Color(0xFFE0D5C0),
+                                ),
+                                onChanged: (_) {
+                                  setModalState(() {});
+                                  _updateFilterPreview();
+                                },
+                                trailing: [
+                                  IconButton(
+                                    tooltip: 'Esborrar cerca',
+                                    icon: const Icon(
+                                      Icons.cancel_outlined,
+                                      color: Color(0xFFE0D5C0),
+                                    ),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setModalState(() {});
+                                      _updateFilterPreview();
+                                    },
+                                  ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 28),
                             const Text(
@@ -278,6 +315,37 @@ class _SearchScreenState extends State<SearchScreen> {
                                   );
                                   return FilterChip(
                                     label: Text(category),
+                                    showCheckmark: false,
+                                    avatar: selected
+                                        ? const DecoratedBox(
+                                            decoration: BoxDecoration(
+                                              color: Color(0xFFF5EDD6),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: SizedBox(
+                                              width: 6,
+                                              height: 6,
+                                            ),
+                                          )
+                                        : null,
+                                    avatarBoxConstraints:
+                                        const BoxConstraints.tightFor(
+                                          width: 8,
+                                          height: 8,
+                                        ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 6,
+                                    ),
+                                    labelPadding: EdgeInsets.zero,
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    elevation: 0,
+                                    pressElevation: 0,
+                                    surfaceTintColor: Colors.transparent,
                                     selected: selected,
                                     onSelected: (value) {
                                       setModalState(() {
@@ -293,7 +361,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                     checkmarkColor: Colors.white,
                                     labelStyle: TextStyle(
                                       color: selected
-                                          ? Colors.white
+                                          ? const Color(0xFFF5EDD6)
                                           : CaliuColors.maroonDeep,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -301,9 +369,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                     side: BorderSide(
                                       color: selected
                                           ? CaliuColors.red
-                                          : CaliuColors.maroon.withValues(
-                                              alpha: 0.3,
-                                            ),
+                                          : const Color(0xFFE0D5C0),
                                     ),
                                   );
                                 }).toList(),
