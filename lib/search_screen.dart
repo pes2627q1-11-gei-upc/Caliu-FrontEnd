@@ -267,7 +267,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                 hintText: 'Cerca esdeveniments, llocs…',
                                 leading: const Icon(
                                   Icons.search,
-                                  color: Color(0xFFE0D5C0),
+                                  color: Color(0xFF700B10),
                                 ),
                                 onChanged: (_) {
                                   setModalState(() {});
@@ -278,7 +278,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                     tooltip: 'Esborrar cerca',
                                     icon: const Icon(
                                       Icons.cancel_outlined,
-                                      color: Color(0xFFE0D5C0),
+                                      color: Color(0xFF700B10),
                                     ),
                                     onPressed: () {
                                       _searchController.clear();
@@ -340,7 +340,9 @@ class _SearchScreenState extends State<SearchScreen> {
                                       horizontal: 12,
                                       vertical: 6,
                                     ),
-                                    labelPadding: EdgeInsets.zero,
+                                    labelPadding: EdgeInsets.only(
+                                      left: selected ? 8 : 0,
+                                    ),
                                     materialTapTargetSize:
                                         MaterialTapTargetSize.shrinkWrap,
                                     elevation: 0,
