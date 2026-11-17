@@ -58,7 +58,7 @@ class _MapViewState extends State<MapView> {
 
   GoogleMapController? mapController;
   Set<Marker> _markers = {};
-  final Set<ClusterManager> _clusterManagers = eventClusterManagers();
+  Set<ClusterManager> _clusterManagers = {};
 
   /// #44: esdeveniment del marcador tocat (previsualització ràpida).
   Event? _selected;
@@ -80,6 +80,9 @@ class _MapViewState extends State<MapView> {
   LatLngBounds? _loadedBounds;
   Timer? _cameraIdleTimer;
   int _loadGeneration = 0;
+
+  /// Força un ClusterManager nou a cada càrrega (evita clústers buits fantasma).
+  int _clusterGeneration = 0;
 
   bool get _hasUserLocation => _locationMode == _LocationMode.user;
 
@@ -391,8 +394,15 @@ class _MapViewState extends State<MapView> {
       _loadedBounds = queryBounds;
 
       setState(() {
-        // #114: pins amb ClusterManager (substitució completa, sense duplicats).
-        _markers = markersForEvents(withLocation, onTap: _selectEvent);
+        // #114: regenera ClusterManager + markers (evita clústers buits a pantalla).
+        _clusterGeneration++;
+        final markerSet = buildEventMarkerSet(
+          withLocation,
+          clusterGeneration: _clusterGeneration,
+          onTap: _selectEvent,
+        );
+        _clusterManagers = markerSet.clusterManagers;
+        _markers = markerSet.markers;
         _selected = selectionAfterReload(_selected, _eventsById);
         _eventsRequestInFlight = false;
       });

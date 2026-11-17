@@ -37,7 +37,8 @@ void main() {
     expect(EventQuery, isNotNull);
     expect(previewWhen, isA<Function>());
     expect(EventsApi, isNotNull);
-    expect(kEventClusterManagerId, isNotNull);
+    expect(kEventClusterManagerIdPrefix, isNotEmpty);
+    expect(eventClusterManagerId(1), isNotNull);
     expect(EventDetailScreen, isNotNull);
     expect(LoginScreen, isNotNull);
     expect(MyApp, isNotNull);

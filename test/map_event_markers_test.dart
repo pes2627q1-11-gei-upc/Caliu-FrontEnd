@@ -7,60 +7,85 @@ Event _event({required String id, String title = 'Acte', LatLng? location}) =>
     Event(id: id, title: title, location: location);
 
 void main() {
-  group('markersForEvents (#114)', () {
+  group('buildEventMarkerSet (#114)', () {
     test(
       'només inclou esdeveniments amb ubicació i els vincula al ClusterManager',
       () {
         final tapped = <String>[];
-        final markers = markersForEvents([
-          _event(id: 'a', location: const LatLng(41.4, 2.1)),
-          _event(id: 'b'), // sense ubicació → no surt
-          _event(
-            id: 'c',
-            title: 'Concert',
-            location: const LatLng(41.41, 2.11),
-          ),
-        ], onTap: (e) => tapped.add(e.id));
+        final set = buildEventMarkerSet(
+          [
+            _event(id: 'a', location: const LatLng(41.4, 2.1)),
+            _event(id: 'b'), // sense ubicació → no surt
+            _event(
+              id: 'c',
+              title: 'Concert',
+              location: const LatLng(41.41, 2.11),
+            ),
+          ],
+          clusterGeneration: 3,
+          onTap: (e) => tapped.add(e.id),
+        );
 
-        expect(markers, hasLength(2));
-        expect(markers.map((m) => m.markerId.value).toSet(), {'a', 'c'});
+        expect(set.markers, hasLength(2));
+        expect(set.markers.map((m) => m.markerId.value).toSet(), {'a', 'c'});
+        final expectedId = eventClusterManagerId(3);
+        expect(set.clusterManagers.single.clusterManagerId, expectedId);
         expect(
-          markers.every((m) => m.clusterManagerId == kEventClusterManagerId),
+          set.markers.every((m) => m.clusterManagerId == expectedId),
           isTrue,
         );
-        expect(
-          eventClusterManagers().single.clusterManagerId,
-          kEventClusterManagerId,
-        );
         // Sense onClusterTap: la #115 afegirà el zoom.
-        expect(eventClusterManagers().single.onClusterTap, isNull);
+        expect(set.clusterManagers.single.onClusterTap, isNull);
 
-        markers.singleWhere((m) => m.markerId.value == 'c').onTap!();
+        set.markers.singleWhere((m) => m.markerId.value == 'c').onTap!();
         expect(tapped, ['c']);
       },
     );
 
-    test(
-      'una recàrrega substitueix el conjunt (sense ids antics ni duplicats)',
-      () {
-        final first = markersForEvents([
+    test('una recàrrega amb nova generació substitueix ids (sense antics ni duplicats)', () {
+      final first = buildEventMarkerSet(
+        [
           _event(id: 'old', location: const LatLng(41.4, 2.1)),
           _event(id: 'keep', location: const LatLng(41.41, 2.11)),
-        ], onTap: (_) {});
-        final second = markersForEvents([
+        ],
+        clusterGeneration: 1,
+        onTap: (_) {},
+      );
+      final second = buildEventMarkerSet(
+        [
           _event(id: 'keep', location: const LatLng(41.41, 2.11)),
           _event(id: 'new', location: const LatLng(41.42, 2.12)),
-        ], onTap: (_) {});
+        ],
+        clusterGeneration: 2,
+        onTap: (_) {},
+      );
 
-        expect(first.map((m) => m.markerId.value).toSet(), {'old', 'keep'});
-        expect(second.map((m) => m.markerId.value).toSet(), {'keep', 'new'});
-        expect(second.where((m) => m.markerId.value == 'keep'), hasLength(1));
+      expect(first.markers.map((m) => m.markerId.value).toSet(), {
+        'old',
+        'keep',
+      });
+      expect(second.markers.map((m) => m.markerId.value).toSet(), {
+        'keep',
+        'new',
+      });
+      expect(
+        first.clusterManagers.single.clusterManagerId,
+        isNot(second.clusterManagers.single.clusterManagerId),
+      );
+    });
+
+    test(
+      'llista buida → sense markers ni ClusterManager (evita clúster fantasma)',
+      () {
+        final set = buildEventMarkerSet(
+          const [],
+          clusterGeneration: 1,
+          onTap: (_) {},
+        );
+        expect(set.markers, isEmpty);
+        expect(set.clusterManagers, isEmpty);
       },
     );
-
-    test('llista buida → cap marcador', () {
-      expect(markersForEvents(const [], onTap: (_) {}), isEmpty);
-    });
   });
 
   group('selectionAfterReload', () {
