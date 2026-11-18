@@ -32,6 +32,15 @@
   <title>caliu</title>
   <link rel="manifest" href="manifest.json">
 
+  <!-- Popup dels marcadors (InfoWindow de Google Maps, només a web): per defecte la X
+       ocupa una fila pròpia i deixa un espai buit sobre el títol. La posem a la dreta.
+       Classes internes de Google Maps: si un dia canvien, només es perd aquest ajust. -->
+  <style>
+    .gm-style .gm-style-iw-chr { position: absolute; top: 0; right: 0; z-index: 1; }
+    .gm-style .gm-style-iw-c { padding-top: 12px !important; }
+    .gm-style .gm-style-iw-d { padding-right: 32px; }
+  </style>
+
   <!-- Google Maps per a Flutter Web (només testing; l'app final és Android).
        La clau NO és al repo: maps_config.js el genera scripts/run-web.ps1 (des de
        android/local.properties) o el workflow deploy-web.yml (secret MAPS_API_KEY).
