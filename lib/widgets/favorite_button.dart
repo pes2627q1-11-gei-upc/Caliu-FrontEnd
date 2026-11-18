@@ -20,6 +20,7 @@ class FavoriteButton extends StatelessWidget {
     this.activeColor = CaliuColors.red,
     this.size = 24,
     this.loginBuilder,
+    this.onRemoved,
   });
 
   final Event event;
@@ -36,6 +37,10 @@ class FavoriteButton extends StatelessWidget {
 
   /// Per als tests; per defecte, la pantalla de login de l'app.
   final FavoritesLoginBuilder? loginBuilder;
+
+  /// Es crida quan l'usuari treu l'esdeveniment dels preferits, just després
+  /// del canvi optimista (p. ex. per oferir "Desfer", tasca #167).
+  final VoidCallback? onRemoved;
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +79,11 @@ class FavoriteButton extends StatelessWidget {
     }
 
     try {
-      await favorites.toggle(event);
+      final removing =
+          favorites.isFavorite(event.id) && !favorites.isPending(event.id);
+      final pending = favorites.toggle(event);
+      if (removing) onRemoved?.call();
+      await pending;
     } on FavoritesApiException catch (e) {
       if (e.isUnauthorized && context.mounted) {
         // Token caducat: es demana login de nou.

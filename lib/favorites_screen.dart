@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'data/event.dart';
 import 'data/event_when.dart';
+import 'data/favorites_api.dart';
 import 'data/favorites_controller.dart';
 import 'event_detail_screen.dart';
 import 'login_screen.dart';
@@ -12,8 +13,9 @@ import 'widgets/favorites_login_prompt.dart';
 
 /// Llista de preferits de l'usuari, accessible des del perfil (tasca #190).
 ///
-/// Es recarrega en obrir-la i estirant cap avall. Treure el cor d'un
-/// esdeveniment el fa desaparèixer de la llista a l'instant.
+/// Es recarrega en obrir-la i estirant cap avall. Treure el cor o lliscar
+/// la targeta cap a l'esquerra el fa desaparèixer a l'instant, amb l'opció
+/// de desfer-ho (tasca #167).
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({
     super.key,
@@ -56,6 +58,56 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       ),
     );
     if (loggedIn == true) await _favorites.load();
+  }
+
+  /// Lliscar la targeta: la treu dels preferits.
+  Future<void> _swipeRemove(Event event) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final pending = _favorites.toggle(event);
+    _showUndo(event);
+    try {
+      await pending;
+    } on FavoritesApiException catch (e) {
+      _showError(messenger, e.message);
+    } catch (_) {
+      _showError(messenger, 'No s\'ha pogut treure dels preferits');
+    }
+  }
+
+  /// SnackBar "Eliminat de preferits" amb l'opció de desfer.
+  void _showUndo(Event event) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text('"${event.title}" eliminat de preferits'),
+          action: SnackBarAction(
+            label: 'Desfer',
+            textColor: CaliuColors.redSoft,
+            onPressed: () => _undo(event),
+          ),
+        ),
+      );
+  }
+
+  Future<void> _undo(Event event) async {
+    final messenger = ScaffoldMessenger.of(context);
+    // Si la petició d'eliminar encara no ha acabat, s'espera abans de desfer.
+    await _favorites.settled(event.id);
+    if (_favorites.isFavorite(event.id)) return;
+    try {
+      await _favorites.toggle(event);
+    } on FavoritesApiException catch (e) {
+      _showError(messenger, e.message);
+    } catch (_) {
+      _showError(messenger, 'No s\'ha pogut tornar a afegir als preferits');
+    }
+  }
+
+  void _showError(ScaffoldMessengerState messenger, String message) {
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _openDetail(Event event) {
@@ -148,18 +200,61 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final event = favorites[index];
-        return EventListTile(
+        return Dismissible(
           key: ValueKey(event.id),
-          event: event,
-          subtitle: _subtitle(event),
-          onTap: () => _openDetail(event),
-          trailing: FavoriteButton(
+          direction: _favorites.isPending(event.id)
+              ? DismissDirection.none
+              : DismissDirection.endToStart,
+          background: const _SwipeBackground(),
+          onDismissed: (_) => _swipeRemove(event),
+          child: EventListTile(
             event: event,
-            controller: _favorites,
-            loginBuilder: widget.loginBuilder,
+            subtitle: _subtitle(event),
+            onTap: () => _openDetail(event),
+            trailing: FavoriteButton(
+              event: event,
+              controller: _favorites,
+              loginBuilder: widget.loginBuilder,
+              onRemoved: () => _showUndo(event),
+            ),
           ),
         );
       },
+    );
+  }
+}
+
+/// Fons vermell que apareix mentre es llisca una targeta per treure-la.
+class _SwipeBackground extends StatelessWidget {
+  const _SwipeBackground();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: CaliuColors.red,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: const Align(
+        alignment: Alignment.centerRight,
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Treure',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(width: 8),
+              Icon(Icons.heart_broken_outlined, color: Colors.white),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
