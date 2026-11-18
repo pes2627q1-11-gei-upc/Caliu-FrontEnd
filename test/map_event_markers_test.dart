@@ -179,6 +179,15 @@ void main() {
       expect(focus, isA<ClusterTapNoop>());
     });
 
+    test('currentZoom per sobre del màxim no petar (decimals càmera)', () {
+      final focus = focusForClusterTap(
+        bounds: degenerateBounds,
+        position: samePoint,
+        currentZoom: kMapMaxZoom + 0.0000001,
+      );
+      expect(focus, isA<ClusterTapNoop>());
+    });
+
     test('clusterBoundsAreUsable distingeix span real', () {
       expect(clusterBoundsAreUsable(spreadBounds), isTrue);
       expect(clusterBoundsAreUsable(degenerateBounds), isFalse);

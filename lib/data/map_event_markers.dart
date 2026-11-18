@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'event.dart';
@@ -79,7 +81,9 @@ ClusterTapFocus focusForClusterTap({
   if (clusterBoundsAreUsable(bounds)) {
     return ClusterTapFitBounds(bounds: bounds, paddingPx: paddingPx);
   }
-  final nextZoom = (currentZoom + zoomStep).clamp(currentZoom, maxZoom);
+  // min (no clamp): si currentZoom > maxZoom per decimals de la càmera,
+  // clamp(current, max) llançaria ArgumentError.
+  final nextZoom = math.min(currentZoom + zoomStep, maxZoom);
   if (nextZoom <= currentZoom + 0.05) {
     return const ClusterTapNoop();
   }
