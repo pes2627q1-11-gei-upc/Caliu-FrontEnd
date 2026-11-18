@@ -126,6 +126,15 @@ void main() {
     expect(chat.messages.single.failed, isTrue);
   });
 
+  test('404 sense sessió: no és una conversa perduda', () async {
+    final chat = _controller(
+      (_) async => http.Response('{"error":"Ruta no trobada"}', 404),
+    );
+    await chat.send('Hola');
+    expect(chat.error, contains('ruta no trobada'));
+    expect(chat.messages.single.failed, isTrue);
+  });
+
   test('404: oblida la sessió perduda per començar-ne una de nova', () async {
     var call = 0;
     final chat = _controller((_) async {

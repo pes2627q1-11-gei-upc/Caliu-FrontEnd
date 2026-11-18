@@ -73,10 +73,18 @@ void main() {
     });
 
     test('tradueix els codis d\'error', () async {
-      Future<ChatApiException> errorFor(int status, [String body = '{}']) async {
+      Future<ChatApiException> errorFor(
+        int status, [
+        String body = '{}',
+        String? sessionId,
+      ]) async {
         final api = _api((_) async => http.Response(body, status));
         try {
-          await api.sendMessage(token: 'tok', message: 'x');
+          await api.sendMessage(
+            token: 'tok',
+            message: 'x',
+            sessionId: sessionId,
+          );
         } on ChatApiException catch (e) {
           return e;
         }
@@ -87,8 +95,14 @@ void main() {
       expect(unauthorized.isUnauthorized, isTrue);
       expect(unauthorized.message, contains('sessió'));
 
-      final lost = await errorFor(404);
+      final lost = await errorFor(404, '{}', 's1');
       expect(lost.isSessionLost, isTrue);
+      expect(lost.message, contains('conversa ja no existeix'));
+
+      // Sense sessió, un 404 vol dir que el servidor no té la ruta del xat.
+      final noRoute = await errorFor(404, '{"error":"Ruta no trobada"}');
+      expect(noRoute.isSessionLost, isFalse);
+      expect(noRoute.message, contains('ruta no trobada'));
 
       final limited = await errorFor(429, '{"error":"Límit assolit"}');
       expect(limited.message, 'Límit assolit');

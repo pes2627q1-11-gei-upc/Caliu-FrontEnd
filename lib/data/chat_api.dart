@@ -7,7 +7,11 @@ import '../config.dart';
 import 'event.dart';
 
 class ChatApiException implements Exception {
-  const ChatApiException(this.message, {this.statusCode});
+  const ChatApiException(
+    this.message, {
+    this.statusCode,
+    this.sessionLost = false,
+  });
 
   final String message;
   final int? statusCode;
@@ -16,7 +20,10 @@ class ChatApiException implements Exception {
   bool get isUnauthorized => statusCode == 401;
 
   /// La sessió de xat ja no existeix: cal començar-ne una de nova.
-  bool get isSessionLost => statusCode == 404;
+  /// Només és cert si s'havia enviat un `sessionId` (un 404 sense sessió vol
+  /// dir que el servidor no té la ruta del xat).
+  final bool sessionLost;
+  bool get isSessionLost => sessionLost;
 
   @override
   String toString() => message;
@@ -85,9 +92,11 @@ class ChatApi {
     }
 
     if (response.statusCode != 200) {
+      final sessionLost = response.statusCode == 404 && sessionId != null;
       throw ChatApiException(
-        _errorMessage(response),
+        _errorMessage(response, hadSession: sessionId != null),
         statusCode: response.statusCode,
+        sessionLost: sessionLost,
       );
     }
 
@@ -131,7 +140,10 @@ class ChatApi {
     }
   }
 
-  static String _errorMessage(http.Response response) {
+  static String _errorMessage(
+    http.Response response, {
+    required bool hadSession,
+  }) {
     final decoded = _decode(response.body);
     final serverMessage = decoded is Map && decoded['error'] is String
         ? decoded['error'] as String
@@ -142,7 +154,9 @@ class ChatApi {
       case 401:
         return 'La sessió ha caducat. Torna a iniciar sessió.';
       case 404:
-        return 'Aquesta conversa ja no existeix. Torna a enviar el missatge per començar-ne una de nova.';
+        return hadSession
+            ? 'Aquesta conversa ja no existeix. Torna a enviar el missatge per començar-ne una de nova.'
+            : 'El servidor no té el servei de xat disponible (ruta no trobada).';
       case 429:
         return serverMessage ??
             'Has enviat massa missatges. Espera un minut i torna-ho a provar.';
