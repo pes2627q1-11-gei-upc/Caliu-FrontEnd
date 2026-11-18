@@ -43,6 +43,8 @@ Comarca i Municipi són selectors amb les localitats retornades per
 `GET /events/locations`. En escollir una comarca, el municipi es restableix
 i només s'ofereixen els seus municipis. Cal desplegar primer aquest endpoint
 al backend; si no està disponible, es mostra un error amb opció de reintentar.
+Si una localitat seleccionada ja no surt al catàleg, es conserva al selector
+fins que l'usuari la canviï o restableixi els filtres.
 
 ## Arrencada ràpida
 

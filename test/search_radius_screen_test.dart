@@ -32,6 +32,68 @@ Future<void> _chooseLocation(
 }
 
 void main() {
+  testWidgets('conserva localitats guardades que no són al catàleg', (
+    tester,
+  ) async {
+    final requests = <Uri>[];
+    final api = EventsApi(
+      client: MockClient((request) async {
+        requests.add(request.url);
+        if (request.url.path.endsWith('/locations')) {
+          return http.Response(
+            '{"locations":[{"comarca":"Garrotxa","municipality":"Olot"}]}',
+            200,
+          );
+        }
+        return http.Response('{"items":[],"categories":[],"total":0}', 200);
+      }),
+    );
+    await tester.pumpWidget(MaterialApp(home: SearchScreen(api: api)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Filtres'));
+    await _settleCount(tester);
+
+    // Simula valors guardats amb un catàleg anterior, ara absents.
+    for (final label in ['Comarca', 'Municipi']) {
+      final field = find.widgetWithText(DropdownButtonFormField<String>, label);
+      tester.widget<DropdownButtonFormField<String>>(field).onChanged!(
+        'Localitat anterior',
+      );
+      await _settleCount(tester);
+      expect(tester.takeException(), isNull);
+      final dropdown = tester.widget<DropdownButtonFormField<String>>(field);
+      expect(dropdown.initialValue, 'Localitat anterior');
+      final button = tester.widget<DropdownButton<String>>(
+        find.descendant(
+          of: field,
+          matching: find.byType(DropdownButton<String>),
+        ),
+      );
+      expect(
+        button.items!.where((item) => item.value == 'Localitat anterior'),
+        hasLength(1),
+      );
+    }
+    await tester.tap(find.text('Aplicar filtres'));
+    await _settleCount(tester);
+    expect(requests.last.queryParameters['comarca'], 'Localitat anterior');
+    expect(requests.last.queryParameters['municipality'], 'Localitat anterior');
+
+    await tester.tap(find.byTooltip('Filtres'));
+    await _settleCount(tester);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Restablir tot'));
+    await _settleCount(tester);
+    for (final field in tester.widgetList<DropdownButtonFormField<String>>(
+      find.byType(DropdownButtonFormField<String>),
+    )) {
+      expect(field.initialValue, '');
+    }
+    await tester.tap(find.byTooltip('Tancar filtres'));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets(
     'la creu descarta radi, text, categories i dates sense notificar el mapa',
     (tester) async {

@@ -493,6 +493,12 @@ class _SearchScreenState extends State<SearchScreen> {
       TextEditingController controller,
       List<String> options,
     ) {
+      // Conserva un filtre guardat encara que ja no surti al catàleg.
+      final selected = controller.text;
+      final availableOptions = [
+        if (selected.isNotEmpty && !options.contains(selected)) selected,
+        ...options,
+      ];
       return DropdownButtonFormField<String>(
         key: ValueKey('$label-${controller.text}'),
         initialValue: controller.text,
@@ -526,7 +532,7 @@ class _SearchScreenState extends State<SearchScreen> {
               label == 'Comarca' ? 'Totes les comarques' : 'Tots els municipis',
             ),
           ),
-          ...options.map(
+          ...availableOptions.map(
             (name) => DropdownMenuItem(value: name, child: Text(name)),
           ),
         ],
