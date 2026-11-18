@@ -8,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'data/event.dart';
 import 'data/search_radius.dart';
 import 'data/events_api.dart';
+import 'data/map_event_markers.dart';
 import 'event_detail_screen.dart';
 import 'search_screen.dart';
 import 'theme/caliu_colors.dart';
@@ -47,6 +48,8 @@ class MapView extends StatefulWidget {
   /// Si la pestanya Mapa és la visible (el mapa continua muntat a l'`IndexedStack`).
   final bool isActive;
   final SearchRadius? radius;
+
+  /// Injectable per als tests (MockClient); en producció usa l'API per defecte.
   final EventsApi? eventsApi;
 
   @override
@@ -59,6 +62,7 @@ class _MapViewState extends State<MapView> {
 
   GoogleMapController? mapController;
   Set<Marker> _markers = {};
+  Set<ClusterManager> _clusterManagers = {};
 
   /// #44: esdeveniment del marcador tocat (previsualització ràpida).
   Event? _selected;
@@ -78,8 +82,19 @@ class _MapViewState extends State<MapView> {
 
   CameraPosition? _lastCamera;
   LatLngBounds? _loadedBounds;
+  double? _loadedZoom;
   Timer? _cameraIdleTimer;
   int _loadGeneration = 0;
+
+  /// Generació del ClusterManager (es renova en passar a mode clúster).
+  int _clusterGeneration = 0;
+  bool _clusteringEnabled = true;
+
+  /// En allunyar: força refresca a l'idle (zona visible més gran).
+  bool _pendingWideReload = false;
+
+  /// Zona on ja hem confirmat que no hi ha esdeveniments (evita bucle de fetch).
+  LatLngBounds? _confirmedEmptyBounds;
 
   bool get _hasUserLocation => _locationMode == _LocationMode.user;
 
@@ -101,8 +116,11 @@ class _MapViewState extends State<MapView> {
   void _radiusChanged() {
     ++_loadGeneration;
     _loadedBounds = null;
+    _loadedZoom = null;
+    _confirmedEmptyBounds = null;
     setState(() {
       _markers = {};
+      _clusterManagers = {};
       _selected = null;
       _eventsById.clear();
       _eventsRequestInFlight = false;
@@ -264,6 +282,8 @@ class _MapViewState extends State<MapView> {
     }
     if (!mounted) return;
     _loadedBounds = null;
+    _loadedZoom = null;
+    _confirmedEmptyBounds = null;
     await _loadAroundFocus(focus: _focus, notifyIfEmpty: false);
   }
 
@@ -355,10 +375,25 @@ class _MapViewState extends State<MapView> {
       visible = _boundsAround(_lastCamera?.target ?? _focus, 8);
     }
 
-    if (!force &&
-        _loadedBounds != null &&
-        _boundsContain(_loadedBounds!, visible)) {
-      return;
+    final zoom = _lastCamera?.zoom ?? _initialZoom;
+    // Allunyar: la finestra creix; el marge carregat pot continuar “contenint”
+    // la vista i cal forçar fetch (si no, zones noves sense pins).
+    final zoomedOutSinceLoad =
+        _loadedZoom != null && zoom < (_loadedZoom! - 0.6);
+
+    final alreadyConfirmedEmpty =
+        _confirmedEmptyBounds != null &&
+        _boundsContain(_confirmedEmptyBounds!, visible);
+
+    if (!force) {
+      // Zona ja sabuda buida → no insistir (el refresh manual sí que força).
+      if (alreadyConfirmedEmpty) return;
+      if (_eventsRequestInFlight) return;
+      if (!zoomedOutSinceLoad &&
+          _loadedBounds != null &&
+          _boundsContain(_loadedBounds!, visible)) {
+        return;
+      }
     }
 
     final queryBounds = _expandBounds(visible, _viewportMargin);
@@ -422,13 +457,26 @@ class _MapViewState extends State<MapView> {
       if (!mounted || generation != _loadGeneration) return;
 
       final withLocation = events.where((e) => e.hasLocation).toList();
+      final byId = indexEventsWithLocation(withLocation);
       _eventsById
         ..clear()
-        ..addEntries(withLocation.map((e) => MapEntry(e.id, e)));
+        ..addAll(byId);
       _loadedBounds = queryBounds;
+      _loadedZoom = _lastCamera?.zoom ?? _initialZoom;
+      // Si no hi ha res: marcar la zona perquè no tornem a demanar en bucle.
+      _confirmedEmptyBounds = withLocation.isEmpty ? queryBounds : null;
 
       setState(() {
-        _markers = withLocation.map(_markerFor).toSet();
+        _clusteringEnabled = shouldClusterAtZoom(
+          _lastCamera?.zoom ?? _initialZoom,
+        );
+        // No recrear el ClusterManager a cada fetch: és lent i fa parpellejar.
+        _applyMarkersFromEvents(
+          withLocation,
+          recreateClusterManager:
+              _clusteringEnabled && _clusterManagers.isEmpty,
+        );
+        _selected = selectionAfterReload(_selected, _eventsById);
         _eventsRequestInFlight = false;
       });
 
@@ -448,21 +496,49 @@ class _MapViewState extends State<MapView> {
     }
   }
 
-  Marker _markerFor(Event event) {
-    return Marker(
-      markerId: MarkerId(event.id),
-      position: event.location!,
-      // Popup curt: títol i lloc. Tocar-lo obre la ubicació a Google Maps.
-      // La resta d'informació va a la previsualització (#44).
-      infoWindow: InfoWindow(
-        title: event.title,
-        snippet: event.shortPlace.isEmpty
-            ? 'Obrir a Google Maps ↗'
-            : '${event.shortPlace} ↗',
-        onTap: () => _openInGoogleMaps(event),
-      ),
-      onTap: () => _selectEvent(event),
+  /// Actualitza `_markers` / `_clusterManagers` a partir dels events en memòria.
+  ///
+  /// [recreateClusterManager]: true en càrregues noves o en tornar al mode
+  /// clúster (evita clústers fantasma); false si només canvien els pins.
+  void _applyMarkersFromEvents(
+    Iterable<Event> events, {
+    required bool recreateClusterManager,
+  }) {
+    if (_clusteringEnabled &&
+        (recreateClusterManager || _clusterManagers.isEmpty)) {
+      _clusterGeneration++;
+    }
+    final markerSet = buildEventMarkerSet(
+      events,
+      clusterGeneration: _clusterGeneration,
+      cluster: _clusteringEnabled,
+      onTap: _selectEvent,
+      onInfoWindowTap: _openInGoogleMaps,
     );
+    _clusterManagers = markerSet.clusterManagers;
+    _markers = markerSet.markers;
+  }
+
+  void _syncClusteringWithZoom(double zoom) {
+    final shouldCluster = shouldClusterAtZoom(zoom);
+    if (shouldCluster == _clusteringEnabled) return;
+    if (!mounted) return;
+    final enablingClusters = shouldCluster;
+    setState(() {
+      _clusteringEnabled = shouldCluster;
+      // Pins de cache de seguida (sense esperar la xarxa).
+      _applyMarkersFromEvents(
+        _eventsById.values,
+        recreateClusterManager: enablingClusters,
+      );
+    });
+    if (enablingClusters) {
+      // Allunyar: pins de cache ja visibles; a l'idle força fetch de la zona ampla.
+      _pendingWideReload = true;
+      _loadedZoom = null;
+      _loadedBounds = null;
+      _confirmedEmptyBounds = null;
+    }
   }
 
   void _selectEvent(Event event) {
@@ -499,6 +575,7 @@ class _MapViewState extends State<MapView> {
   }
 
   Future<void> _refresh() async {
+    _confirmedEmptyBounds = null;
     await _reloadForVisibleRegion(
       force: true,
       notifyIfEmpty: true,
@@ -508,15 +585,19 @@ class _MapViewState extends State<MapView> {
 
   void _onCameraMove(CameraPosition position) {
     _lastCamera = position;
+    // Dissolve / agrupa segons el zoom (el ClusterManager natiu no té maxZoom).
+    _syncClusteringWithZoom(position.zoom);
   }
 
   void _onCameraIdle() {
     if (!_acceptCameraIdleReloads) return;
     _cameraIdleTimer?.cancel();
-    _cameraIdleTimer = Timer(const Duration(milliseconds: 350), () {
+    _cameraIdleTimer = Timer(const Duration(milliseconds: 180), () {
+      final force = _pendingWideReload;
+      _pendingWideReload = false;
       unawaited(
         _reloadForVisibleRegion(
-          force: false,
+          force: force,
           notifyIfEmpty: false,
           notifyErrors: false,
         ),
@@ -638,6 +719,8 @@ class _MapViewState extends State<MapView> {
                           myLocationButtonEnabled: false,
                           mapToolbarEnabled: false,
                           compassEnabled: true,
+                          // #114: agrupació nativa (Android / iOS / web amb MarkerClusterer).
+                          clusterManagers: _clusterManagers,
                           markers: _markers,
                           onCameraMove: _onCameraMove,
                           onCameraIdle: _onCameraIdle,
