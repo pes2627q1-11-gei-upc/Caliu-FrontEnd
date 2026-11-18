@@ -45,6 +45,8 @@ void main() {
     expect(EventsApi, isNotNull);
     expect(kEventClusterManagerIdPrefix, isNotEmpty);
     expect(eventClusterManagerId(1), isNotNull);
+    expect(kMapMaxZoom, greaterThan(kStopClusteringZoom));
+    expect(focusForClusterTap, isA<Function>());
     expect(MockFavoritesApi, isNotNull);
     expect(FavoritesController, isNotNull);
     expect(FavoriteButton, isNotNull);
