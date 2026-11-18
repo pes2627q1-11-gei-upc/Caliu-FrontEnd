@@ -230,9 +230,9 @@ class _SearchScreenState extends State<SearchScreen> {
         ]),
         builder: (context, _) => StatefulBuilder(
           builder: (context, setModalState) => Scaffold(
-            backgroundColor: const Color(0xFFF5EDD8),
+            backgroundColor: CaliuColors.filterBackground,
             appBar: AppBar(
-              backgroundColor: const Color(0xFFF5EDD8),
+              backgroundColor: CaliuColors.filterBackground,
               foregroundColor: CaliuColors.maroonDeep,
               surfaceTintColor: Colors.transparent,
               centerTitle: true,
@@ -283,8 +283,9 @@ class _SearchScreenState extends State<SearchScreen> {
                                 borderRadius: BorderRadius.circular(18),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: const Color(0xFF806B43)
-                                        .withValues(alpha: 0.12),
+                                    color: CaliuColors.filterAccent.withValues(
+                                      alpha: 0.12,
+                                    ),
                                     blurRadius: 24,
                                     offset: const Offset(0, 10),
                                   ),
@@ -302,7 +303,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                   RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(18),
                                     side: const BorderSide(
-                                      color: Color(0xFFE0D5C0),
+                                      color: CaliuColors.filterBorder,
                                     ),
                                   ),
                                 ),
@@ -313,7 +314,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                 hintText: 'Cerca esdeveniments, llocs…',
                                 leading: const Icon(
                                   Icons.search,
-                                  color: Color(0xFF700B10),
+                                  color: CaliuColors.maroonAccent,
                                 ),
                                 onChanged: (_) {
                                   setModalState(() {});
@@ -324,7 +325,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                     tooltip: 'Esborrar cerca',
                                     icon: const Icon(
                                       Icons.cancel_outlined,
-                                      color: Color(0xFF700B10),
+                                      color: CaliuColors.maroonAccent,
                                     ),
                                     onPressed: () {
                                       _searchController.clear();
@@ -365,7 +366,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                     avatar: selected
                                         ? const DecoratedBox(
                                             decoration: BoxDecoration(
-                                              color: Color(0xFFF5EDD6),
+                                              color: CaliuColors.filterField,
                                               shape: BoxShape.circle,
                                             ),
                                             child: SizedBox(
@@ -409,7 +410,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                     checkmarkColor: Colors.white,
                                     labelStyle: TextStyle(
                                       color: selected
-                                          ? const Color(0xFFF5EDD6)
+                                          ? CaliuColors.filterField
                                           : CaliuColors.maroonDeep,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -417,7 +418,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                     side: BorderSide(
                                       color: selected
                                           ? CaliuColors.red
-                                          : const Color(0xFFE0D5C0),
+                                          : CaliuColors.filterBorder,
                                     ),
                                   );
                                 }).toList(),
@@ -523,7 +524,7 @@ class _SearchScreenState extends State<SearchScreen> {
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: Color(0xFFE0D5C0)),
+            borderSide: const BorderSide(color: CaliuColors.filterBorder),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
