@@ -230,9 +230,9 @@ class _SearchScreenState extends State<SearchScreen> {
         ]),
         builder: (context, _) => StatefulBuilder(
           builder: (context, setModalState) => Scaffold(
-            backgroundColor: const Color(0xFFF5EDD8),
+            backgroundColor: const Color(0xFFF5F0E5),
             appBar: AppBar(
-              backgroundColor: const Color(0xFFF5EDD8),
+              backgroundColor: const Color(0xFFF5F0E5),
               foregroundColor: CaliuColors.maroonDeep,
               surfaceTintColor: Colors.transparent,
               centerTitle: true,
