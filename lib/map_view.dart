@@ -96,6 +96,9 @@ class _MapViewState extends State<MapView> {
   /// Zona on ja hem confirmat que no hi ha esdeveniments (evita bucle de fetch).
   LatLngBounds? _confirmedEmptyBounds;
 
+  /// Evita dues animacions seguides si es toca el mateix clúster de pressa (#115).
+  bool _clusterZoomInFlight = false;
+
   bool get _hasUserLocation => _locationMode == _LocationMode.user;
 
   @override
@@ -514,9 +517,42 @@ class _MapViewState extends State<MapView> {
       cluster: _clusteringEnabled,
       onTap: _selectEvent,
       onInfoWindowTap: _openInGoogleMaps,
+      onClusterTap: _onClusterTap,
     );
     _clusterManagers = markerSet.clusterManagers;
     _markers = markerSet.markers;
+  }
+
+  /// #115: en tocar un clúster, apropa la càmera (bounds o zoom si coincideixen).
+  Future<void> _onClusterTap(Cluster cluster) async {
+    if (_clusterZoomInFlight) return;
+    final controller = mapController;
+    if (controller == null) return;
+
+    final focus = focusForClusterTap(
+      bounds: cluster.bounds,
+      position: cluster.position,
+      currentZoom: _lastCamera?.zoom ?? _initialZoom,
+      maxZoom: kMapMaxZoom,
+    );
+
+    final CameraUpdate? update = switch (focus) {
+      ClusterTapFitBounds(:final bounds, :final paddingPx) =>
+        CameraUpdate.newLatLngBounds(bounds, paddingPx),
+      ClusterTapZoomTo(:final center, :final zoom) =>
+        CameraUpdate.newLatLngZoom(center, zoom),
+      ClusterTapNoop() => null,
+    };
+    if (update == null) return;
+
+    _clusterZoomInFlight = true;
+    try {
+      await controller.animateCamera(update);
+    } catch (_) {
+      // Mapa no llest o bounds invàlids.
+    } finally {
+      _clusterZoomInFlight = false;
+    }
   }
 
   void _syncClusteringWithZoom(double zoom) {
@@ -712,14 +748,14 @@ class _MapViewState extends State<MapView> {
                           ),
                           minMaxZoomPreference: const MinMaxZoomPreference(
                             7,
-                            18,
+                            kMapMaxZoom,
                           ),
                           // #153: només si tenim permís (evita comportaments estranys).
                           myLocationEnabled: _hasUserLocation,
                           myLocationButtonEnabled: false,
                           mapToolbarEnabled: false,
                           compassEnabled: true,
-                          // #114: agrupació nativa (Android / iOS / web amb MarkerClusterer).
+                          // #114/#115: clustering natiu + zoom en tocar el clúster.
                           clusterManagers: _clusterManagers,
                           markers: _markers,
                           onCameraMove: _onCameraMove,
