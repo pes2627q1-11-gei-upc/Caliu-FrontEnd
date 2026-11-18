@@ -9,6 +9,7 @@ import 'package:caliu/data/event.dart';
 import 'package:caliu/data/event_query.dart';
 import 'package:caliu/data/event_when.dart';
 import 'package:caliu/data/events_api.dart';
+import 'package:caliu/data/favorites_api.dart';
 import 'package:caliu/event_detail_screen.dart';
 import 'package:caliu/login_screen.dart';
 import 'package:caliu/main.dart';
@@ -36,6 +37,7 @@ void main() {
     expect(EventQuery, isNotNull);
     expect(previewWhen, isA<Function>());
     expect(EventsApi, isNotNull);
+    expect(MockFavoritesApi, isNotNull);
     expect(EventDetailScreen, isNotNull);
     expect(LoginScreen, isNotNull);
     expect(MyApp, isNotNull);
