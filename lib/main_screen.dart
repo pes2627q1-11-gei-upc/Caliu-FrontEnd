@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'chat_screen.dart';
 import 'map_view.dart';
 import 'data/search_radius.dart';
 import 'profile_screen.dart';
@@ -33,18 +34,22 @@ class _MainScreenState extends State<MainScreen> {
     SearchScreen(radius: _radius),
     MapView(isActive: _selectedIndex == 1, radius: _radius),
     const ProfileScreen(),
+    // H.U #11: assistent. `isActive` fa que revisi la sessió en tornar-hi.
+    ChatScreen(isActive: _selectedIndex == 3),
   ];
 
-  static const List<String> _labels = ['Inici', 'Mapa', 'Perfil'];
+  static const List<String> _labels = ['Inici', 'Mapa', 'Perfil', 'Xat'];
   static const List<IconData> _outlinedIcons = [
     Icons.home_outlined,
     Icons.location_on_outlined,
     Icons.person_outline,
+    Icons.chat_bubble_outline,
   ];
   static const List<IconData> _selectedIcons = [
     Icons.home,
     Icons.location_on,
     Icons.person,
+    Icons.chat_bubble,
   ];
 
   @override
