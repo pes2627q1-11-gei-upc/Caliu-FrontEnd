@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'data/favorites_controller.dart';
 import 'main_screen.dart';
 
 void main() {
+  FavoritesController.shared.load();
   runApp(const MyApp());
 }
 

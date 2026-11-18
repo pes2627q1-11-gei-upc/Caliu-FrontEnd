@@ -5,16 +5,21 @@ import 'data/event.dart';
 import 'data/event_count_preview.dart';
 import 'data/event_query.dart';
 import 'data/events_api.dart';
+import 'data/favorites_controller.dart';
 import 'data/search_radius.dart';
 import 'event_detail_screen.dart';
 import 'theme/caliu_colors.dart';
-import 'widgets/caliu_chip.dart';
+import 'widgets/event_list_tile.dart';
+import 'widgets/favorite_button.dart';
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key, this.radius, this.api});
+  const SearchScreen({super.key, this.radius, this.api, this.favorites});
 
   final SearchRadius? radius;
   final EventsApi? api;
+
+  /// Per defecte, [FavoritesController.shared].
+  final FavoritesController? favorites;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -31,6 +36,11 @@ class _SearchScreenState extends State<SearchScreen> {
   SearchRadius? _editingRadius;
   SearchRadius get _filterRadius => _editingRadius ?? _radius;
   EventCountPreview? _filterPreview;
+  final _locationsVersion = ValueNotifier(0);
+  List<EventLocation> _locations = [];
+  bool _locationsLoaded = false;
+  bool _loadingLocations = false;
+  String? _locationsError;
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _comarcaController = TextEditingController();
   final TextEditingController _municipalityController = TextEditingController();
@@ -80,6 +90,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     _editingRadius?.dispose();
+    _locationsVersion.dispose();
     _filterPreview?.dispose();
     _radius.removeListener(_radiusChanged);
     if (widget.radius == null) _radius.dispose();
@@ -179,6 +190,7 @@ class _SearchScreenState extends State<SearchScreen> {
         .clamp(_selectorMinKm, _selectorMaxKm)
         .roundToDouble();
     draft.addListener(_updateFilterPreview);
+    if (!_locationsLoaded) _loadLocations();
     final preview = EventCountPreview(_api);
     _filterPreview = preview;
     _updateFilterPreview();
@@ -211,7 +223,11 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<bool?> _showFilters(EventCountPreview preview) async {
     final route = MaterialPageRoute<bool>(
       builder: (context) => ListenableBuilder(
-        listenable: Listenable.merge([_radius, preview]),
+        listenable: Listenable.merge([
+          _filterRadius,
+          preview,
+          _locationsVersion,
+        ]),
         builder: (context, _) => StatefulBuilder(
           builder: (context, setModalState) => Scaffold(
             backgroundColor: const Color(0xFFF5EDD8),
@@ -410,31 +426,7 @@ class _SearchScreenState extends State<SearchScreen> {
                             _buildRadiusFilter(setModalState),
                             _buildFilterDates(setModalState),
                             const SizedBox(height: 20),
-                            TextField(
-                              controller: _comarcaController,
-                              decoration: const InputDecoration(
-                                labelText: 'Comarca',
-                                hintText: 'Ex: Barcelonès',
-                                border: OutlineInputBorder(),
-                              ),
-                              onChanged: (_) {
-                                setModalState(() {});
-                                _updateFilterPreview();
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: _municipalityController,
-                              decoration: const InputDecoration(
-                                labelText: 'Municipi',
-                                hintText: 'Ex: Barcelona',
-                                border: OutlineInputBorder(),
-                              ),
-                              onChanged: (_) {
-                                setModalState(() {});
-                                _updateFilterPreview();
-                              },
-                            ),
+                            _buildLocations(setModalState),
                             const SizedBox(height: 20),
                           ],
                         ),
@@ -459,6 +451,136 @@ class _SearchScreenState extends State<SearchScreen> {
     // Manté vius els notificadors fins que s'ha desmuntat la ruta de sortida.
     await route.completed;
     return result;
+  }
+
+  Future<void> _loadLocations() async {
+    if (_loadingLocations) return;
+    _loadingLocations = true;
+    _locationsError = null;
+    _locationsVersion.value++;
+    try {
+      final locations = await _api.fetchLocations();
+      if (!mounted) return;
+      _locations = locations;
+      _locationsLoaded = true;
+    } catch (_) {
+      if (!mounted) return;
+      _locationsError =
+          'No s’han pogut carregar les comarques i els municipis.';
+    }
+    if (!mounted) return;
+    _loadingLocations = false;
+    _locationsVersion.value++;
+  }
+
+  Widget _buildLocations(StateSetter setModalState) {
+    final comarques =
+        _locations
+            .map((row) => row.comarca)
+            .where((name) => name.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    final municipis =
+        _locations
+            .where(
+              (row) =>
+                  _comarcaController.text.isEmpty ||
+                  row.comarca == _comarcaController.text,
+            )
+            .map((row) => row.municipality)
+            .where((name) => name.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    Widget selector(
+      String label,
+      TextEditingController controller,
+      List<String> options,
+    ) {
+      // Conserva un filtre guardat encara que ja no surti al catàleg.
+      final selected = controller.text;
+      final availableOptions = [
+        if (selected.isNotEmpty && !options.contains(selected)) selected,
+        ...options,
+      ];
+      return DropdownButtonFormField<String>(
+        key: ValueKey('$label-${controller.text}'),
+        initialValue: controller.text,
+        isExpanded: true,
+        dropdownColor: Colors.white,
+        style: const TextStyle(color: CaliuColors.maroonDeep, fontSize: 16),
+        iconEnabledColor: CaliuColors.maroonDeep,
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(color: CaliuColors.maroonDeep),
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFFE0D5C0)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: CaliuColors.red, width: 2),
+          ),
+        ),
+        items: [
+          DropdownMenuItem(
+            value: '',
+            child: Text(
+              label == 'Comarca' ? 'Totes les comarques' : 'Tots els municipis',
+            ),
+          ),
+          ...availableOptions.map(
+            (name) => DropdownMenuItem(value: name, child: Text(name)),
+          ),
+        ],
+        onChanged: !_locationsLoaded || _loadingLocations
+            ? null
+            : (value) {
+                setModalState(() {
+                  controller.text = value ?? '';
+                  if (label == 'Comarca') _municipalityController.clear();
+                });
+                _updateFilterPreview();
+              },
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        selector('Comarca', _comarcaController, comarques),
+        const SizedBox(height: 16),
+        selector('Municipi', _municipalityController, municipis),
+        if (_locationsLoaded && _locations.isEmpty)
+          const Text(
+            'No hi ha localitats disponibles.',
+            style: TextStyle(color: CaliuColors.maroonDeep),
+          ),
+        if (_loadingLocations)
+          const Padding(
+            padding: EdgeInsets.all(12),
+            child: LinearProgressIndicator(),
+          ),
+        if (_locationsError != null) ...[
+          Text(
+            _locationsError!,
+            style: const TextStyle(color: CaliuColors.red),
+          ),
+          TextButton(
+            onPressed: _loadLocations,
+            child: const Text('Tornar a carregar localitats'),
+          ),
+        ],
+      ],
+    );
   }
 
   Widget _buildFilterDates(StateSetter setModalState) {
@@ -670,8 +792,11 @@ class _SearchScreenState extends State<SearchScreen> {
   void _openDetail(Event event) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) =>
-            EventDetailScreen(eventId: event.id, initialEvent: event),
+        builder: (_) => EventDetailScreen(
+          eventId: event.id,
+          initialEvent: event,
+          favorites: widget.favorites,
+        ),
       ),
     );
   }
@@ -807,113 +932,13 @@ class _SearchScreenState extends State<SearchScreen> {
       separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final event = _results[index];
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: CaliuColors.maroon.withValues(alpha: 0.14),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: CaliuColors.maroonDeep.withValues(alpha: 0.08),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(14),
-              onTap: () => _openDetail(event),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: SizedBox(
-                        width: 64,
-                        height: 64,
-                        child: event.imageUrl != null
-                            ? Image.network(
-                                event.imageUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    _thumbPlaceholder(),
-                              )
-                            : _thumbPlaceholder(),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            event.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15,
-                              color: CaliuColors.maroonDeep,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _subtitle(event),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: CaliuColors.textMuted,
-                              fontSize: 13,
-                            ),
-                          ),
-                          Builder(
-                            builder: (context) {
-                              final labels = <String>{
-                                ...event.categories,
-                                ...event.tags,
-                              }.take(3).toList();
-                              if (labels.isEmpty) {
-                                return const SizedBox.shrink();
-                              }
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Wrap(
-                                  spacing: 6,
-                                  runSpacing: 6,
-                                  children: labels
-                                      .map((label) => CaliuChip(label: label))
-                                      .toList(),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(
-                      Icons.chevron_right,
-                      color: CaliuColors.textMuted,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+        return EventListTile(
+          event: event,
+          subtitle: _subtitle(event),
+          onTap: () => _openDetail(event),
+          trailing: FavoriteButton(event: event, controller: widget.favorites),
         );
       },
-    );
-  }
-
-  Widget _thumbPlaceholder() {
-    return Container(
-      color: CaliuColors.maroon,
-      child: const Icon(Icons.event, color: Colors.white54),
     );
   }
 }

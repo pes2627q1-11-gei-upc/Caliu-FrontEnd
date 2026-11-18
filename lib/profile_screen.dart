@@ -5,6 +5,8 @@ import 'data/auth_api.dart';
 import 'data/auth_session.dart';
 import 'data/auth_validators.dart';
 import 'data/events_api.dart';
+import 'data/favorites_controller.dart';
+import 'favorites_screen.dart';
 import 'login_screen.dart';
 import 'preferences_screen.dart';
 import 'register_screen.dart';
@@ -17,11 +19,15 @@ class ProfileScreen extends StatefulWidget {
     this.authApi,
     this.authSession,
     this.eventsApi,
+    this.favorites,
   });
 
   final AuthApi? authApi;
   final AuthSessionStore? authSession;
   final EventsApi? eventsApi;
+
+  /// Per defecte, [FavoritesController.shared].
+  final FavoritesController? favorites;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -32,6 +38,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late final AuthApi _authApi = widget.authApi ?? AuthApi();
   late final AuthSessionStore _authSession =
       widget.authSession ?? AuthSession();
+  late final FavoritesController _favorites =
+      widget.favorites ?? FavoritesController.shared;
   ApiHealth? _health;
   AuthenticatedProfile? _profile;
   String? _token;
@@ -99,14 +107,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final loggedIn = await Navigator.of(
       context,
     ).push<bool>(MaterialPageRoute<bool>(builder: (_) => const LoginScreen()));
-    if (loggedIn == true) await _loadAccount();
+    if (loggedIn == true) await _onSignedIn();
   }
 
   Future<void> _openRegistration() async {
     final registered = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(builder: (_) => const RegisterScreen()),
     );
-    if (registered == true) await _loadAccount();
+    if (registered == true) await _onSignedIn();
+  }
+
+  /// Nou compte o nova sessió: carrega el perfil i els seus preferits.
+  Future<void> _onSignedIn() async {
+    _favorites.load();
+    await _loadAccount();
   }
 
   Future<void> _openPreferences() async {
@@ -124,6 +138,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (updated == true && mounted && _token == token) await _loadAccount();
   }
 
+  void _openFavorites() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FavoritesScreen(favorites: _favorites),
+      ),
+    );
+  }
+
   Future<void> _expireSession([String? expectedToken]) async {
     final token = expectedToken ?? _token;
     if (token == null || _token != token) return;
@@ -135,6 +157,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } on Exception {
       // The expired account must no longer be visible even if storage fails.
     }
+    _favorites.clear();
     if (!mounted || _token != token) return;
     setState(() {
       _token = null;
@@ -234,6 +257,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } on Exception {
       errorMessage = 'No s’ha pogut esborrar la sessió desada al dispositiu.';
     }
+    _favorites.clear();
     if (!mounted || _token != token) return;
     setState(() {
       _token = null;
@@ -397,6 +421,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onPressed: _openPreferences,
                 icon: const Icon(Icons.tune),
                 label: const Text('Edita les preferències'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _openFavorites,
+                icon: const Icon(Icons.favorite_border),
+                label: const Text('Preferits'),
               ),
               if (_profileError case final error?) ...[
                 const SizedBox(height: 12),
