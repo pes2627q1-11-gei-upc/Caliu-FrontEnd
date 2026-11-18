@@ -10,6 +10,7 @@ import 'package:caliu/data/event_query.dart';
 import 'package:caliu/data/event_when.dart';
 import 'package:caliu/data/events_api.dart';
 import 'package:caliu/data/favorites_api.dart';
+import 'package:caliu/data/favorites_controller.dart';
 import 'package:caliu/event_detail_screen.dart';
 import 'package:caliu/login_screen.dart';
 import 'package:caliu/main.dart';
@@ -22,6 +23,7 @@ import 'package:caliu/search_screen.dart';
 import 'package:caliu/theme/caliu_colors.dart';
 import 'package:caliu/widgets/caliu_chip.dart';
 import 'package:caliu/widgets/event_preview_card.dart';
+import 'package:caliu/widgets/favorite_button.dart';
 import 'package:caliu/widgets/map_event_preview.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -38,6 +40,8 @@ void main() {
     expect(previewWhen, isA<Function>());
     expect(EventsApi, isNotNull);
     expect(MockFavoritesApi, isNotNull);
+    expect(FavoritesController, isNotNull);
+    expect(FavoriteButton, isNotNull);
     expect(EventDetailScreen, isNotNull);
     expect(LoginScreen, isNotNull);
     expect(MyApp, isNotNull);
