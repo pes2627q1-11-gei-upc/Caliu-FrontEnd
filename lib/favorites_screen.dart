@@ -4,22 +4,32 @@ import 'data/event.dart';
 import 'data/event_when.dart';
 import 'data/favorites_controller.dart';
 import 'event_detail_screen.dart';
+import 'login_screen.dart';
 import 'theme/caliu_colors.dart';
 import 'widgets/event_list_tile.dart';
 import 'widgets/favorite_button.dart';
+import 'widgets/favorites_login_prompt.dart';
 
 /// Llista de preferits de l'usuari, accessible des del perfil (tasca #190).
 ///
 /// Es recarrega en obrir-la i estirant cap avall. Treure el cor d'un
 /// esdeveniment el fa desaparèixer de la llista a l'instant.
 class FavoritesScreen extends StatefulWidget {
-  const FavoritesScreen({super.key, this.favorites, this.now});
+  const FavoritesScreen({
+    super.key,
+    this.favorites,
+    this.now,
+    this.loginBuilder,
+  });
 
   /// Per defecte, [FavoritesController.shared].
   final FavoritesController? favorites;
 
   /// Per als tests; per defecte, `DateTime.now()`.
   final DateTime? now;
+
+  /// Per als tests; per defecte, la pantalla de login de l'app.
+  final FavoritesLoginBuilder? loginBuilder;
 
   @override
   State<FavoritesScreen> createState() => _FavoritesScreenState();
@@ -33,6 +43,19 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   void initState() {
     super.initState();
     _favorites.load();
+  }
+
+  /// Sense sessió: obre el login i, si va bé, carrega els preferits (#191).
+  Future<void> _login() async {
+    final builder = widget.loginBuilder;
+    final loggedIn = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (context) => builder != null
+            ? builder(context)
+            : const LoginScreen(notice: favoritesLoginNotice),
+      ),
+    );
+    if (loggedIn == true) await _favorites.load();
   }
 
   void _openDetail(Event event) {
@@ -85,8 +108,20 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     }
 
     if (_favorites.error case final error? when favorites.isEmpty) {
+      if (error.isUnauthorized) {
+        return _Message(
+          icon: Icons.lock_outline,
+          title: 'Inicia sessió per veure els teus preferits',
+          action: FilledButton.icon(
+            onPressed: _login,
+            icon: const Icon(Icons.login),
+            label: const Text('Inicia sessió'),
+            style: FilledButton.styleFrom(backgroundColor: CaliuColors.red),
+          ),
+        );
+      }
       return _Message(
-        icon: error.isUnauthorized ? Icons.lock_outline : Icons.cloud_off,
+        icon: Icons.cloud_off,
         title: error.message,
         action: FilledButton(
           onPressed: _favorites.load,
@@ -118,7 +153,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           event: event,
           subtitle: _subtitle(event),
           onTap: () => _openDetail(event),
-          trailing: FavoriteButton(event: event, controller: _favorites),
+          trailing: FavoriteButton(
+            event: event,
+            controller: _favorites,
+            loginBuilder: widget.loginBuilder,
+          ),
         );
       },
     );

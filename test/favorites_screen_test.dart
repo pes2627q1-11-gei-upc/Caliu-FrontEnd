@@ -100,26 +100,15 @@ void main() {
       expect(favorites.isFavorite('evt-1'), isFalse);
     });
 
-    testWidgets('sense sessió: missatge d\'error i botó per tornar a provar', (
+    testWidgets('error de xarxa: missatge i botó per tornar a provar', (
       tester,
     ) async {
-      final session = _MemorySession(null);
-      final favorites = FavoritesController(
-        MockFavoritesApi(
-          session: session,
-          seed: const [_concert],
-          latency: Duration.zero,
-        ),
-      );
-      await _pumpScreen(tester, favorites);
+      final api = _FlakyApi(failures: 1, favorites: const [_concert]);
+      await _pumpScreen(tester, FavoritesController(api));
 
-      expect(
-        find.text('Cal iniciar sessió per gestionar els preferits'),
-        findsOneWidget,
-      );
-      expect(find.byIcon(Icons.lock_outline), findsOneWidget);
+      expect(find.text('Error de xarxa'), findsOneWidget);
+      expect(find.byIcon(Icons.cloud_off), findsOneWidget);
 
-      session.token = 'jwt';
       await tester.tap(find.text('Tornar a provar'));
       await tester.pumpAndSettle();
       expect(find.text('Concert al Parc'), findsOneWidget);
@@ -182,4 +171,31 @@ void main() {
     expect(find.byType(FavoritesScreen), findsOneWidget);
     expect(find.text('Concert al Parc'), findsOneWidget);
   });
+}
+
+/// Falla les primeres [failures] càrregues amb un error que no és 401.
+class _FlakyApi implements FavoritesApi {
+  _FlakyApi({required this.failures, required this.favorites});
+
+  int failures;
+  final List<Event> favorites;
+
+  @override
+  Future<List<Event>> fetchFavorites() async {
+    if (failures > 0) {
+      failures--;
+      throw const FavoritesApiException('Error de xarxa', statusCode: 503);
+    }
+    return favorites;
+  }
+
+  @override
+  Future<void> addFavorite(Event event) async {}
+
+  @override
+  Future<void> removeFavorite(String eventId) async {}
+
+  @override
+  Future<bool> isFavorite(String eventId) async =>
+      favorites.any((e) => e.id == eventId);
 }

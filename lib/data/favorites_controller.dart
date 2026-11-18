@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import 'auth_session.dart';
 import 'event.dart';
 import 'favorites_api.dart';
 
@@ -10,14 +11,21 @@ import 'favorites_api.dart';
 /// Els canvis són optimistes: el cor canvia a l'instant i, si la petició
 /// falla, es desfà el canvi i es rellança l'error perquè la UI l'expliqui.
 class FavoritesController extends ChangeNotifier {
-  FavoritesController(this._api);
+  FavoritesController(this._api, {this.session});
 
   /// Instància de l'app. Els tests n'injecten una de pròpia.
-  static final FavoritesController shared = FavoritesController(
-    createFavoritesApi(),
-  );
+  static final FavoritesController shared = () {
+    final session = AuthSession();
+    return FavoritesController(
+      createFavoritesApi(session: session),
+      session: session,
+    );
+  }();
 
   final FavoritesApi _api;
+
+  /// Si és null, es considera que sempre hi ha sessió (tests).
+  final AuthSessionStore? session;
 
   /// Ordre d'inserció: l'últim és el preferit més recent.
   final Map<String, Event> _events = {};
@@ -41,6 +49,27 @@ class FavoritesController extends ChangeNotifier {
 
   /// Hi ha una petició en curs per a aquest esdeveniment.
   bool isPending(String eventId) => _pending.contains(eventId);
+
+  /// Hi ha un token desat? Si no, cal demanar login abans de marcar (#191).
+  Future<bool> hasSession() async {
+    final session = this.session;
+    if (session == null) return true;
+    try {
+      final token = await session.readToken();
+      return token != null && token.isNotEmpty;
+    } on Exception {
+      return false;
+    }
+  }
+
+  /// Oblida els preferits locals (en tancar o caducar la sessió).
+  void clear() {
+    _events.clear();
+    _pending.clear();
+    _loaded = false;
+    _error = null;
+    notifyListeners();
+  }
 
   /// Carrega els preferits del servidor. Si falla, la llista queda buida i
   /// l'error es guarda a [error] perquè la pantalla de Preferits l'expliqui.

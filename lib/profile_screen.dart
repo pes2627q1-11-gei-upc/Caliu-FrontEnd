@@ -38,6 +38,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late final AuthApi _authApi = widget.authApi ?? AuthApi();
   late final AuthSessionStore _authSession =
       widget.authSession ?? AuthSession();
+  late final FavoritesController _favorites =
+      widget.favorites ?? FavoritesController.shared;
   ApiHealth? _health;
   AuthenticatedProfile? _profile;
   String? _token;
@@ -105,14 +107,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final loggedIn = await Navigator.of(
       context,
     ).push<bool>(MaterialPageRoute<bool>(builder: (_) => const LoginScreen()));
-    if (loggedIn == true) await _loadAccount();
+    if (loggedIn == true) await _onSignedIn();
   }
 
   Future<void> _openRegistration() async {
     final registered = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(builder: (_) => const RegisterScreen()),
     );
-    if (registered == true) await _loadAccount();
+    if (registered == true) await _onSignedIn();
+  }
+
+  /// Nou compte o nova sessió: carrega el perfil i els seus preferits.
+  Future<void> _onSignedIn() async {
+    _favorites.load();
+    await _loadAccount();
   }
 
   Future<void> _openPreferences() async {
@@ -133,7 +141,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _openFavorites() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => FavoritesScreen(favorites: widget.favorites),
+        builder: (_) => FavoritesScreen(favorites: _favorites),
       ),
     );
   }
@@ -149,6 +157,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } on Exception {
       // The expired account must no longer be visible even if storage fails.
     }
+    _favorites.clear();
     if (!mounted || _token != token) return;
     setState(() {
       _token = null;
@@ -248,6 +257,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } on Exception {
       errorMessage = 'No s’ha pogut esborrar la sessió desada al dispositiu.';
     }
+    _favorites.clear();
     if (!mounted || _token != token) return;
     setState(() {
       _token = null;

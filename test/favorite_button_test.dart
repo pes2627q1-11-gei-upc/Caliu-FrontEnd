@@ -149,18 +149,12 @@ void main() {
       await tester.tap(find.byType(FavoriteButton));
       await tester.pump();
       api.calls.single.completeError(
-        const FavoritesApiException(
-          'Cal iniciar sessió per gestionar els preferits',
-          statusCode: 401,
-        ),
+        const FavoritesApiException('Error de xarxa', statusCode: 503),
       );
       await tester.pumpAndSettle();
 
       expect(_heart('evt-1', Icons.favorite_border), findsOneWidget);
-      expect(
-        find.text('Cal iniciar sessió per gestionar els preferits'),
-        findsOneWidget,
-      );
+      expect(find.text('Error de xarxa'), findsOneWidget);
     });
 
     testWidgets('dos cors del mateix esdeveniment van sincronitzats', (
