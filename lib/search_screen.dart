@@ -5,16 +5,21 @@ import 'data/event.dart';
 import 'data/event_count_preview.dart';
 import 'data/event_query.dart';
 import 'data/events_api.dart';
+import 'data/favorites_controller.dart';
 import 'data/search_radius.dart';
 import 'event_detail_screen.dart';
 import 'theme/caliu_colors.dart';
 import 'widgets/caliu_chip.dart';
+import 'widgets/favorite_button.dart';
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key, this.radius, this.api});
+  const SearchScreen({super.key, this.radius, this.api, this.favorites});
 
   final SearchRadius? radius;
   final EventsApi? api;
+
+  /// Per defecte, [FavoritesController.shared].
+  final FavoritesController? favorites;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -670,8 +675,11 @@ class _SearchScreenState extends State<SearchScreen> {
   void _openDetail(Event event) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) =>
-            EventDetailScreen(eventId: event.id, initialEvent: event),
+        builder: (_) => EventDetailScreen(
+          eventId: event.id,
+          initialEvent: event,
+          favorites: widget.favorites,
+        ),
       ),
     );
   }
@@ -896,10 +904,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         ],
                       ),
                     ),
-                    const Icon(
-                      Icons.chevron_right,
-                      color: CaliuColors.textMuted,
-                    ),
+                    FavoriteButton(event: event, controller: widget.favorites),
                   ],
                 ),
               ),

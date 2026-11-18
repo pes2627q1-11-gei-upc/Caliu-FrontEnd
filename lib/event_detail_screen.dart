@@ -3,18 +3,24 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'data/event.dart';
 import 'data/events_api.dart';
+import 'data/favorites_controller.dart';
 import 'theme/caliu_colors.dart';
 import 'widgets/caliu_chip.dart';
+import 'widgets/favorite_button.dart';
 
 class EventDetailScreen extends StatefulWidget {
   const EventDetailScreen({
     super.key,
     required this.eventId,
     this.initialEvent,
+    this.favorites,
   });
 
   final String eventId;
   final Event? initialEvent;
+
+  /// Per defecte, [FavoritesController.shared].
+  final FavoritesController? favorites;
 
   @override
   State<EventDetailScreen> createState() => _EventDetailScreenState();
@@ -223,9 +229,25 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       Positioned(
                         top: MediaQuery.paddingOf(context).top + 8,
                         right: 12,
-                        child: _roundIconButton(
-                          icon: Icons.ios_share,
-                          onPressed: () => _stub('Compartir'),
+                        child: Row(
+                          children: [
+                            Material(
+                              color: Colors.black45,
+                              shape: const CircleBorder(),
+                              child: FavoriteButton(
+                                event: event,
+                                controller: widget.favorites,
+                                color: Colors.white,
+                                activeColor: CaliuColors.redSoft,
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _roundIconButton(
+                              icon: Icons.ios_share,
+                              onPressed: () => _stub('Compartir'),
+                            ),
+                          ],
                         ),
                       ),
                     ],
