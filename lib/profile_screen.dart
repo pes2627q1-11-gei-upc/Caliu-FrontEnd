@@ -5,6 +5,8 @@ import 'data/auth_api.dart';
 import 'data/auth_session.dart';
 import 'data/auth_validators.dart';
 import 'data/events_api.dart';
+import 'data/favorites_controller.dart';
+import 'favorites_screen.dart';
 import 'login_screen.dart';
 import 'preferences_screen.dart';
 import 'register_screen.dart';
@@ -17,11 +19,15 @@ class ProfileScreen extends StatefulWidget {
     this.authApi,
     this.authSession,
     this.eventsApi,
+    this.favorites,
   });
 
   final AuthApi? authApi;
   final AuthSessionStore? authSession;
   final EventsApi? eventsApi;
+
+  /// Per defecte, [FavoritesController.shared].
+  final FavoritesController? favorites;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -122,6 +128,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
     if (updated == true && mounted && _token == token) await _loadAccount();
+  }
+
+  void _openFavorites() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FavoritesScreen(favorites: widget.favorites),
+      ),
+    );
   }
 
   Future<void> _expireSession([String? expectedToken]) async {
@@ -397,6 +411,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onPressed: _openPreferences,
                 icon: const Icon(Icons.tune),
                 label: const Text('Edita les preferències'),
+              ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _openFavorites,
+                icon: const Icon(Icons.favorite_border),
+                label: const Text('Preferits'),
               ),
               if (_profileError case final error?) ...[
                 const SizedBox(height: 12),

@@ -9,7 +9,7 @@ import 'data/favorites_controller.dart';
 import 'data/search_radius.dart';
 import 'event_detail_screen.dart';
 import 'theme/caliu_colors.dart';
-import 'widgets/caliu_chip.dart';
+import 'widgets/event_list_tile.dart';
 import 'widgets/favorite_button.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -815,110 +815,13 @@ class _SearchScreenState extends State<SearchScreen> {
       separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final event = _results[index];
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: CaliuColors.maroon.withValues(alpha: 0.14),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: CaliuColors.maroonDeep.withValues(alpha: 0.08),
-                blurRadius: 10,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(14),
-              onTap: () => _openDetail(event),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: SizedBox(
-                        width: 64,
-                        height: 64,
-                        child: event.imageUrl != null
-                            ? Image.network(
-                                event.imageUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    _thumbPlaceholder(),
-                              )
-                            : _thumbPlaceholder(),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            event.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15,
-                              color: CaliuColors.maroonDeep,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _subtitle(event),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: CaliuColors.textMuted,
-                              fontSize: 13,
-                            ),
-                          ),
-                          Builder(
-                            builder: (context) {
-                              final labels = <String>{
-                                ...event.categories,
-                                ...event.tags,
-                              }.take(3).toList();
-                              if (labels.isEmpty) {
-                                return const SizedBox.shrink();
-                              }
-                              return Padding(
-                                padding: const EdgeInsets.only(top: 8),
-                                child: Wrap(
-                                  spacing: 6,
-                                  runSpacing: 6,
-                                  children: labels
-                                      .map((label) => CaliuChip(label: label))
-                                      .toList(),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    FavoriteButton(event: event, controller: widget.favorites),
-                  ],
-                ),
-              ),
-            ),
-          ),
+        return EventListTile(
+          event: event,
+          subtitle: _subtitle(event),
+          onTap: () => _openDetail(event),
+          trailing: FavoriteButton(event: event, controller: widget.favorites),
         );
       },
-    );
-  }
-
-  Widget _thumbPlaceholder() {
-    return Container(
-      color: CaliuColors.maroon,
-      child: const Icon(Icons.event, color: Colors.white54),
     );
   }
 }
