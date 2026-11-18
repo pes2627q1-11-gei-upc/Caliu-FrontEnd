@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'map_view.dart';
+import 'data/search_radius.dart';
 import 'profile_screen.dart';
 import 'search_screen.dart';
 
@@ -18,12 +19,19 @@ class _MainScreenState extends State<MainScreen> {
   static const Color _indicatorColor = Color(0x40F2A33A);
 
   int _selectedIndex = 0;
+  final _radius = SearchRadius();
+
+  @override
+  void dispose() {
+    _radius.dispose();
+    super.dispose();
+  }
 
   // MapView rep si és la pestanya visible: fora d'ella no ha d'interceptar el
   // botó enrere (#44). L'IndexedStack conserva l'estat de cada pantalla.
   List<Widget> get _screens => [
-    const SearchScreen(),
-    MapView(isActive: _selectedIndex == 1),
+    SearchScreen(radius: _radius),
+    MapView(isActive: _selectedIndex == 1, radius: _radius),
     const ProfileScreen(),
   ];
 

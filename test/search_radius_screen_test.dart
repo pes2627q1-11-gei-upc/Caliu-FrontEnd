@@ -1,0 +1,610 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:caliu/data/events_api.dart';
+import 'package:caliu/data/search_radius.dart';
+import 'package:caliu/search_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+
+Future<void> _settleCount(WidgetTester tester) async {
+  await tester.pump(const Duration(milliseconds: 350));
+  await tester.pumpAndSettle();
+}
+
+String? _countLabel(WidgetTester tester) =>
+    tester.widget<Text>(find.byKey(const ValueKey('filter-result-count'))).data;
+
+void main() {
+  testWidgets(
+    'la creu descarta radi, text, categories i dates sense notificar el mapa',
+    (tester) async {
+      final radius = SearchRadius(locate: () async => const LatLng(42, 1));
+      await radius.apply(5);
+      var notifications = 0;
+      radius.addListener(() => notifications++);
+      final requests = <Uri>[];
+      final api = EventsApi(
+        client: MockClient((request) async {
+          requests.add(request.url);
+          return http.Response(
+            '{"items":[],"categories":["Musica"],"total":18}',
+            200,
+          );
+        }),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SearchScreen(radius: radius, api: api),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Filtres'));
+      await _settleCount(tester);
+      await tester.enterText(find.byType(TextField).first, 'provisional');
+      await tester.tap(find.text('Musica'));
+      await tester.ensureVisible(find.text('Demà'));
+      await tester.tap(find.text('Demà'));
+      final slider = tester.widget<Slider>(find.byType(Slider));
+      slider.onChanged!(10);
+      slider.onChangeEnd!(10);
+      await _settleCount(tester);
+      expect(requests.last.queryParameters['radiusKm'], '10.0');
+      expect(requests.last.queryParameters['q'], 'provisional');
+      expect(radius.radiusKm, 5);
+      expect(notifications, 0);
+      expect(
+        requests.where((uri) => uri.queryParameters['limit'] == '40').length,
+        1,
+      );
+      await tester.tap(find.byTooltip('Tancar filtres'));
+      await tester.pumpAndSettle();
+      expect(radius.radiusKm, 5);
+      expect(notifications, 0);
+      await tester.tap(find.byTooltip('Filtres'));
+      await _settleCount(tester);
+      final query = requests.last.queryParameters;
+      expect(query['radiusKm'], '5.0');
+      for (final key in ['q', 'category', 'from', 'to']) {
+        expect(query.containsKey(key), isFalse);
+      }
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(notifications, 0);
+      await tester.pumpWidget(const SizedBox());
+      radius.dispose();
+    },
+  );
+
+  testWidgets('Aplicar filtres confirma una vegada el radi i la cerca', (
+    tester,
+  ) async {
+    final radius = SearchRadius(locate: () async => const LatLng(42, 1));
+    await radius.apply(5);
+    var notifications = 0;
+    radius.addListener(() => notifications++);
+    final requests = <Uri>[];
+    final api = EventsApi(
+      client: MockClient((request) async {
+        requests.add(request.url);
+        return http.Response('{"items":[],"categories":[],"total":18}', 200);
+      }),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SearchScreen(radius: radius, api: api),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Filtres'));
+    await _settleCount(tester);
+    await tester.enterText(find.byType(TextField).first, 'jazz');
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    slider.onChanged!(8);
+    slider.onChangeEnd!(8);
+    await _settleCount(tester);
+    expect(notifications, 0);
+    await tester.tap(find.text('Aplicar filtres'));
+    await tester.pumpAndSettle();
+    expect(radius.radiusKm, 8);
+    expect(notifications, 1);
+    final searches = requests
+        .where((uri) => uri.queryParameters['limit'] == '40')
+        .toList();
+    expect(searches.length, 2);
+    expect(searches.last.queryParameters['q'], 'jazz');
+    expect(searches.last.queryParameters['radiusKm'], '8.0');
+    await tester.pumpWidget(const SizedBox());
+    radius.dispose();
+  });
+
+  testWidgets('cancel·lar amb GPS pendent no aplica la resposta tardana', (
+    tester,
+  ) async {
+    final pending = Completer<LatLng>();
+    final radius = SearchRadius(locate: () => pending.future);
+    final api = EventsApi(
+      client: MockClient(
+        (_) async => http.Response('{"items":[],"categories":[]}', 200),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SearchScreen(radius: radius, api: api),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Filtres'));
+    await _settleCount(tester);
+    tester.widget<Slider>(find.byType(Slider)).onChangeEnd!(8);
+    await tester.pump();
+    await tester.tap(find.byTooltip('Tancar filtres'));
+    await tester.pumpAndSettle();
+    pending.complete(const LatLng(42, 1));
+    await tester.pumpAndSettle();
+    expect(radius.radiusKm, isNull);
+    expect(radius.center, isNull);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    radius.dispose();
+  });
+
+  testWidgets(
+    'Filtrar és una ruta normal i tanca sense errors amb un recompte pendent',
+    (tester) async {
+      final pending = Completer<http.Response>();
+      final radius = SearchRadius(locate: () async => const LatLng(42, 1));
+      final api = EventsApi(
+        client: MockClient((request) async {
+          if (request.url.queryParameters['limit'] == '1') {
+            return pending.future;
+          }
+          return http.Response('{"items":[],"categories":[]}', 200);
+        }),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SearchScreen(radius: radius, api: api),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Filtres'));
+      await _settleCount(tester);
+      expect(find.byType(BottomSheet), findsNothing);
+      expect(find.byType(AppBar), findsOneWidget);
+      await tester.drag(find.text('Filtrar'), const Offset(0, 300));
+      await tester.pumpAndSettle();
+      expect(find.text('Filtrar'), findsOneWidget);
+      await tester.tap(find.byTooltip('Tancar filtres'));
+      await tester.pump(const Duration(milliseconds: 50));
+      pending.complete(http.Response('{"items":[],"total":18}', 200));
+      await tester.pumpAndSettle();
+      expect(find.text('Filtrar'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byTooltip('Filtres'));
+      await _settleCount(tester);
+      expect(_countLabel(tester), '18 esdeveniments');
+      await tester.tap(find.byTooltip('Tancar filtres'));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+      radius.dispose();
+    },
+  );
+
+  testWidgets(
+    'la cerca i les targetes de data de Filtrar actualitzen el recompte',
+    (tester) async {
+      final requests = <Uri>[];
+      final radius = SearchRadius(locate: () async => const LatLng(42, 1));
+      final api = EventsApi(
+        client: MockClient((request) async {
+          requests.add(request.url);
+          return http.Response('{"items":[],"categories":[],"total":18}', 200);
+        }),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SearchScreen(radius: radius, api: api),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Filtres'));
+      await _settleCount(tester);
+      await tester.enterText(find.byType(TextField).first, 'jazz');
+      await tester.ensureVisible(find.text('Demà'));
+      await tester.tap(find.text('Demà'));
+      await _settleCount(tester);
+      expect(requests.last.queryParameters['q'], 'jazz');
+      expect(requests.last.queryParameters['from'], isNotNull);
+      expect(requests.last.queryParameters['to'], isNotNull);
+      expect(_countLabel(tester), '18 esdeveniments');
+      await tester.tap(find.text('Restablir tot'));
+      await _settleCount(tester);
+      expect(requests.last.queryParameters.containsKey('q'), isFalse);
+      expect(requests.last.queryParameters.containsKey('from'), isFalse);
+      await tester.tap(find.byTooltip('Tancar filtres'));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+      radius.dispose();
+    },
+  );
+
+  testWidgets(
+    'el botó compta categories, municipi i radi abans de tancar Filtrar',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final pending = Completer<LatLng>();
+      final radius = SearchRadius(locate: () => pending.future);
+      final requests = <Uri>[];
+      final api = EventsApi(
+        client: MockClient((request) async {
+          requests.add(request.url);
+          if (request.url.path.endsWith('categories')) {
+            return http.Response('{"categories":["Musica"]}', 200);
+          }
+          final query = request.url.queryParameters;
+          final total = query.containsKey('radiusKm')
+              ? 2
+              : query.containsKey('municipality')
+              ? 4
+              : query.containsKey('category')
+              ? 18
+              : 125;
+          return http.Response('{"items":[],"total":$total}', 200);
+        }),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SearchScreen(radius: radius, api: api),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Filtres'));
+      await _settleCount(tester);
+      expect(_countLabel(tester), '125 esdeveniments');
+      expect(find.text('Aplicar radi'), findsNothing);
+      final buttonRect = tester.getRect(
+        find.ancestor(
+          of: find.text('Aplicar filtres'),
+          matching: find.byType(FilledButton),
+        ),
+      );
+      expect(
+        tester.getRect(find.text('Aplicar filtres')).left - buttonRect.left,
+        greaterThanOrEqualTo(20),
+      );
+
+      await tester.tap(find.text('Musica'));
+      await tester.pump();
+      expect(_countLabel(tester), 'Comptant…');
+      await _settleCount(tester);
+      expect(_countLabel(tester), '18 esdeveniments');
+      await tester.ensureVisible(find.widgetWithText(TextField, 'Municipi'));
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Municipi'),
+        'Olot',
+      );
+      await _settleCount(tester);
+      expect(_countLabel(tester), '4 esdeveniments');
+
+      final slider = tester.widget<Slider>(find.byType(Slider));
+      slider.onChanged!(3);
+      slider.onChangeEnd!(3);
+      await tester.pump();
+      expect(_countLabel(tester), 'Comptant…');
+      expect(
+        requests.any((uri) => uri.queryParameters.containsKey('radiusKm')),
+        isFalse,
+      );
+      pending.complete(const LatLng(42, 1));
+      await tester.pump();
+      await _settleCount(tester);
+      expect(_countLabel(tester), '2 esdeveniments');
+      expect(requests.last.queryParameters['radiusKm'], '3.0');
+      expect(requests.last.queryParameters['category'], 'Musica');
+      expect(requests.last.queryParameters['municipality'], 'Olot');
+      expect(requests.last.queryParameters['limit'], '1');
+
+      await tester.ensureVisible(find.text('Treure radi'));
+      await tester.tap(find.text('Treure radi'));
+      await _settleCount(tester);
+      expect(_countLabel(tester), '4 esdeveniments');
+      await tester.ensureVisible(find.text('Aplicar filtres'));
+      await tester.tap(find.text('Aplicar filtres'));
+      await tester.pumpAndSettle();
+      expect(find.text('4 esdeveniments'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      radius.dispose();
+    },
+  );
+
+  testWidgets(
+    'el text del botó queda dins la forma arrodonida en pantalla estreta',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 740));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final radius = SearchRadius(locate: () async => const LatLng(42, 1));
+      final api = EventsApi(
+        client: MockClient(
+          (_) async =>
+              http.Response('{"items":[],"categories":[],"total":221}', 200),
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: const TextScaler.linear(1.3),
+              viewPadding: const EdgeInsets.only(bottom: 24),
+              padding: const EdgeInsets.only(bottom: 24),
+            ),
+            child: child!,
+          ),
+          home: SearchScreen(radius: radius, api: api),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Filtres'));
+      await _settleCount(tester);
+      await tester.ensureVisible(find.text('Aplicar filtres'));
+      await tester.pumpAndSettle();
+      final buttonRect = tester.getRect(
+        find.ancestor(
+          of: find.text('Aplicar filtres'),
+          matching: find.byType(FilledButton),
+        ),
+      );
+      expect(buttonRect.bottom, lessThanOrEqualTo(740 - 24));
+      await tester.ensureVisible(find.widgetWithText(TextField, 'Municipi'));
+      await tester.pumpAndSettle();
+      expect(
+        tester
+            .getRect(
+              find.ancestor(
+                of: find.text('Aplicar filtres'),
+                matching: find.byType(FilledButton),
+              ),
+            )
+            .top,
+        closeTo(buttonRect.top, 0.1),
+      );
+      for (final finder in [
+        find.text('Aplicar filtres'),
+        find.byKey(const ValueKey('filter-result-count')),
+      ]) {
+        final textRect = tester.getRect(finder);
+        expect(textRect.left, greaterThanOrEqualTo(buttonRect.left + 20));
+        expect(textRect.right, lessThanOrEqualTo(buttonRect.right - 20));
+        expect(textRect.top, greaterThan(buttonRect.top));
+        expect(textRect.bottom, lessThan(buttonRect.bottom));
+        expect(tester.getSize(finder).height, lessThan(28));
+      }
+      expect(_countLabel(tester), '221 esdeveniments');
+      final sliderContext = tester.element(find.byType(Slider));
+      expect(
+        SliderTheme.of(sliderContext).showValueIndicator,
+        ShowValueIndicator.never,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.text('Aplicar filtres'));
+      await tester.pumpAndSettle();
+      expect(find.text('Filtrar'), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+      radius.dispose();
+    },
+  );
+
+  testWidgets(
+    'un error de recompte es mostra com a no disponible i no com a zero',
+    (tester) async {
+      final radius = SearchRadius(locate: () async => const LatLng(42, 1));
+      final api = EventsApi(
+        client: MockClient((request) async {
+          if (request.url.queryParameters['limit'] == '1') {
+            return http.Response('{}', 503);
+          }
+          return http.Response('{"items":[],"categories":[],"total":0}', 200);
+        }),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SearchScreen(radius: radius, api: api),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Filtres'));
+      await _settleCount(tester);
+      expect(_countLabel(tester), 'No disponible');
+      expect(find.text('No s’ha pogut calcular el recompte.'), findsOneWidget);
+      await tester.pumpWidget(const SizedBox());
+      radius.dispose();
+    },
+  );
+
+  testWidgets('envia radi i ubicació, conserva text i permet treure el radi', (
+    tester,
+  ) async {
+    final requests = <Uri>[];
+    final radius = SearchRadius(locate: () async => const LatLng(42, 1));
+    final api = EventsApi(
+      client: MockClient((request) async {
+        requests.add(request.url);
+        return http.Response(
+          jsonEncode(
+            request.url.path.endsWith('categories')
+                ? {
+                    'categories': ['Musica'],
+                  }
+                : {'items': [], 'total': 0},
+          ),
+          200,
+        );
+      }),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SearchScreen(radius: radius, api: api),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(Slider), findsNothing);
+    expect(find.text('RADI DE DISTÀNCIA'), findsNothing);
+    await tester.enterText(find.byType(TextField).first, 'jazz');
+    await tester.tap(find.text('Demà'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Filtres'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Musica'));
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Comarca'),
+      'Garrotxa',
+    );
+    await tester.ensureVisible(find.widgetWithText(TextField, 'Municipi'));
+    await tester.enterText(find.widgetWithText(TextField, 'Municipi'), 'Olot');
+    await tester.ensureVisible(find.text('Aplicar filtres'));
+    await tester.tap(find.text('Aplicar filtres'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Filtres'));
+    await tester.pumpAndSettle();
+    expect(find.text('RADI DE DISTÀNCIA'), findsOneWidget);
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    expect(slider.min, 1);
+    expect(slider.max, 50);
+    expect(slider.divisions, 49);
+    expect(slider.value, 5);
+    tester.widget<Slider>(find.byType(Slider)).onChanged!(5);
+    await tester.pump();
+    expect(find.text('5 km'), findsOneWidget);
+    expect(find.text('Aplicar radi'), findsNothing);
+    tester.widget<Slider>(find.byType(Slider)).onChangeEnd!(5);
+    await tester.pump(const Duration(milliseconds: 350));
+    await tester.pumpAndSettle();
+    final query = requests.last.queryParameters;
+    expect(query['q'], 'jazz');
+    expect(query['lat'], '42.0');
+    expect(query['lng'], '1.0');
+    expect(query['radiusKm'], '5.0');
+    expect(query['category'], 'Musica');
+    expect(query['comarca'], 'Garrotxa');
+    expect(query['municipality'], 'Olot');
+    expect(query['from'], isNotNull);
+    expect(query['to'], isNotNull);
+    await tester.ensureVisible(find.text('Treure radi'));
+    await tester.tap(find.text('Treure radi'));
+    await tester.pumpAndSettle();
+    expect(requests.last.queryParameters['q'], 'jazz');
+    expect(requests.last.queryParameters.containsKey('lat'), isFalse);
+    expect(requests.last.queryParameters.containsKey('radiusKm'), isFalse);
+    for (final key in ['category', 'comarca', 'municipality', 'from', 'to']) {
+      expect(requests.last.queryParameters[key], query[key]);
+    }
+    await tester.pumpWidget(const SizedBox());
+    radius.dispose();
+  });
+
+  testWidgets('espera la ubicació i informa del timeout sense enviar radi', (
+    tester,
+  ) async {
+    final pending = Completer<LatLng>();
+    final radius = SearchRadius(locate: () => pending.future);
+    final requests = <Uri>[];
+    final api = EventsApi(
+      client: MockClient((request) async {
+        requests.add(request.url);
+        return http.Response('{"items":[],"categories":[]}', 200);
+      }),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SearchScreen(radius: radius, api: api),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Filtres'));
+    await tester.pumpAndSettle();
+    tester.widget<Slider>(find.byType(Slider)).onChangeEnd!(5);
+    await tester.pump();
+    expect(find.text('Obtenint ubicació…'), findsOneWidget);
+    expect(tester.widget<Slider>(find.byType(Slider)).onChanged, isNull);
+    pending.completeError(TimeoutException('location'));
+    await tester.pumpAndSettle();
+    expect(find.text(SearchRadius.unavailableMessage), findsOneWidget);
+    expect(
+      requests.every((uri) => !uri.queryParameters.containsKey('lat')),
+      isTrue,
+    );
+    await tester.pumpWidget(const SizedBox());
+    radius.dispose();
+  });
+
+  testWidgets('Restablir tot treu el radi des del menú Filtrar', (
+    tester,
+  ) async {
+    final radius = SearchRadius(locate: () async => const LatLng(42, 1));
+    await radius.apply(5);
+    final api = EventsApi(
+      client: MockClient(
+        (_) async => http.Response('{"items":[],"categories":[]}', 200),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SearchScreen(radius: radius, api: api),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byType(Slider), findsNothing);
+    await tester.tap(find.byTooltip('Filtres'));
+    await tester.pumpAndSettle();
+    expect(find.text('Treure radi'), findsOneWidget);
+    expect(find.textContaining('Radi aplicat:'), findsNothing);
+    await tester.tap(find.text('Restablir tot'));
+    await tester.pumpAndSettle();
+    expect(radius.radiusKm, 5);
+    expect(find.text('Treure radi'), findsNothing);
+    expect(tester.widget<Slider>(find.byType(Slider)).value, 5);
+    await tester.ensureVisible(find.text('Aplicar filtres'));
+    await tester.tap(find.text('Aplicar filtres'));
+    await tester.pumpAndSettle();
+    expect(find.byType(Slider), findsNothing);
+    expect(radius.radiusKm, isNull);
+    await tester.pumpWidget(const SizedBox());
+    radius.dispose();
+  });
+
+  testWidgets('un radi anterior més gran no desborda el selector de 50 km', (
+    tester,
+  ) async {
+    final radius = SearchRadius(locate: () async => const LatLng(42, 1));
+    await radius.apply(500);
+    final api = EventsApi(
+      client: MockClient(
+        (_) async => http.Response('{"items":[],"categories":[]}', 200),
+      ),
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SearchScreen(radius: radius, api: api),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Filtres'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Slider>(find.byType(Slider)).value, 50);
+    expect(radius.radiusKm, 500);
+    expect(find.textContaining('Radi aplicat:'), findsNothing);
+    tester.widget<Slider>(find.byType(Slider)).onChangeEnd!(50);
+    await tester.pumpAndSettle();
+    expect(radius.radiusKm, 500);
+    await tester.tap(find.text('Aplicar filtres'));
+    await tester.pumpAndSettle();
+    expect(radius.radiusKm, 50);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    radius.dispose();
+  });
+}
