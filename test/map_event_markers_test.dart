@@ -80,6 +80,33 @@ void main() {
       expect(tapped, ['c']);
     });
 
+    test('amb cluster: enllaça onClusterTap al ClusterManager (#115)', () {
+      Cluster? tapped;
+      final set = buildEventMarkerSet(
+        [
+          _event(id: 'a', location: const LatLng(41.4, 2.1)),
+          _event(id: 'c', location: const LatLng(41.41, 2.11)),
+        ],
+        clusterGeneration: 2,
+        cluster: true,
+        onTap: (_) {},
+        onClusterTap: (cluster) => tapped = cluster,
+      );
+
+      expect(set.clusterManagers.single.onClusterTap, isNotNull);
+      final sample = Cluster(
+        eventClusterManagerId(2),
+        const [MarkerId('a'), MarkerId('c')],
+        position: const LatLng(41.405, 2.105),
+        bounds: LatLngBounds(
+          southwest: const LatLng(41.4, 2.1),
+          northeast: const LatLng(41.41, 2.11),
+        ),
+      );
+      set.clusterManagers.single.onClusterTap!(sample);
+      expect(tapped, sample);
+    });
+
     test('sense cluster: pins individuals (dissolve anticipat)', () {
       final set = buildEventMarkerSet(
         [
@@ -105,6 +132,56 @@ void main() {
       );
       expect(set.markers, isEmpty);
       expect(set.clusterManagers, isEmpty);
+    });
+  });
+
+  group('focusForClusterTap (#115)', () {
+    final spreadBounds = LatLngBounds(
+      southwest: const LatLng(41.38, 2.15),
+      northeast: const LatLng(41.40, 2.18),
+    );
+    final samePoint = const LatLng(41.39, 2.16);
+    final degenerateBounds = LatLngBounds(
+      southwest: samePoint,
+      northeast: samePoint,
+    );
+
+    test('bounds amb span → enquadra el grup', () {
+      final focus = focusForClusterTap(
+        bounds: spreadBounds,
+        position: const LatLng(41.39, 2.165),
+        currentZoom: 11,
+      );
+      expect(focus, isA<ClusterTapFitBounds>());
+      final fit = focus as ClusterTapFitBounds;
+      expect(fit.bounds, spreadBounds);
+      expect(fit.paddingPx, kClusterTapPaddingPx);
+    });
+
+    test('pins coincidents → centra i puja el zoom', () {
+      final focus = focusForClusterTap(
+        bounds: degenerateBounds,
+        position: samePoint,
+        currentZoom: 12,
+      );
+      expect(focus, isA<ClusterTapZoomTo>());
+      final zoomTo = focus as ClusterTapZoomTo;
+      expect(zoomTo.center, samePoint);
+      expect(zoomTo.zoom, 12 + kClusterTapZoomStep);
+    });
+
+    test('pins coincidents al zoom màxim → no fa res', () {
+      final focus = focusForClusterTap(
+        bounds: degenerateBounds,
+        position: samePoint,
+        currentZoom: kMapMaxZoom,
+      );
+      expect(focus, isA<ClusterTapNoop>());
+    });
+
+    test('clusterBoundsAreUsable distingeix span real', () {
+      expect(clusterBoundsAreUsable(spreadBounds), isTrue);
+      expect(clusterBoundsAreUsable(degenerateBounds), isFalse);
     });
   });
 
