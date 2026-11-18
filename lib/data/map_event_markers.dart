@@ -10,10 +10,81 @@ const String kEventClusterManagerIdPrefix = 'caliu-events';
 /// els clústers es mantenen massa temps en apropar el mapa.
 const double kStopClusteringZoom = 13.5;
 
+/// Zoom màxim del mapa (ha de coincidir amb [MinMaxZoomPreference] a MapView).
+const double kMapMaxZoom = 18;
+
+/// Padding (px) en enquadrar els bounds d'un clúster (#115).
+const double kClusterTapPaddingPx = 64;
+
+/// Increment de zoom si els pins del clúster coincideixen (#115).
+const double kClusterTapZoomStep = 2;
+
+/// Span mínim perquè [LatLngBounds] sigui usable amb `newLatLngBounds`.
+const double kClusterBoundsMinSpan = 1e-5;
+
 ClusterManagerId eventClusterManagerId(int generation) =>
     ClusterManagerId('$kEventClusterManagerIdPrefix-$generation');
 
 bool shouldClusterAtZoom(double zoom) => zoom < kStopClusteringZoom;
+
+/// True si els bounds del clúster cobreixen una àrea real (no pins coincidents).
+bool clusterBoundsAreUsable(LatLngBounds bounds) {
+  final latSpan = (bounds.northeast.latitude - bounds.southwest.latitude).abs();
+  final lngSpan = (bounds.northeast.longitude - bounds.southwest.longitude)
+      .abs();
+  return latSpan >= kClusterBoundsMinSpan || lngSpan >= kClusterBoundsMinSpan;
+}
+
+/// Com apropar la càmera en tocar un clúster (#115).
+///
+/// Amb bounds útils → enquadrar. Amb coordenades coincidents → centrar i
+/// pujar el zoom. Si ja som al zoom màxim i no hi ha span → no fer res.
+sealed class ClusterTapFocus {
+  const ClusterTapFocus();
+}
+
+/// Enquadra tots els pins del clúster.
+final class ClusterTapFitBounds extends ClusterTapFocus {
+  const ClusterTapFitBounds({
+    required this.bounds,
+    this.paddingPx = kClusterTapPaddingPx,
+  });
+
+  final LatLngBounds bounds;
+  final double paddingPx;
+}
+
+/// Centra i aplica un zoom concret (pins coincidents).
+final class ClusterTapZoomTo extends ClusterTapFocus {
+  const ClusterTapZoomTo({required this.center, required this.zoom});
+
+  final LatLng center;
+  final double zoom;
+}
+
+/// Cap animació (p. ex. ja al zoom màxim amb pins al mateix punt).
+final class ClusterTapNoop extends ClusterTapFocus {
+  const ClusterTapNoop();
+}
+
+/// Decideix el focus de càmera a partir de les dades del [Cluster] de l'SDK.
+ClusterTapFocus focusForClusterTap({
+  required LatLngBounds bounds,
+  required LatLng position,
+  required double currentZoom,
+  double maxZoom = kMapMaxZoom,
+  double paddingPx = kClusterTapPaddingPx,
+  double zoomStep = kClusterTapZoomStep,
+}) {
+  if (clusterBoundsAreUsable(bounds)) {
+    return ClusterTapFitBounds(bounds: bounds, paddingPx: paddingPx);
+  }
+  final nextZoom = (currentZoom + zoomStep).clamp(currentZoom, maxZoom);
+  if (nextZoom <= currentZoom + 0.05) {
+    return const ClusterTapNoop();
+  }
+  return ClusterTapZoomTo(center: position, zoom: nextZoom);
+}
 
 /// Resultat d'aplicar una càrrega de pins (markers + managers).
 class EventMarkerSet {
@@ -25,7 +96,8 @@ class EventMarkerSet {
 
 /// Construeix markers (+ ClusterManager si [cluster] és true).
 ///
-/// Sense `onClusterTap`: el zoom en tocar un clúster és la #115.
+/// [onClusterTap]: apropar la càmera al grup (#115). Android/iOS/web
+/// (MarkerClusterer) exposen el mateix callback amb `bounds` + `position`.
 /// Llista buida → conjunts buits (treu el manager; evita clúster fantasma).
 EventMarkerSet buildEventMarkerSet(
   Iterable<Event> events, {
@@ -33,6 +105,7 @@ EventMarkerSet buildEventMarkerSet(
   required bool cluster,
   required void Function(Event event) onTap,
   void Function(Event event)? onInfoWindowTap,
+  void Function(Cluster cluster)? onClusterTap,
 }) {
   final withLocation = events.where((event) => event.hasLocation).toList();
   if (withLocation.isEmpty) {
@@ -42,7 +115,12 @@ EventMarkerSet buildEventMarkerSet(
   final managerId = eventClusterManagerId(clusterGeneration);
   return EventMarkerSet(
     clusterManagers: cluster
-        ? {ClusterManager(clusterManagerId: managerId)}
+        ? {
+            ClusterManager(
+              clusterManagerId: managerId,
+              onClusterTap: onClusterTap,
+            ),
+          }
         : const {},
     markers: withLocation
         .map(
