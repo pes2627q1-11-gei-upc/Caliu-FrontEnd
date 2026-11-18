@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'data/event.dart';
+import 'data/search_radius.dart';
 import 'data/events_api.dart';
 import 'data/map_event_markers.dart';
 import 'event_detail_screen.dart';
@@ -41,10 +43,11 @@ enum _LocationMode {
 }
 
 class MapView extends StatefulWidget {
-  const MapView({super.key, this.isActive = true, this.eventsApi});
+  const MapView({super.key, this.isActive = true, this.radius, this.eventsApi});
 
   /// Si la pestanya Mapa és la visible (el mapa continua muntat a l'`IndexedStack`).
   final bool isActive;
+  final SearchRadius? radius;
 
   /// Injectable per als tests (MockClient); en producció usa l'API per defecte.
   final EventsApi? eventsApi;
@@ -55,6 +58,7 @@ class MapView extends StatefulWidget {
 
 class _MapViewState extends State<MapView> {
   late final EventsApi _eventsApi = widget.eventsApi ?? EventsApi();
+  late final SearchRadius _radius = widget.radius ?? SearchRadius();
 
   GoogleMapController? mapController;
   Set<Marker> _markers = {};
@@ -97,13 +101,48 @@ class _MapViewState extends State<MapView> {
   @override
   void dispose() {
     _cameraIdleTimer?.cancel();
+    _radius.removeListener(_radiusChanged);
+    if (widget.radius == null) _radius.dispose();
     super.dispose();
   }
 
   @override
   void initState() {
     super.initState();
+    _radius.addListener(_radiusChanged);
     unawaited(_bootstrap());
+  }
+
+  void _radiusChanged() {
+    ++_loadGeneration;
+    _loadedBounds = null;
+    _loadedZoom = null;
+    _confirmedEmptyBounds = null;
+    setState(() {
+      _markers = {};
+      _clusterManagers = {};
+      _selected = null;
+      _eventsById.clear();
+      _eventsRequestInFlight = false;
+    });
+    if (!_radius.locating) {
+      unawaited(_showRadiusAndReload());
+    }
+  }
+
+  Future<void> _showRadiusAndReload() async {
+    final center = _radius.center;
+    final km = _radius.radiusKm;
+    if (center != null && km != null && mapController != null) {
+      try {
+        await mapController!.animateCamera(
+          CameraUpdate.newLatLngBounds(_boundsAround(center, km), 32),
+        );
+      } catch (_) {
+        // El mapa pot estar acabant de crear-se; el filtre continua actiu.
+      }
+    }
+    if (mounted) await _reloadForVisibleRegion(force: true);
   }
 
   Future<void> _bootstrap() async {
@@ -398,7 +437,13 @@ class _MapViewState extends State<MapView> {
     bool notifyIfEmpty = false,
     bool notifyErrors = true,
   }) async {
-    if (!mounted) return;
+    if (!mounted || _radius.locating) return;
+    final selectedCenter = _radius.center;
+    if (selectedCenter != null && _radius.radiusKm != null) {
+      lat = selectedCenter.latitude;
+      lng = selectedCenter.longitude;
+      radiusKm = _radius.radiusKm!;
+    }
     final generation = ++_loadGeneration;
     _eventsRequestInFlight = true;
 
@@ -468,6 +513,7 @@ class _MapViewState extends State<MapView> {
       clusterGeneration: _clusterGeneration,
       cluster: _clusteringEnabled,
       onTap: _selectEvent,
+      onInfoWindowTap: _openInGoogleMaps,
     );
     _clusterManagers = markerSet.clusterManagers;
     _markers = markerSet.markers;
@@ -513,6 +559,13 @@ class _MapViewState extends State<MapView> {
         ),
       ),
     );
+  }
+
+  Future<void> _openInGoogleMaps(Event event) async {
+    final uri = event.googleMapsUri;
+    if (uri == null) return;
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok) _showMessage('No s\'ha pogut obrir Google Maps');
   }
 
   void _showMessage(String message) {
@@ -596,11 +649,10 @@ class _MapViewState extends State<MapView> {
           IconButton(
             tooltip: 'Cerca',
             onPressed: () {
-              final target = _lastCamera?.target ?? _focus;
               Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) =>
-                      SearchScreen(lat: target.latitude, lng: target.longitude),
+                      SearchScreen(radius: _radius, api: _eventsApi),
                 ),
               );
             },

@@ -16,6 +16,41 @@ void main() {
   });
 
   group('buildEventMarkerSet (#114)', () {
+    for (final cluster in [false, true]) {
+      test('popup conserva el lloc i el callback (cluster: $cluster)', () {
+        final opened = <Event>[];
+        const event = Event(
+          id: 'popup',
+          title: 'Concert',
+          venue: 'Teatre Principal',
+          municipality: 'Olot',
+          location: LatLng(42.18, 2.49),
+        );
+        final set = buildEventMarkerSet(
+          [event],
+          clusterGeneration: 1,
+          cluster: cluster,
+          onTap: (_) {},
+          onInfoWindowTap: opened.add,
+        );
+        final popup = set.markers.single.infoWindow;
+        expect(popup.title, event.title);
+        expect(popup.snippet, '${event.shortPlace} ↗');
+        popup.onTap!();
+        expect(opened, [event]);
+      });
+
+      test('popup sense lloc ofereix Google Maps (cluster: $cluster)', () {
+        final set = buildEventMarkerSet(
+          [_event(id: 'empty', location: const LatLng(42, 2))],
+          clusterGeneration: 1,
+          cluster: cluster,
+          onTap: (_) {},
+        );
+        expect(set.markers.single.infoWindow.snippet, 'Obrir a Google Maps ↗');
+      });
+    }
+
     test('amb cluster: vincula els pins al ClusterManager', () {
       final tapped = <String>[];
       final set = buildEventMarkerSet(

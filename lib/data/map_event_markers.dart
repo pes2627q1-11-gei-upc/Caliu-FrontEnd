@@ -32,38 +32,33 @@ EventMarkerSet buildEventMarkerSet(
   required int clusterGeneration,
   required bool cluster,
   required void Function(Event event) onTap,
+  void Function(Event event)? onInfoWindowTap,
 }) {
   final withLocation = events.where((event) => event.hasLocation).toList();
   if (withLocation.isEmpty) {
     return const EventMarkerSet(markers: {}, clusterManagers: {});
   }
 
-  if (!cluster) {
-    return EventMarkerSet(
-      clusterManagers: const {},
-      markers: withLocation
-          .map(
-            (event) => Marker(
-              markerId: MarkerId(event.id),
-              position: event.location!,
-              infoWindow: InfoWindow(title: event.title),
-              onTap: () => onTap(event),
-            ),
-          )
-          .toSet(),
-    );
-  }
-
   final managerId = eventClusterManagerId(clusterGeneration);
   return EventMarkerSet(
-    clusterManagers: {ClusterManager(clusterManagerId: managerId)},
+    clusterManagers: cluster
+        ? {ClusterManager(clusterManagerId: managerId)}
+        : const {},
     markers: withLocation
         .map(
           (event) => Marker(
             markerId: MarkerId(event.id),
             position: event.location!,
-            clusterManagerId: managerId,
-            infoWindow: InfoWindow(title: event.title),
+            clusterManagerId: cluster ? managerId : null,
+            infoWindow: InfoWindow(
+              title: event.title,
+              snippet: event.shortPlace.isEmpty
+                  ? 'Obrir a Google Maps ↗'
+                  : '${event.shortPlace} ↗',
+              onTap: onInfoWindowTap == null
+                  ? null
+                  : () => onInfoWindowTap(event),
+            ),
             onTap: () => onTap(event),
           ),
         )
