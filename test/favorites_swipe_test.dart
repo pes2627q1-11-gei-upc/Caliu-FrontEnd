@@ -142,6 +142,32 @@ void main() {
       expect(favorites.isFavorite('evt-1'), isTrue);
     });
 
+    testWidgets('treure amb el cor: si falla, l\'error substitueix "Desfer"', (
+      tester,
+    ) async {
+      final api = _ControlledApi(const [_concert]);
+      final favorites = FavoritesController(api);
+      await _pump(tester, favorites);
+
+      await tester.tap(find.byTooltip('Treure de preferits'));
+      await tester.pumpAndSettle();
+      expect(find.text('Desfer'), findsOneWidget);
+
+      api.calls.single.completeError(
+        const FavoritesApiException('Error de xarxa', statusCode: 503),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Concert al Parc'), findsOneWidget);
+      expect(favorites.isFavorite('evt-1'), isTrue);
+      expect(find.text('Error de xarxa'), findsOneWidget);
+      expect(find.text('Desfer'), findsNothing);
+      expect(
+        find.text('"Concert al Parc" eliminat de preferits'),
+        findsNothing,
+      );
+    });
+
     testWidgets('si falla l\'eliminació, torna a sortir i explica l\'error', (
       tester,
     ) async {

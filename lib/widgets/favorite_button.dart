@@ -89,14 +89,10 @@ class FavoriteButton extends StatelessWidget {
         // Token caducat: es demana login de nou.
         await _loginAndAdd(context, favorites);
       } else {
-        messenger?.showSnackBar(SnackBar(content: Text(e.message)));
+        _showError(messenger, e.message);
       }
     } catch (_) {
-      messenger?.showSnackBar(
-        const SnackBar(
-          content: Text('No s\'han pogut actualitzar els preferits'),
-        ),
-      );
+      _showError(messenger, 'No s\'han pogut actualitzar els preferits');
     }
   }
 
@@ -129,5 +125,13 @@ class FavoriteButton extends StatelessWidget {
         ),
       );
     }
+  }
+
+  /// L'error substitueix el SnackBar actual (p. ex. l'avís "Desfer" que
+  /// s'ha mostrat de manera optimista) en lloc de quedar a la cua.
+  void _showError(ScaffoldMessengerState? messenger, String message) {
+    messenger
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }
