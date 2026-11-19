@@ -60,6 +60,12 @@ class _FlakyApi implements UsersApi {
 
   @override
   Future<void> unfollow(String userId) async {}
+
+  @override
+  Future<List<PublicUser>> fetchFollowers(String userId) async => const [];
+
+  @override
+  Future<List<PublicUser>> fetchFollowing(String userId) async => const [];
 }
 
 MockUsersApi _api({AuthSessionStore? session}) =>

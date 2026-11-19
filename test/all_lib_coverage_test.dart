@@ -15,6 +15,7 @@ import 'package:caliu/data/favorites_controller.dart';
 import 'package:caliu/data/map_event_markers.dart';
 import 'package:caliu/event_detail_screen.dart';
 import 'package:caliu/favorites_screen.dart';
+import 'package:caliu/follow_lists_screen.dart';
 import 'package:caliu/login_screen.dart';
 import 'package:caliu/main.dart';
 import 'package:caliu/main_screen.dart';
@@ -48,6 +49,7 @@ void main() {
     expect(EventsApi, isNotNull);
     expect(MockUsersApi, isNotNull);
     expect(PublicProfileScreen, isNotNull);
+    expect(FollowListsScreen, isNotNull);
     expect(UserAvatar, isNotNull);
     expect(kEventClusterManagerIdPrefix, isNotEmpty);
     expect(eventClusterManagerId(1), isNotNull);

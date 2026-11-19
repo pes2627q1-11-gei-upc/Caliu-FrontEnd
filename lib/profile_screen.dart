@@ -6,7 +6,9 @@ import 'data/auth_session.dart';
 import 'data/auth_validators.dart';
 import 'data/events_api.dart';
 import 'data/favorites_controller.dart';
+import 'data/users_api.dart';
 import 'favorites_screen.dart';
+import 'follow_lists_screen.dart';
 import 'login_screen.dart';
 import 'preferences_screen.dart';
 import 'register_screen.dart';
@@ -16,11 +18,15 @@ import 'theme/caliu_colors.dart';
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
     super.key,
+    this.usersApi,
     this.authApi,
     this.authSession,
     this.eventsApi,
     this.favorites,
   });
+
+  /// Per a les llistes de seguidors i seguits; per defecte, [createUsersApi].
+  final UsersApi? usersApi;
 
   final AuthApi? authApi;
   final AuthSessionStore? authSession;
@@ -142,6 +148,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => FavoritesScreen(favorites: _favorites),
+      ),
+    );
+  }
+
+  void _openFollowLists(String userId, FollowList list) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FollowListsScreen(
+          userId: userId,
+          title: 'El meu perfil',
+          initialList: list,
+          api: widget.usersApi,
+        ),
       ),
     );
   }
@@ -409,7 +428,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              // Seguidors i seguits del propi compte (tasca #184).
+              Row(
+                children: [
+                  TextButton.icon(
+                    key: const Key('my-followers'),
+                    onPressed: () =>
+                        _openFollowLists(profile.id, FollowList.followers),
+                    icon: const Icon(Icons.group_outlined),
+                    label: const Text('Seguidors'),
+                  ),
+                  TextButton.icon(
+                    key: const Key('my-following'),
+                    onPressed: () =>
+                        _openFollowLists(profile.id, FollowList.following),
+                    icon: const Icon(Icons.person_add_alt),
+                    label: const Text('Seguits'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
               Text(
                 profile.preferences.isEmpty
                     ? 'Encara no tens preferències desades.'
