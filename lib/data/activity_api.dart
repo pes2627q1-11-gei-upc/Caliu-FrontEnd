@@ -2,7 +2,6 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'auth_session.dart';
 import 'event.dart';
-import 'favorites_api.dart';
 
 class ActivityApiException implements Exception {
   const ActivityApiException(this.message, {this.statusCode});
@@ -16,38 +15,30 @@ class ActivityApiException implements Exception {
   String toString() => message;
 }
 
-enum ActivityType {
-  /// L'usuari ha afegit l'esdeveniment als preferits.
-  favoriteAdded,
-
-  /// L'usuari ha assistit a l'esdeveniment.
-  attended,
-}
-
-/// Una entrada de l'historial d'activitat de l'usuari (H.U #36).
+/// Una assistència de l'historial d'activitat de l'usuari (H.U #36).
 class ActivityEntry {
   const ActivityEntry({
     required this.id,
-    required this.type,
     required this.event,
     required this.at,
   });
 
   final String id;
-  final ActivityType type;
   final Event event;
+
+  /// Quan hi va assistir.
   final DateTime at;
 }
 
-/// Historial d'activitat de l'usuari autenticat.
+/// Historial d'assistència de l'usuari autenticat (H.U #36).
 ///
 /// El backend encara no l'exposa. Proposta de contracte (pendent de
 /// confirmar a l'OpenAPI del backend):
 /// - `GET /users/me/activity` →
-///   `{ "items": [{ "id", "type": "favorite_added" | "attended",
-///   "event": Event, "createdAt" }] }`, el més recent primer
+///   `{ "items": [{ "id", "event": Event, "attendedAt" }] }`,
+///   el més recent primer
 abstract interface class ActivityApi {
-  /// Activitat de l'usuari, la més recent primer.
+  /// Assistències de l'usuari, la més recent primer.
   Future<List<ActivityEntry>> fetchActivity();
 }
 
@@ -90,51 +81,86 @@ class MockActivityApi implements ActivityApi {
   }
 }
 
-/// Activitat simulada relativa a [now] (per defecte, ara), perquè les dates
-/// surtin recents.
+/// Assistències simulades relatives a [now] (per defecte, ara): unes de
+/// recents i unes d'antigues, perquè surtin les dues seccions.
 List<ActivityEntry> sampleActivity({DateTime? now}) {
   final today = now ?? DateTime.now();
+  ActivityEntry attended(
+    String id,
+    int daysAgo,
+    String title, {
+    String? venue,
+    required String municipality,
+    required String comarca,
+    required LatLng location,
+    required String category,
+  }) {
+    final at = today.subtract(Duration(days: daysAgo));
+    return ActivityEntry(
+      id: 'mock-act-$id',
+      at: at,
+      event: Event(
+        id: 'mock-past-$id',
+        title: title,
+        venue: venue,
+        municipality: municipality,
+        comarca: comarca,
+        location: location,
+        categories: [category],
+        startDate: at,
+      ),
+    );
+  }
+
   return [
-    ActivityEntry(
-      id: 'mock-act-1',
-      type: ActivityType.favoriteAdded,
-      event: sampleFavorites[0],
-      at: today.subtract(const Duration(hours: 3)),
+    attended(
+      '1',
+      2,
+      'Concert de Sant Esteve',
+      venue: 'Palau de la Música Catalana',
+      municipality: 'Barcelona',
+      comarca: 'Barcelonès',
+      location: const LatLng(41.3875, 2.1753),
+      category: 'música',
     ),
-    ActivityEntry(
-      id: 'mock-act-2',
-      type: ActivityType.attended,
-      event: Event(
-        id: 'mock-past-1',
-        title: 'Concert de Sant Esteve',
-        venue: 'Palau de la Música Catalana',
-        municipality: 'Barcelona',
-        comarca: 'Barcelonès',
-        location: const LatLng(41.3875, 2.1753),
-        categories: const ['música'],
-        startDate: today.subtract(const Duration(days: 2)),
-      ),
-      at: today.subtract(const Duration(days: 2)),
+    attended(
+      '2',
+      12,
+      'Fira Modernista de Terrassa',
+      municipality: 'Terrassa',
+      comarca: 'Vallès Occidental',
+      location: const LatLng(41.5633, 2.0089),
+      category: 'fires',
     ),
-    ActivityEntry(
-      id: 'mock-act-3',
-      type: ActivityType.favoriteAdded,
-      event: sampleFavorites[1],
-      at: today.subtract(const Duration(days: 5)),
+    attended(
+      '3',
+      45,
+      'Exposició: Dalí i la ciència',
+      venue: 'Teatre-Museu Dalí',
+      municipality: 'Figueres',
+      comarca: 'Alt Empordà',
+      location: const LatLng(42.2681, 2.9592),
+      category: 'exposicions',
     ),
-    ActivityEntry(
-      id: 'mock-act-4',
-      type: ActivityType.attended,
-      event: Event(
-        id: 'mock-past-2',
-        title: 'Fira Modernista de Terrassa',
-        municipality: 'Terrassa',
-        comarca: 'Vallès Occidental',
-        location: const LatLng(41.5633, 2.0089),
-        categories: const ['fires'],
-        startDate: today.subtract(const Duration(days: 12)),
-      ),
-      at: today.subtract(const Duration(days: 12)),
+    attended(
+      '4',
+      150,
+      'Fira de Sant Ponç',
+      venue: 'Carrer de l\'Hospital',
+      municipality: 'Barcelona',
+      comarca: 'Barcelonès',
+      location: const LatLng(41.3809, 2.1700),
+      category: 'fires',
+    ),
+    attended(
+      '5',
+      240,
+      'Festival Grec: nit de dansa',
+      venue: 'Teatre Grec',
+      municipality: 'Barcelona',
+      comarca: 'Barcelonès',
+      location: const LatLng(41.3689, 2.1586),
+      category: 'dansa',
     ),
   ];
 }

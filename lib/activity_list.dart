@@ -7,10 +7,24 @@ import 'login_screen.dart';
 import 'theme/caliu_colors.dart';
 import 'widgets/centered_message.dart';
 
-/// Historial d'activitat de l'usuari, per a la pestanya Activitat del perfil
-/// (tasca #152, H.U #36). Es carrega en mostrar-se i estirant cap avall.
+/// Historial d'assistència de l'usuari, per a la pestanya Activitat del
+/// perfil (tasca #152, H.U #36). Separa les assistències dels darrers
+/// [recentMonths] mesos de les anteriors. Es carrega en mostrar-se i estirant
+/// cap avall.
 class ActivityList extends StatefulWidget {
-  const ActivityList({super.key, this.api, this.now, this.loginBuilder});
+  const ActivityList({
+    super.key,
+    this.api,
+    this.now,
+    this.loginBuilder,
+    this.recentMonths = defaultRecentMonths,
+  });
+
+  /// Mesos que compten com a "recents". La H.U #36 el deixa a confirmar per
+  /// l'equip: de moment, 3.
+  static const defaultRecentMonths = 3;
+
+  final int recentMonths;
 
   /// Per defecte, [createActivityApi].
   final ActivityApi? api;
@@ -136,27 +150,83 @@ class _ActivityListState extends State<ActivityList> {
       return const CenteredMessage(
         icon: Icons.history,
         title: 'Encara no hi ha activitat',
-        subtitle:
-            'Aquí veuràs els esdeveniments que afegeixis a preferits i '
-            'als quals assisteixis.',
+        subtitle: 'Aquí veuràs els esdeveniments als quals assisteixis.',
       );
     }
 
     final now = widget.now ?? DateTime.now();
-    return ListView.separated(
+    final (recent, older) = splitActivity(entries, now, widget.recentMonths);
+    final months = widget.recentMonths;
+    final recentTitle = months == 1 ? 'Darrer mes' : 'Darrers $months mesos';
+
+    Widget tile(ActivityEntry entry) => Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: _ActivityTile(
+        key: ValueKey(entry.id),
+        entry: entry,
+        when: activityWhen(entry.at, now),
+        onTap: () => _openDetail(entry.event),
+      ),
+    );
+
+    return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-      itemCount: entries.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final entry = entries[index];
-        return _ActivityTile(
-          key: ValueKey(entry.id),
-          entry: entry,
-          when: activityWhen(entry.at, now),
-          onTap: () => _openDetail(entry.event),
-        );
-      },
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      children: [
+        _SectionHeader(title: recentTitle, count: recent.length),
+        if (recent.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 10),
+            child: Text(
+              'Cap assistència en aquest període.',
+              style: TextStyle(color: CaliuColors.textMuted),
+            ),
+          ),
+        ...recent.map(tile),
+        if (older.isNotEmpty) ...[
+          _SectionHeader(title: 'Anteriors', count: older.length),
+          ...older.map(tile),
+        ],
+      ],
+    );
+  }
+}
+
+/// Separa les assistències en recents (dins dels darrers [months] mesos
+/// respecte a [now]) i anteriors, mantenint l'ordre.
+(List<ActivityEntry>, List<ActivityEntry>) splitActivity(
+  List<ActivityEntry> entries,
+  DateTime now,
+  int months,
+) {
+  final limit = DateTime(now.year, now.month - months, now.day);
+  final recent = <ActivityEntry>[];
+  final older = <ActivityEntry>[];
+  for (final entry in entries) {
+    (entry.at.isBefore(limit) ? older : recent).add(entry);
+  }
+  return (recent, older);
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title, required this.count});
+
+  final String title;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
+      child: Text(
+        '${title.toUpperCase()} · $count',
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.8,
+          color: CaliuColors.maroon,
+        ),
+      ),
     );
   }
 }
@@ -175,10 +245,6 @@ class _ActivityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (icon, label) = switch (entry.type) {
-      ActivityType.favoriteAdded => (Icons.favorite, 'Has afegit a preferits'),
-      ActivityType.attended => (Icons.check_circle, 'Has assistit a'),
-    };
     final place = entry.event.shortPlace;
 
     return Material(
@@ -194,7 +260,7 @@ class _ActivityTile extends StatelessWidget {
               CircleAvatar(
                 backgroundColor: CaliuColors.red.withValues(alpha: 0.12),
                 foregroundColor: CaliuColors.red,
-                child: Icon(icon, size: 20),
+                child: const Icon(Icons.check_circle, size: 20),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -202,7 +268,7 @@ class _ActivityTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '$label · $when',
+                      'Has assistit a · $when',
                       style: const TextStyle(
                         color: CaliuColors.textMuted,
                         fontSize: 12,

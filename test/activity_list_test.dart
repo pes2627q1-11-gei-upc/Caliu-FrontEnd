@@ -105,18 +105,8 @@ void main() {
     test('retorna l\'activitat de la més recent a la més antiga', () async {
       final api = MockActivityApi(
         seed: [
-          ActivityEntry(
-            id: 'a',
-            type: ActivityType.attended,
-            event: _fira,
-            at: DateTime(2026, 11, 1),
-          ),
-          ActivityEntry(
-            id: 'b',
-            type: ActivityType.favoriteAdded,
-            event: _concert,
-            at: DateTime(2026, 11, 10),
-          ),
+          ActivityEntry(id: 'a', event: _fira, at: DateTime(2026, 11, 1)),
+          ActivityEntry(id: 'b', event: _concert, at: DateTime(2026, 11, 10)),
         ],
         latency: Duration.zero,
       );
@@ -141,43 +131,105 @@ void main() {
       );
     });
 
-    test('les dades simulades són recents i variades', () {
+    test('les dades simulades tenen assistències recents i antigues', () {
       final entries = sampleActivity(now: _now);
-      expect(entries, isNotEmpty);
-      expect(entries.map((e) => e.type).toSet(), ActivityType.values.toSet());
+      final (recent, older) = splitActivity(entries, _now, 3);
+      expect(recent, isNotEmpty);
+      expect(older, isNotEmpty);
       expect(entries.every((e) => !e.at.isAfter(_now)), isTrue);
     });
   });
 
+  group('splitActivity', () {
+    ActivityEntry at(String id, DateTime when) =>
+        ActivityEntry(id: id, event: _fira, at: when);
+
+    test('separa els darrers N mesos dels anteriors i manté l\'ordre', () {
+      final entries = [
+        at('a', DateTime(2026, 11, 10)),
+        at('b', DateTime(2026, 8, 20)),
+        at('c', DateTime(2026, 8, 18)),
+        at('d', DateTime(2025, 12, 1)),
+      ];
+      final (recent, older) = splitActivity(entries, _now, 3);
+      expect(recent.map((e) => e.id), ['a', 'b']);
+      expect(older.map((e) => e.id), ['c', 'd']);
+    });
+
+    test('el nombre de mesos es pot canviar', () {
+      final entries = [
+        at('a', DateTime(2026, 11, 1)),
+        at('b', DateTime(2026, 9, 1)),
+      ];
+      expect(splitActivity(entries, _now, 1).$1.map((e) => e.id), ['a']);
+      expect(splitActivity(entries, _now, 6).$1.map((e) => e.id), ['a', 'b']);
+    });
+  });
+
   group('ActivityList', () {
-    testWidgets('mostra què ha fet l\'usuari, quan i on', (tester) async {
+    testWidgets('mostra les assistències, quan i on, en dues seccions', (
+      tester,
+    ) async {
       await _pump(
         tester,
         MockActivityApi(
           seed: [
             ActivityEntry(
               id: 'a',
-              type: ActivityType.favoriteAdded,
               event: _concert,
               at: DateTime(2026, 11, 19, 9),
             ),
-            ActivityEntry(
-              id: 'b',
-              type: ActivityType.attended,
-              event: _fira,
-              at: DateTime(2026, 11, 18),
-            ),
+            ActivityEntry(id: 'b', event: _fira, at: DateTime(2026, 4, 30)),
           ],
           latency: Duration.zero,
         ),
       );
 
-      expect(find.text('Has afegit a preferits · avui'), findsOneWidget);
+      expect(find.text('DARRERS 3 MESOS · 1'), findsOneWidget);
+      expect(find.text('ANTERIORS · 1'), findsOneWidget);
+      expect(find.text('Has assistit a · avui'), findsOneWidget);
       expect(find.text('Concert al Parc'), findsOneWidget);
       expect(find.text('Parc de la Ciutadella, Barcelona'), findsOneWidget);
-      expect(find.text('Has assistit a · ahir'), findsOneWidget);
-      expect(find.byIcon(Icons.favorite), findsOneWidget);
-      expect(find.byIcon(Icons.check_circle), findsOneWidget);
+      expect(find.text('Has assistit a · 30 d\'abr.'), findsOneWidget);
+      final recentY = tester.getTopLeft(find.text('Concert al Parc')).dy;
+      final olderHeaderY = tester.getTopLeft(find.text('ANTERIORS · 1')).dy;
+      final olderY = tester.getTopLeft(find.text('Fira del Llibre')).dy;
+      expect(recentY, lessThan(olderHeaderY));
+      expect(olderHeaderY, lessThan(olderY));
+    });
+
+    testWidgets('sense assistències recents ho indica i mostra les antigues', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        MockActivityApi(
+          seed: [
+            ActivityEntry(id: 'b', event: _fira, at: DateTime(2026, 4, 30)),
+          ],
+          latency: Duration.zero,
+        ),
+      );
+
+      expect(find.text('DARRERS 3 MESOS · 0'), findsOneWidget);
+      expect(find.text('Cap assistència en aquest període.'), findsOneWidget);
+      expect(find.text('Fira del Llibre'), findsOneWidget);
+    });
+
+    testWidgets('sense assistències antigues no mostra la secció Anteriors', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        MockActivityApi(
+          seed: [
+            ActivityEntry(id: 'a', event: _concert, at: DateTime(2026, 11, 1)),
+          ],
+          latency: Duration.zero,
+        ),
+      );
+
+      expect(find.textContaining('ANTERIORS'), findsNothing);
     });
 
     testWidgets('sense activitat: missatge explicatiu', (tester) async {
@@ -187,12 +239,7 @@ void main() {
 
     testWidgets('error de xarxa: es pot tornar a provar', (tester) async {
       final api = _FlakyApi([
-        ActivityEntry(
-          id: 'a',
-          type: ActivityType.attended,
-          event: _fira,
-          at: DateTime(2026, 11, 18),
-        ),
+        ActivityEntry(id: 'a', event: _fira, at: DateTime(2026, 11, 18)),
       ], failures: 1);
       await _pump(tester, api);
       expect(find.text('Error de xarxa'), findsOneWidget);
@@ -209,12 +256,7 @@ void main() {
         MockActivityApi(
           session: session,
           seed: [
-            ActivityEntry(
-              id: 'a',
-              type: ActivityType.attended,
-              event: _fira,
-              at: DateTime(2026, 11, 18),
-            ),
+            ActivityEntry(id: 'a', event: _fira, at: DateTime(2026, 11, 18)),
           ],
           latency: Duration.zero,
         ),
@@ -268,12 +310,7 @@ void main() {
           ),
           activityApi: MockActivityApi(
             seed: [
-              ActivityEntry(
-                id: 'a',
-                type: ActivityType.attended,
-                event: _fira,
-                at: DateTime(2026, 11, 18),
-              ),
+              ActivityEntry(id: 'a', event: _fira, at: DateTime(2026, 11, 18)),
             ],
             latency: Duration.zero,
           ),
