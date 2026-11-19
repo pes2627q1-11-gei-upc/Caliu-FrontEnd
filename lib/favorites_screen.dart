@@ -7,22 +7,50 @@ import 'data/favorites_controller.dart';
 import 'event_detail_screen.dart';
 import 'login_screen.dart';
 import 'theme/caliu_colors.dart';
+import 'widgets/centered_message.dart';
 import 'widgets/event_list_tile.dart';
 import 'widgets/favorite_button.dart';
 import 'widgets/favorites_login_prompt.dart';
 
-/// Llista de preferits de l'usuari, accessible des del perfil (tasca #190).
-///
-/// Es recarrega en obrir-la i estirant cap avall. Treure el cor o lliscar
-/// la targeta cap a l'esquerra el fa desaparèixer a l'instant, amb l'opció
-/// de desfer-ho (tasca #167).
-class FavoritesScreen extends StatefulWidget {
+/// Pantalla completa de Preferits (tasca #190). Al perfil, la mateixa llista
+/// es mostra a la pestanya Guardats (tasca #152).
+class FavoritesScreen extends StatelessWidget {
   const FavoritesScreen({
     super.key,
     this.favorites,
     this.now,
     this.loginBuilder,
   });
+
+  final FavoritesController? favorites;
+  final DateTime? now;
+  final FavoritesLoginBuilder? loginBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: CaliuColors.beige,
+      appBar: AppBar(
+        backgroundColor: CaliuColors.maroonDeep,
+        foregroundColor: Colors.white,
+        title: const Text('Preferits'),
+      ),
+      body: FavoritesList(
+        favorites: favorites,
+        now: now,
+        loginBuilder: loginBuilder,
+      ),
+    );
+  }
+}
+
+/// Llista de preferits de l'usuari, sense Scaffold propi.
+///
+/// Es recarrega en mostrar-se i estirant cap avall. Treure el cor o lliscar
+/// la targeta cap a l'esquerra el fa desaparèixer a l'instant, amb l'opció
+/// de desfer-ho (tasca #167).
+class FavoritesList extends StatefulWidget {
+  const FavoritesList({super.key, this.favorites, this.now, this.loginBuilder});
 
   /// Per defecte, [FavoritesController.shared].
   final FavoritesController? favorites;
@@ -34,10 +62,10 @@ class FavoritesScreen extends StatefulWidget {
   final FavoritesLoginBuilder? loginBuilder;
 
   @override
-  State<FavoritesScreen> createState() => _FavoritesScreenState();
+  State<FavoritesList> createState() => _FavoritesListState();
 }
 
-class _FavoritesScreenState extends State<FavoritesScreen> {
+class _FavoritesListState extends State<FavoritesList> {
   late final FavoritesController _favorites =
       widget.favorites ?? FavoritesController.shared;
 
@@ -132,20 +160,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: CaliuColors.beige,
-      appBar: AppBar(
-        backgroundColor: CaliuColors.maroonDeep,
-        foregroundColor: Colors.white,
-        title: const Text('Preferits'),
-      ),
-      body: ListenableBuilder(
-        listenable: _favorites,
-        builder: (context, _) => RefreshIndicator(
-          color: CaliuColors.red,
-          onRefresh: _favorites.load,
-          child: _buildBody(),
-        ),
+    return ListenableBuilder(
+      listenable: _favorites,
+      builder: (context, _) => RefreshIndicator(
+        color: CaliuColors.red,
+        onRefresh: _favorites.load,
+        child: _buildBody(),
       ),
     );
   }
@@ -161,7 +181,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
     if (_favorites.error case final error? when favorites.isEmpty) {
       if (error.isUnauthorized) {
-        return _Message(
+        return CenteredMessage(
           icon: Icons.lock_outline,
           title: 'Inicia sessió per veure els teus preferits',
           action: FilledButton.icon(
@@ -172,7 +192,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           ),
         );
       }
-      return _Message(
+      return CenteredMessage(
         icon: Icons.cloud_off,
         title: error.message,
         action: FilledButton(
@@ -184,7 +204,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     }
 
     if (favorites.isEmpty) {
-      return const _Message(
+      return const CenteredMessage(
         icon: Icons.favorite_border,
         title: 'Encara no tens preferits',
         subtitle:
@@ -252,66 +272,6 @@ class _SwipeBackground extends StatelessWidget {
               SizedBox(width: 8),
               Icon(Icons.heart_broken_outlined, color: Colors.white),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Missatge centrat (llista buida o error) que es pot estirar per recarregar.
-class _Message extends StatelessWidget {
-  const _Message({
-    required this.icon,
-    required this.title,
-    this.subtitle,
-    this.action,
-  });
-
-  final IconData icon;
-  final String title;
-  final String? subtitle;
-  final Widget? action;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) => SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(minHeight: constraints.maxHeight),
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(icon, size: 56, color: CaliuColors.textMuted),
-                  const SizedBox(height: 16),
-                  Text(
-                    title,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      color: CaliuColors.maroonDeep,
-                    ),
-                  ),
-                  if (subtitle case final subtitle?) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      subtitle,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: CaliuColors.textMuted),
-                    ),
-                  ],
-                  if (action case final action?) ...[
-                    const SizedBox(height: 20),
-                    action,
-                  ],
-                ],
-              ),
-            ),
           ),
         ),
       ),

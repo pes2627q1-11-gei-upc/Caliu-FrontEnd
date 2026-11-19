@@ -132,7 +132,9 @@ void main() {
     });
   });
 
-  testWidgets('el perfil obre la pantalla de Preferits', (tester) async {
+  testWidgets('el perfil mostra els preferits a la pestanya Guardats', (
+    tester,
+  ) async {
     final authApi = AuthApi(
       client: MockClient((request) async {
         if (request.url.path == '/users/me') {
@@ -165,10 +167,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Preferits'));
+    await tester.tap(find.text('Guardats'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(FavoritesScreen), findsOneWidget);
+    expect(find.byType(FavoritesList), findsOneWidget);
     expect(find.text('Concert al Parc'), findsOneWidget);
   });
 }
