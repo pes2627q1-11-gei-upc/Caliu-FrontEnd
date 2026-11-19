@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'data/event.dart';
 import 'data/event_when.dart';
 import 'data/favorites_api.dart';
+import 'data/favorite_alerts_controller.dart';
 import 'data/favorites_controller.dart';
 import 'event_detail_screen.dart';
 import 'login_screen.dart';
 import 'theme/caliu_colors.dart';
+import 'widgets/alerts_toggle_button.dart';
 import 'widgets/centered_message.dart';
 import 'widgets/event_list_tile.dart';
 import 'widgets/favorite_button.dart';
@@ -18,11 +20,13 @@ class FavoritesScreen extends StatelessWidget {
   const FavoritesScreen({
     super.key,
     this.favorites,
+    this.alerts,
     this.now,
     this.loginBuilder,
   });
 
   final FavoritesController? favorites;
+  final FavoriteAlertsController? alerts;
   final DateTime? now;
   final FavoritesLoginBuilder? loginBuilder;
 
@@ -37,6 +41,7 @@ class FavoritesScreen extends StatelessWidget {
       ),
       body: FavoritesList(
         favorites: favorites,
+        alerts: alerts,
         now: now,
         loginBuilder: loginBuilder,
       ),
@@ -50,7 +55,17 @@ class FavoritesScreen extends StatelessWidget {
 /// la targeta cap a l'esquerra el fa desaparèixer a l'instant, amb l'opció
 /// de desfer-ho (tasca #167).
 class FavoritesList extends StatefulWidget {
-  const FavoritesList({super.key, this.favorites, this.now, this.loginBuilder});
+  const FavoritesList({
+    super.key,
+    this.favorites,
+    this.alerts,
+    this.now,
+    this.loginBuilder,
+  });
+
+  /// Si es dona, cada targeta mostra la campana per silenciar-ne les alertes
+  /// (tasca #171). El perfil hi passa [FavoriteAlertsController.shared].
+  final FavoriteAlertsController? alerts;
 
   /// Per defecte, [FavoritesController.shared].
   final FavoritesController? favorites;
@@ -73,6 +88,7 @@ class _FavoritesListState extends State<FavoritesList> {
   void initState() {
     super.initState();
     _favorites.load();
+    widget.alerts?.load();
   }
 
   /// Sense sessió: obre el login i, si va bé, carrega els preferits (#191).
@@ -145,6 +161,7 @@ class _FavoritesListState extends State<FavoritesList> {
           eventId: event.id,
           initialEvent: event,
           favorites: widget.favorites,
+          alerts: widget.alerts,
         ),
       ),
     );
@@ -231,11 +248,22 @@ class _FavoritesListState extends State<FavoritesList> {
             event: event,
             subtitle: _subtitle(event),
             onTap: () => _openDetail(event),
-            trailing: FavoriteButton(
-              event: event,
-              controller: _favorites,
-              loginBuilder: widget.loginBuilder,
-              onRemoved: () => _showUndo(event),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (widget.alerts case final alerts?)
+                  AlertsToggleButton(
+                    event: event,
+                    alerts: alerts,
+                    favorites: _favorites,
+                  ),
+                FavoriteButton(
+                  event: event,
+                  controller: _favorites,
+                  loginBuilder: widget.loginBuilder,
+                  onRemoved: () => _showUndo(event),
+                ),
+              ],
             ),
           ),
         );

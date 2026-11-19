@@ -3,8 +3,10 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'data/event.dart';
 import 'data/events_api.dart';
+import 'data/favorite_alerts_controller.dart';
 import 'data/favorites_controller.dart';
 import 'theme/caliu_colors.dart';
+import 'widgets/alerts_toggle_button.dart';
 import 'widgets/caliu_chip.dart';
 import 'widgets/favorite_button.dart';
 
@@ -14,6 +16,7 @@ class EventDetailScreen extends StatefulWidget {
     required this.eventId,
     this.initialEvent,
     this.favorites,
+    this.alerts,
   });
 
   final String eventId;
@@ -21,6 +24,9 @@ class EventDetailScreen extends StatefulWidget {
 
   /// Per defecte, [FavoritesController.shared].
   final FavoritesController? favorites;
+
+  /// Per defecte, [FavoriteAlertsController.shared].
+  final FavoriteAlertsController? alerts;
 
   @override
   State<EventDetailScreen> createState() => _EventDetailScreenState();
@@ -231,6 +237,35 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                         right: 12,
                         child: Row(
                           children: [
+                            // Campana d'alertes: només si és un preferit.
+                            ListenableBuilder(
+                              listenable:
+                                  widget.favorites ??
+                                  FavoritesController.shared,
+                              builder: (context, _) {
+                                final favorites =
+                                    widget.favorites ??
+                                    FavoritesController.shared;
+                                if (!favorites.isFavorite(event.id)) {
+                                  return const SizedBox.shrink();
+                                }
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: Material(
+                                    color: Colors.black45,
+                                    shape: const CircleBorder(),
+                                    child: AlertsToggleButton(
+                                      event: event,
+                                      alerts: widget.alerts,
+                                      favorites: favorites,
+                                      color: Colors.white70,
+                                      activeColor: Colors.white,
+                                      size: 22,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                             Material(
                               color: Colors.black45,
                               shape: const CircleBorder(),

@@ -9,6 +9,7 @@ import 'data/auth_api.dart';
 import 'data/auth_session.dart';
 import 'data/auth_validators.dart';
 import 'data/events_api.dart';
+import 'data/favorite_alerts_controller.dart';
 import 'data/favorites_controller.dart';
 import 'favorites_screen.dart';
 import 'login_screen.dart';
@@ -26,6 +27,7 @@ class ProfileScreen extends StatefulWidget {
     this.authSession,
     this.eventsApi,
     this.favorites,
+    this.alerts,
     this.activityApi,
     this.attendedApi,
   });
@@ -36,6 +38,9 @@ class ProfileScreen extends StatefulWidget {
 
   /// Per defecte, [FavoritesController.shared].
   final FavoritesController? favorites;
+
+  /// Per defecte, [FavoriteAlertsController.shared].
+  final FavoriteAlertsController? alerts;
 
   /// Per defecte, [createActivityApi].
   final ActivityApi? activityApi;
@@ -54,6 +59,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       widget.authSession ?? AuthSession();
   late final FavoritesController _favorites =
       widget.favorites ?? FavoritesController.shared;
+  late final FavoriteAlertsController _alerts =
+      widget.alerts ?? FavoriteAlertsController.shared;
   ApiHealth? _health;
   AuthenticatedProfile? _profile;
   String? _token;
@@ -134,6 +141,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// Nou compte o nova sessió: carrega el perfil i els seus preferits.
   Future<void> _onSignedIn() async {
     _favorites.load();
+    _alerts.load();
     await _loadAccount();
   }
 
@@ -164,6 +172,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // The expired account must no longer be visible even if storage fails.
     }
     _favorites.clear();
+    _alerts.clear();
     if (!mounted || _token != token) return;
     setState(() {
       _token = null;
@@ -264,6 +273,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       errorMessage = 'No s’ha pogut esborrar la sessió desada al dispositiu.';
     }
     _favorites.clear();
+    _alerts.clear();
     if (!mounted || _token != token) return;
     setState(() {
       _token = null;
@@ -342,6 +352,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             FavoritesList(
               key: ValueKey('guardats-$sessionKey'),
               favorites: _favorites,
+              alerts: _alerts,
             ),
             ActivityList(
               key: ValueKey('activitat-$sessionKey'),
