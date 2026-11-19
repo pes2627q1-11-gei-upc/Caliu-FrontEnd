@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 
 import 'auth_session.dart';
@@ -29,7 +31,9 @@ class FavoritesController extends ChangeNotifier {
 
   /// Ordre d'inserció: l'últim és el preferit més recent.
   final Map<String, Event> _events = {};
-  final Set<String> _pending = {};
+
+  /// Peticions en curs: es completen (sense error) quan acaben.
+  final Map<String, Future<void>> _inFlight = {};
   bool _loaded = false;
   bool _loading = false;
   FavoritesApiException? _error;
@@ -48,7 +52,12 @@ class FavoritesController extends ChangeNotifier {
   bool isFavorite(String eventId) => _events.containsKey(eventId);
 
   /// Hi ha una petició en curs per a aquest esdeveniment.
-  bool isPending(String eventId) => _pending.contains(eventId);
+  bool isPending(String eventId) => _inFlight.containsKey(eventId);
+
+  /// Espera que acabi la petició en curs per a aquest esdeveniment, si n'hi
+  /// ha (p. ex. "Desfer" just després de treure'l, tasca #167).
+  Future<void> settled(String eventId) =>
+      _inFlight[eventId] ?? Future<void>.value();
 
   /// Hi ha un token desat? Si no, cal demanar login abans de marcar (#191).
   Future<bool> hasSession() async {
@@ -65,7 +74,7 @@ class FavoritesController extends ChangeNotifier {
   /// Oblida els preferits locals (en tancar o caducar la sessió).
   void clear() {
     _events.clear();
-    _pending.clear();
+    _inFlight.clear();
     _loaded = false;
     _error = null;
     notifyListeners();
@@ -104,7 +113,9 @@ class FavoritesController extends ChangeNotifier {
   Future<bool> toggle(Event event) async {
     final id = event.id;
     final wasFavorite = _events.containsKey(id);
-    if (!_pending.add(id)) return wasFavorite;
+    if (_inFlight.containsKey(id)) return wasFavorite;
+    final done = Completer<void>();
+    _inFlight[id] = done.future;
 
     _setFavorite(event, !wasFavorite);
     try {
@@ -118,7 +129,8 @@ class FavoritesController extends ChangeNotifier {
       _setFavorite(event, wasFavorite);
       rethrow;
     } finally {
-      _pending.remove(id);
+      if (identical(_inFlight[id], done.future)) _inFlight.remove(id);
+      done.complete();
       notifyListeners();
     }
   }

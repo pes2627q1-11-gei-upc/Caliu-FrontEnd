@@ -20,6 +20,7 @@ class FavoriteButton extends StatelessWidget {
     this.activeColor = CaliuColors.red,
     this.size = 24,
     this.loginBuilder,
+    this.onRemoved,
   });
 
   final Event event;
@@ -36,6 +37,10 @@ class FavoriteButton extends StatelessWidget {
 
   /// Per als tests; per defecte, la pantalla de login de l'app.
   final FavoritesLoginBuilder? loginBuilder;
+
+  /// Es crida quan l'usuari treu l'esdeveniment dels preferits, just després
+  /// del canvi optimista (p. ex. per oferir "Desfer", tasca #167).
+  final VoidCallback? onRemoved;
 
   @override
   Widget build(BuildContext context) {
@@ -74,20 +79,20 @@ class FavoriteButton extends StatelessWidget {
     }
 
     try {
-      await favorites.toggle(event);
+      final removing =
+          favorites.isFavorite(event.id) && !favorites.isPending(event.id);
+      final pending = favorites.toggle(event);
+      if (removing) onRemoved?.call();
+      await pending;
     } on FavoritesApiException catch (e) {
       if (e.isUnauthorized && context.mounted) {
         // Token caducat: es demana login de nou.
         await _loginAndAdd(context, favorites);
       } else {
-        messenger?.showSnackBar(SnackBar(content: Text(e.message)));
+        _showError(messenger, e.message);
       }
     } catch (_) {
-      messenger?.showSnackBar(
-        const SnackBar(
-          content: Text('No s\'han pogut actualitzar els preferits'),
-        ),
-      );
+      _showError(messenger, 'No s\'han pogut actualitzar els preferits');
     }
   }
 
@@ -120,5 +125,13 @@ class FavoriteButton extends StatelessWidget {
         ),
       );
     }
+  }
+
+  /// L'error substitueix el SnackBar actual (p. ex. l'avís "Desfer" que
+  /// s'ha mostrat de manera optimista) en lloc de quedar a la cua.
+  void _showError(ScaffoldMessengerState? messenger, String message) {
+    messenger
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }
