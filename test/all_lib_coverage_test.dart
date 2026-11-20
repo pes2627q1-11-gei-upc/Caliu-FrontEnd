@@ -1,6 +1,8 @@
 // Carrega tot lib/ perquè `flutter test --coverage` compti també fitxers
 // sense tests (p. ex. map_view). Sense això lcov només té el que els tests toquen.
+import 'package:caliu/activity_list.dart';
 import 'package:caliu/config.dart';
+import 'package:caliu/data/activity_api.dart';
 import 'package:caliu/data/auth_api.dart';
 import 'package:caliu/data/auth_session.dart';
 import 'package:caliu/data/auth_validators.dart';
@@ -13,7 +15,7 @@ import 'package:caliu/data/favorites_api.dart';
 import 'package:caliu/data/favorites_controller.dart';
 import 'package:caliu/data/map_event_markers.dart';
 import 'package:caliu/event_detail_screen.dart';
-import 'package:caliu/favorites_screen.dart';
+import 'package:caliu/favorites_list.dart';
 import 'package:caliu/login_screen.dart';
 import 'package:caliu/main.dart';
 import 'package:caliu/main_screen.dart';
@@ -24,6 +26,7 @@ import 'package:caliu/register_screen.dart';
 import 'package:caliu/search_screen.dart';
 import 'package:caliu/theme/caliu_colors.dart';
 import 'package:caliu/widgets/caliu_chip.dart';
+import 'package:caliu/widgets/centered_message.dart';
 import 'package:caliu/widgets/event_list_tile.dart';
 import 'package:caliu/widgets/event_preview_card.dart';
 import 'package:caliu/widgets/favorite_button.dart';
@@ -51,7 +54,10 @@ void main() {
     expect(FavoritesController, isNotNull);
     expect(FavoriteButton, isNotNull);
     expect(requestFavoritesLogin, isA<Function>());
-    expect(FavoritesScreen, isNotNull);
+    expect(FavoritesList, isNotNull);
+    expect(ActivityList, isNotNull);
+    expect(MockActivityApi, isNotNull);
+    expect(CenteredMessage, isNotNull);
     expect(EventListTile, isNotNull);
     expect(EventDetailScreen, isNotNull);
     expect(LoginScreen, isNotNull);
