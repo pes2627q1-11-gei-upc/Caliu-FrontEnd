@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'achievements_screen.dart';
 import 'config.dart';
 import 'data/auth_api.dart';
 import 'data/auth_session.dart';
@@ -432,6 +433,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 12),
                 Text(error, style: const TextStyle(color: CaliuColors.red)),
               ],
+              const SizedBox(height: 12),
+              // Catàleg de medalles (tasca #177).
+              OutlinedButton.icon(
+                key: const Key('open-achievements'),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const AchievementsScreen(),
+                  ),
+                ),
+                icon: const Icon(Icons.emoji_events_outlined),
+                label: const Text('Assoliments'),
+              ),
               const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: _loggingOut ? null : _logout,
