@@ -14,7 +14,7 @@ import 'package:caliu/data/events_api.dart';
 import 'package:caliu/data/favorites_api.dart';
 import 'package:caliu/data/favorites_controller.dart';
 import 'package:caliu/event_detail_screen.dart';
-import 'package:caliu/favorites_screen.dart';
+import 'package:caliu/favorites_list.dart';
 import 'package:caliu/login_screen.dart';
 import 'package:caliu/main.dart';
 import 'package:caliu/main_screen.dart';
@@ -49,7 +49,7 @@ void main() {
     expect(FavoritesController, isNotNull);
     expect(FavoriteButton, isNotNull);
     expect(requestFavoritesLogin, isA<Function>());
-    expect(FavoritesScreen, isNotNull);
+    expect(FavoritesList, isNotNull);
     expect(ActivityList, isNotNull);
     expect(MockActivityApi, isNotNull);
     expect(CenteredMessage, isNotNull);

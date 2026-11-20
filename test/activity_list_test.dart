@@ -6,7 +6,7 @@ import 'package:caliu/data/event.dart';
 import 'package:caliu/data/events_api.dart';
 import 'package:caliu/data/favorites_api.dart';
 import 'package:caliu/data/favorites_controller.dart';
-import 'package:caliu/favorites_screen.dart';
+import 'package:caliu/favorites_list.dart';
 import 'package:caliu/profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
