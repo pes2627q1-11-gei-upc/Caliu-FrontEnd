@@ -1,15 +1,20 @@
 import 'dart:async';
 
+import 'package:caliu/data/auth_api.dart';
 import 'package:caliu/data/auth_session.dart';
 import 'package:caliu/data/event.dart';
 import 'package:caliu/data/favorite_alerts_api.dart';
 import 'package:caliu/data/favorite_alerts_controller.dart';
 import 'package:caliu/data/favorites_api.dart';
+import 'package:caliu/data/events_api.dart';
 import 'package:caliu/data/favorites_controller.dart';
 import 'package:caliu/favorites_list.dart';
+import 'package:caliu/profile_screen.dart';
 import 'package:caliu/widgets/alerts_toggle_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 const _concert = Event(id: 'evt-1', title: 'Concert al Parc');
 const _fira = Event(id: 'evt-2', title: 'Fira del Llibre');
@@ -72,7 +77,69 @@ Widget _button(
   ),
 );
 
+class _TokenSession implements AuthSessionStore {
+  String? token = 'test-token';
+
+  @override
+  Future<String?> readToken() async => token;
+
+  @override
+  Future<void> saveToken(String value) async => token = value;
+
+  @override
+  Future<void> clear() async => token = null;
+}
+
 void main() {
+  group('Campana amagada fins que hi hagi notificacions (revisió PR #29)', () {
+    test('per defecte, les alertes no estan disponibles', () {
+      expect(favoriteAlertsAvailable, isFalse);
+    });
+
+    testWidgets('la pestanya Guardats del perfil no mostra la campana', (
+      tester,
+    ) async {
+      final authApi = AuthApi(
+        client: MockClient((request) async {
+          if (request.url.path == '/users/me') {
+            return http.Response(
+              '{"id":"u1","username":"Nuria_42","email":"nuria@example.cat",'
+              '"preferences":[]}',
+              200,
+            );
+          }
+          throw StateError('Crida inesperada: ${request.url}');
+        }),
+        baseUrl: 'http://localhost:3000',
+      );
+      final eventsApi = EventsApi(
+        client: MockClient(
+          (_) async => http.Response('{"status":"ok","service":"test"}', 200),
+        ),
+        baseUrl: 'http://localhost:3000',
+      );
+      final alerts = FavoriteAlertsController(_alertsApi());
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProfileScreen(
+            authApi: authApi,
+            authSession: _TokenSession(),
+            eventsApi: eventsApi,
+            favorites: await _favorites(const [_concert]),
+            alerts: alerts,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Guardats'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Concert al Parc'), findsOneWidget);
+      expect(find.byType(AlertsToggleButton), findsNothing);
+    });
+  });
+
   group('FavoriteAlertsController', () {
     test('per defecte les alertes estan actives', () {
       final alerts = FavoriteAlertsController(_alertsApi());
@@ -181,8 +248,6 @@ void main() {
         findsOneWidget,
       );
       expect(favorites.isFavorite('evt-1'), isTrue);
-      // Encara no hi ha notificacions reals (FCM): s'avisa que arribaran.
-      expect(find.text(alertsComingSoonNote), findsOneWidget);
 
       await tester.tap(find.byType(AlertsToggleButton));
       await tester.pumpAndSettle();

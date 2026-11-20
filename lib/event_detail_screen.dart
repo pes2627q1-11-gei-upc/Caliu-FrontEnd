@@ -17,6 +17,7 @@ class EventDetailScreen extends StatefulWidget {
     this.initialEvent,
     this.favorites,
     this.alerts,
+    this.showAlerts = favoriteAlertsAvailable,
   });
 
   final String eventId;
@@ -27,6 +28,10 @@ class EventDetailScreen extends StatefulWidget {
 
   /// Per defecte, [FavoriteAlertsController.shared].
   final FavoriteAlertsController? alerts;
+
+  /// Mostrar la campana d'alertes. Per defecte, només si les notificacions
+  /// ja funcionen ([favoriteAlertsAvailable]).
+  final bool showAlerts;
 
   @override
   State<EventDetailScreen> createState() => _EventDetailScreenState();
@@ -246,7 +251,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                 final favorites =
                                     widget.favorites ??
                                     FavoritesController.shared;
-                                if (!favorites.isFavorite(event.id)) {
+                                if (!widget.showAlerts ||
+                                    !favorites.isFavorite(event.id)) {
                                   return const SizedBox.shrink();
                                 }
                                 return Padding(

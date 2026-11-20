@@ -6,7 +6,7 @@ import 'main_screen.dart';
 
 void main() {
   FavoritesController.shared.load();
-  FavoriteAlertsController.shared.load();
+  if (favoriteAlertsAvailable) FavoriteAlertsController.shared.load();
   runApp(const MyApp());
 }
 

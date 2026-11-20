@@ -2,6 +2,12 @@ import 'package:flutter/foundation.dart';
 
 import 'favorite_alerts_api.dart';
 
+/// Les alertes encara no envien cap notificació (FCM no està integrat ni a
+/// l'app ni al backend), així que la campana s'amaga fins que la preferència
+/// tingui efecte (revisió de la PR #29). Per provar-la:
+/// `flutter run --dart-define=FAVORITE_ALERTS=true`.
+const favoriteAlertsAvailable = bool.fromEnvironment('FAVORITE_ALERTS');
+
 /// Estat compartit de les alertes dels preferits, perquè la campana de la
 /// fitxa i la de la pestanya Guardats estiguin sincronitzades (H.U #52).
 ///

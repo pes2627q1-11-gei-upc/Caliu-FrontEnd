@@ -141,7 +141,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// Nou compte o nova sessió: carrega el perfil i els seus preferits.
   Future<void> _onSignedIn() async {
     _favorites.load();
-    _alerts.load();
+    if (favoriteAlertsAvailable) _alerts.load();
     await _loadAccount();
   }
 
@@ -352,7 +352,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             FavoritesList(
               key: ValueKey('guardats-$sessionKey'),
               favorites: _favorites,
-              alerts: _alerts,
+              // Campana amagada fins que hi hagi notificacions reals.
+              alerts: favoriteAlertsAvailable ? _alerts : null,
             ),
             ActivityList(
               key: ValueKey('activitat-$sessionKey'),
