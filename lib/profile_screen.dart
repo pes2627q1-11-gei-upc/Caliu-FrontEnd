@@ -11,6 +11,7 @@ import 'login_screen.dart';
 import 'preferences_screen.dart';
 import 'register_screen.dart';
 import 'theme/caliu_colors.dart';
+import 'widgets/profile_avatar.dart';
 
 /// Pestanya Perfil: mostra el compte autenticat i l’estat de connexió de l’API.
 class ProfileScreen extends StatefulWidget {
@@ -372,14 +373,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               Row(
                 children: [
-                  CircleAvatar(
-                    backgroundColor: CaliuColors.maroon,
-                    foregroundColor: Colors.white,
-                    child: Text(() {
-                      final name = profile.username?.trim() ?? '';
-                      return name.isEmpty ? '?' : name[0].toUpperCase();
-                    }()),
-                  ),
+                  // Foto de perfil, que es pot canviar tocant-la (tasca #150).
+                  ProfileAvatar(username: profile.username, radius: 26),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
