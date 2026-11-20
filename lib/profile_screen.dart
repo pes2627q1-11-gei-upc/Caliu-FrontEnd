@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'activity_list.dart';
+import 'attended_list.dart';
 import 'config.dart';
 import 'data/activity_api.dart';
+import 'data/attended_api.dart';
 import 'data/auth_api.dart';
 import 'data/auth_session.dart';
 import 'data/auth_validators.dart';
@@ -14,8 +16,9 @@ import 'preferences_screen.dart';
 import 'register_screen.dart';
 import 'theme/caliu_colors.dart';
 
-/// Pestanya Perfil: compte i estat de l’API, preferits guardats i historial
-/// d’activitat, cadascun a la seva pestanya (tasca #152).
+/// Pestanya Perfil: compte i estat de l’API, preferits guardats, activitat
+/// recent (tasca #152) i historial d’assistència (tasca #169), cadascun a la
+/// seva pestanya.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
     super.key,
@@ -24,6 +27,7 @@ class ProfileScreen extends StatefulWidget {
     this.eventsApi,
     this.favorites,
     this.activityApi,
+    this.attendedApi,
   });
 
   final AuthApi? authApi;
@@ -35,6 +39,9 @@ class ProfileScreen extends StatefulWidget {
 
   /// Per defecte, [createActivityApi].
   final ActivityApi? activityApi;
+
+  /// Per defecte, [createAttendedApi].
+  final AttendedApi? attendedApi;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -305,7 +312,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     // Les pestanyes es reconstrueixen en iniciar o tancar sessió.
     final sessionKey = _token ?? 'sense-sessio';
     return DefaultTabController(
-      length: 3,
+      length: 4,
       child: Scaffold(
         backgroundColor: CaliuColors.beige,
         appBar: AppBar(
@@ -316,10 +323,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
             labelColor: Colors.white,
             unselectedLabelColor: Colors.white70,
             indicatorColor: CaliuColors.redSoft,
+            // Quatre pestanyes: menys marge i lletra més petita perquè els
+            // noms no es tallin en mòbils estrets.
+            labelPadding: EdgeInsets.symmetric(horizontal: 4),
+            labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            unselectedLabelStyle: TextStyle(fontSize: 12),
             tabs: [
               Tab(icon: Icon(Icons.person_outline), text: 'Compte'),
               Tab(icon: Icon(Icons.favorite_border), text: 'Guardats'),
               Tab(icon: Icon(Icons.history), text: 'Activitat'),
+              Tab(icon: Icon(Icons.event_available), text: 'Historial'),
             ],
           ),
         ),
@@ -333,6 +346,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ActivityList(
               key: ValueKey('activitat-$sessionKey'),
               api: widget.activityApi,
+            ),
+            AttendedList(
+              key: ValueKey('historial-$sessionKey'),
+              api: widget.attendedApi,
             ),
           ],
         ),

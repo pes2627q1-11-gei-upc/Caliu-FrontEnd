@@ -1,8 +1,10 @@
 // Carrega tot lib/ perquè `flutter test --coverage` compti també fitxers
 // sense tests (p. ex. map_view). Sense això lcov només té el que els tests toquen.
 import 'package:caliu/activity_list.dart';
+import 'package:caliu/attended_list.dart';
 import 'package:caliu/config.dart';
 import 'package:caliu/data/activity_api.dart';
+import 'package:caliu/data/attended_api.dart';
 import 'package:caliu/data/auth_api.dart';
 import 'package:caliu/data/auth_session.dart';
 import 'package:caliu/data/auth_validators.dart';
@@ -56,6 +58,8 @@ void main() {
     expect(requestFavoritesLogin, isA<Function>());
     expect(FavoritesList, isNotNull);
     expect(ActivityList, isNotNull);
+    expect(AttendedList, isNotNull);
+    expect(MockAttendedApi, isNotNull);
     expect(MockActivityApi, isNotNull);
     expect(CenteredMessage, isNotNull);
     expect(EventListTile, isNotNull);
