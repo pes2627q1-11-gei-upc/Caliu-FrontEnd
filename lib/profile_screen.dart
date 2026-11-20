@@ -11,7 +11,7 @@ import 'data/auth_validators.dart';
 import 'data/events_api.dart';
 import 'data/favorite_alerts_controller.dart';
 import 'data/favorites_controller.dart';
-import 'favorites_screen.dart';
+import 'favorites_list.dart';
 import 'login_screen.dart';
 import 'preferences_screen.dart';
 import 'register_screen.dart';

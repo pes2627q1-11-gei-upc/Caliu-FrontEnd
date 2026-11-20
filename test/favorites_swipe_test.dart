@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:caliu/data/event.dart';
 import 'package:caliu/data/favorites_api.dart';
 import 'package:caliu/data/favorites_controller.dart';
-import 'package:caliu/favorites_screen.dart';
+import 'package:caliu/favorites_list.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -42,7 +42,9 @@ class _ControlledApi implements FavoritesApi {
 Future<void> _pump(WidgetTester tester, FavoritesController favorites) async {
   await tester.pumpWidget(
     MaterialApp(
-      home: FavoritesScreen(favorites: favorites, now: DateTime(2026, 11, 18)),
+      home: Scaffold(
+        body: FavoritesList(favorites: favorites, now: DateTime(2026, 11, 18)),
+      ),
     ),
   );
   await tester.pumpAndSettle();

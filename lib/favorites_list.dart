@@ -14,42 +14,8 @@ import 'widgets/event_list_tile.dart';
 import 'widgets/favorite_button.dart';
 import 'widgets/favorites_login_prompt.dart';
 
-/// Pantalla completa de Preferits (tasca #190). Al perfil, la mateixa llista
-/// es mostra a la pestanya Guardats (tasca #152).
-class FavoritesScreen extends StatelessWidget {
-  const FavoritesScreen({
-    super.key,
-    this.favorites,
-    this.alerts,
-    this.now,
-    this.loginBuilder,
-  });
-
-  final FavoritesController? favorites;
-  final FavoriteAlertsController? alerts;
-  final DateTime? now;
-  final FavoritesLoginBuilder? loginBuilder;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: CaliuColors.beige,
-      appBar: AppBar(
-        backgroundColor: CaliuColors.maroonDeep,
-        foregroundColor: Colors.white,
-        title: const Text('Preferits'),
-      ),
-      body: FavoritesList(
-        favorites: favorites,
-        alerts: alerts,
-        now: now,
-        loginBuilder: loginBuilder,
-      ),
-    );
-  }
-}
-
-/// Llista de preferits de l'usuari, sense Scaffold propi.
+/// Llista de preferits de l'usuari per a la pestanya Guardats del perfil
+/// (tasques #190 i #152). No té Scaffold propi.
 ///
 /// Es recarrega en mostrar-se i estirant cap avall. Treure el cor o lliscar
 /// la targeta cap a l'esquerra el fa desaparèixer a l'instant, amb l'opció

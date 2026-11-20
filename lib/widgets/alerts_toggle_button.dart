@@ -6,6 +6,12 @@ import '../data/favorites_api.dart';
 import '../data/favorites_controller.dart';
 import '../theme/caliu_colors.dart';
 
+/// Avís que les notificacions encara no s'envien (no hi ha FCM integrat):
+/// de moment només es desa la preferència, per quan existeixin.
+const alertsComingSoonNote =
+    'Les notificacions arribaran properament: de moment es desa la teva '
+    'preferència.';
+
 /// Campana per silenciar o activar les alertes d'un esdeveniment guardat
 /// (tasca #171, H.U #52). Només es mostra si l'esdeveniment és als
 /// preferits; silenciar-lo no el treu dels preferits.
@@ -71,10 +77,21 @@ class AlertsToggleButton extends StatelessWidget {
         ?..hideCurrentSnackBar()
         ..showSnackBar(
           SnackBar(
-            content: Text(
-              willEnable
-                  ? 'Alertes activades per a "${event.title}"'
-                  : 'Alertes silenciades per a "${event.title}"',
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  willEnable
+                      ? 'Alertes activades per a "${event.title}"'
+                      : 'Alertes silenciades per a "${event.title}"',
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  alertsComingSoonNote,
+                  style: TextStyle(fontSize: 12, color: Colors.white70),
+                ),
+              ],
             ),
           ),
         );

@@ -6,7 +6,7 @@ import 'package:caliu/data/favorite_alerts_api.dart';
 import 'package:caliu/data/favorite_alerts_controller.dart';
 import 'package:caliu/data/favorites_api.dart';
 import 'package:caliu/data/favorites_controller.dart';
-import 'package:caliu/favorites_screen.dart';
+import 'package:caliu/favorites_list.dart';
 import 'package:caliu/widgets/alerts_toggle_button.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -181,6 +181,8 @@ void main() {
         findsOneWidget,
       );
       expect(favorites.isFavorite('evt-1'), isTrue);
+      // Encara no hi ha notificacions reals (FCM): s'avisa que arribaran.
+      expect(find.text(alertsComingSoonNote), findsOneWidget);
 
       await tester.tap(find.byType(AlertsToggleButton));
       await tester.pumpAndSettle();

@@ -32,11 +32,17 @@ class ActivityEntry {
 
 /// Historial d'assistència de l'usuari autenticat (H.U #36).
 ///
+/// **Les assistències encara no poden ser reals.** Saber si l'usuari ha anat
+/// a un acte depèn de la validació d'assistència per GPS (`HaAssistit`), que
+/// encara no existeix. Fins llavors, l'app només mostra dades simulades
+/// ([MockActivityApi]).
+///
 /// El backend encara no l'exposa. Proposta de contracte (pendent de
 /// confirmar a l'OpenAPI del backend):
 /// - `GET /users/me/activity` →
 ///   `{ "items": [{ "id", "event": Event, "attendedAt" }] }`,
-///   el més recent primer
+///   el més recent primer. Només ha d'incloure assistències validades per
+///   GPS (`HaAssistit`).
 abstract interface class ActivityApi {
   /// Assistències de l'usuari, la més recent primer.
   Future<List<ActivityEntry>> fetchActivity();

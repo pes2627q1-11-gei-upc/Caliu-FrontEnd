@@ -24,7 +24,7 @@ App mòbil **Flutter** de **Caliu**: mapa i agenda d’esdeveniments culturals a
 
 ## Què fa
 
-- **Mapa** amb esdeveniments propers (geolocalització).
+- **Mapa** amb esdeveniments propers (geolocalització) i **clustering** de marcadors (#114; el zoom en tocar un clúster és la #115).
 - **Fitxa** d’esdeveniment (imatge, categories, lloc, enllaç web oficial quan hi ha `url`).
 - **Cerca i filtres** (text, categories/chips, radi).
 - Parla amb el backend **només** per HTTP/JSON; contracte: OpenAPI del repo backend.
@@ -39,6 +39,12 @@ El lliscador actualitza només la previsualització i el recompte. «Aplicar
 filtres» confirma tots els canvis a la cerca i al mapa; la creu i el botó
 enrere els descarten. Els límits de l'API continuen sent 0,1–500 km;
 el selector de la interfície ofereix 1–50 km.
+Comarca i Municipi són selectors amb les localitats retornades per
+`GET /events/locations`. En escollir una comarca, el municipi es restableix
+i només s'ofereixen els seus municipis. Cal desplegar primer aquest endpoint
+al backend; si no està disponible, es mostra un error amb opció de reintentar.
+Si una localitat seleccionada ja no surt al catàleg, es conserva al selector
+fins que l'usuari la canviï o restableixi els filtres.
 
 ## Arrencada ràpida
 

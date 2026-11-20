@@ -36,6 +36,11 @@ class _SearchScreenState extends State<SearchScreen> {
   SearchRadius? _editingRadius;
   SearchRadius get _filterRadius => _editingRadius ?? _radius;
   EventCountPreview? _filterPreview;
+  final _locationsVersion = ValueNotifier(0);
+  List<EventLocation> _locations = [];
+  bool _locationsLoaded = false;
+  bool _loadingLocations = false;
+  String? _locationsError;
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _comarcaController = TextEditingController();
   final TextEditingController _municipalityController = TextEditingController();
@@ -85,6 +90,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     _editingRadius?.dispose();
+    _locationsVersion.dispose();
     _filterPreview?.dispose();
     _radius.removeListener(_radiusChanged);
     if (widget.radius == null) _radius.dispose();
@@ -184,6 +190,7 @@ class _SearchScreenState extends State<SearchScreen> {
         .clamp(_selectorMinKm, _selectorMaxKm)
         .roundToDouble();
     draft.addListener(_updateFilterPreview);
+    if (!_locationsLoaded) _loadLocations();
     final preview = EventCountPreview(_api);
     _filterPreview = preview;
     _updateFilterPreview();
@@ -216,12 +223,16 @@ class _SearchScreenState extends State<SearchScreen> {
   Future<bool?> _showFilters(EventCountPreview preview) async {
     final route = MaterialPageRoute<bool>(
       builder: (context) => ListenableBuilder(
-        listenable: Listenable.merge([_radius, preview]),
+        listenable: Listenable.merge([
+          _filterRadius,
+          preview,
+          _locationsVersion,
+        ]),
         builder: (context, _) => StatefulBuilder(
           builder: (context, setModalState) => Scaffold(
-            backgroundColor: const Color(0xFFF5EDD8),
+            backgroundColor: CaliuColors.filterBackground,
             appBar: AppBar(
-              backgroundColor: const Color(0xFFF5EDD8),
+              backgroundColor: CaliuColors.filterBackground,
               foregroundColor: CaliuColors.maroonDeep,
               surfaceTintColor: Colors.transparent,
               centerTitle: true,
@@ -272,8 +283,9 @@ class _SearchScreenState extends State<SearchScreen> {
                                 borderRadius: BorderRadius.circular(18),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: const Color(0xFF806B43)
-                                        .withValues(alpha: 0.12),
+                                    color: CaliuColors.filterAccent.withValues(
+                                      alpha: 0.12,
+                                    ),
                                     blurRadius: 24,
                                     offset: const Offset(0, 10),
                                   ),
@@ -291,7 +303,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                   RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(18),
                                     side: const BorderSide(
-                                      color: Color(0xFFE0D5C0),
+                                      color: CaliuColors.filterBorder,
                                     ),
                                   ),
                                 ),
@@ -302,7 +314,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                 hintText: 'Cerca esdeveniments, llocs…',
                                 leading: const Icon(
                                   Icons.search,
-                                  color: Color(0xFF700B10),
+                                  color: CaliuColors.maroonAccent,
                                 ),
                                 onChanged: (_) {
                                   setModalState(() {});
@@ -313,7 +325,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                     tooltip: 'Esborrar cerca',
                                     icon: const Icon(
                                       Icons.cancel_outlined,
-                                      color: Color(0xFF700B10),
+                                      color: CaliuColors.maroonAccent,
                                     ),
                                     onPressed: () {
                                       _searchController.clear();
@@ -354,7 +366,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                     avatar: selected
                                         ? const DecoratedBox(
                                             decoration: BoxDecoration(
-                                              color: Color(0xFFF5EDD6),
+                                              color: CaliuColors.filterField,
                                               shape: BoxShape.circle,
                                             ),
                                             child: SizedBox(
@@ -398,7 +410,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                     checkmarkColor: Colors.white,
                                     labelStyle: TextStyle(
                                       color: selected
-                                          ? const Color(0xFFF5EDD6)
+                                          ? CaliuColors.filterField
                                           : CaliuColors.maroonDeep,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -406,7 +418,7 @@ class _SearchScreenState extends State<SearchScreen> {
                                     side: BorderSide(
                                       color: selected
                                           ? CaliuColors.red
-                                          : const Color(0xFFE0D5C0),
+                                          : CaliuColors.filterBorder,
                                     ),
                                   );
                                 }).toList(),
@@ -415,31 +427,7 @@ class _SearchScreenState extends State<SearchScreen> {
                             _buildRadiusFilter(setModalState),
                             _buildFilterDates(setModalState),
                             const SizedBox(height: 20),
-                            TextField(
-                              controller: _comarcaController,
-                              decoration: const InputDecoration(
-                                labelText: 'Comarca',
-                                hintText: 'Ex: Barcelonès',
-                                border: OutlineInputBorder(),
-                              ),
-                              onChanged: (_) {
-                                setModalState(() {});
-                                _updateFilterPreview();
-                              },
-                            ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: _municipalityController,
-                              decoration: const InputDecoration(
-                                labelText: 'Municipi',
-                                hintText: 'Ex: Barcelona',
-                                border: OutlineInputBorder(),
-                              ),
-                              onChanged: (_) {
-                                setModalState(() {});
-                                _updateFilterPreview();
-                              },
-                            ),
+                            _buildLocations(setModalState),
                             const SizedBox(height: 20),
                           ],
                         ),
@@ -464,6 +452,136 @@ class _SearchScreenState extends State<SearchScreen> {
     // Manté vius els notificadors fins que s'ha desmuntat la ruta de sortida.
     await route.completed;
     return result;
+  }
+
+  Future<void> _loadLocations() async {
+    if (_loadingLocations) return;
+    _loadingLocations = true;
+    _locationsError = null;
+    _locationsVersion.value++;
+    try {
+      final locations = await _api.fetchLocations();
+      if (!mounted) return;
+      _locations = locations;
+      _locationsLoaded = true;
+    } catch (_) {
+      if (!mounted) return;
+      _locationsError =
+          'No s’han pogut carregar les comarques i els municipis.';
+    }
+    if (!mounted) return;
+    _loadingLocations = false;
+    _locationsVersion.value++;
+  }
+
+  Widget _buildLocations(StateSetter setModalState) {
+    final comarques =
+        _locations
+            .map((row) => row.comarca)
+            .where((name) => name.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    final municipis =
+        _locations
+            .where(
+              (row) =>
+                  _comarcaController.text.isEmpty ||
+                  row.comarca == _comarcaController.text,
+            )
+            .map((row) => row.municipality)
+            .where((name) => name.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    Widget selector(
+      String label,
+      TextEditingController controller,
+      List<String> options,
+    ) {
+      // Conserva un filtre guardat encara que ja no surti al catàleg.
+      final selected = controller.text;
+      final availableOptions = [
+        if (selected.isNotEmpty && !options.contains(selected)) selected,
+        ...options,
+      ];
+      return DropdownButtonFormField<String>(
+        key: ValueKey('$label-${controller.text}'),
+        initialValue: controller.text,
+        isExpanded: true,
+        dropdownColor: Colors.white,
+        style: const TextStyle(color: CaliuColors.maroonDeep, fontSize: 16),
+        iconEnabledColor: CaliuColors.maroonDeep,
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(color: CaliuColors.maroonDeep),
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: CaliuColors.filterBorder),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: CaliuColors.red, width: 2),
+          ),
+        ),
+        items: [
+          DropdownMenuItem(
+            value: '',
+            child: Text(
+              label == 'Comarca' ? 'Totes les comarques' : 'Tots els municipis',
+            ),
+          ),
+          ...availableOptions.map(
+            (name) => DropdownMenuItem(value: name, child: Text(name)),
+          ),
+        ],
+        onChanged: !_locationsLoaded || _loadingLocations
+            ? null
+            : (value) {
+                setModalState(() {
+                  controller.text = value ?? '';
+                  if (label == 'Comarca') _municipalityController.clear();
+                });
+                _updateFilterPreview();
+              },
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        selector('Comarca', _comarcaController, comarques),
+        const SizedBox(height: 16),
+        selector('Municipi', _municipalityController, municipis),
+        if (_locationsLoaded && _locations.isEmpty)
+          const Text(
+            'No hi ha localitats disponibles.',
+            style: TextStyle(color: CaliuColors.maroonDeep),
+          ),
+        if (_loadingLocations)
+          const Padding(
+            padding: EdgeInsets.all(12),
+            child: LinearProgressIndicator(),
+          ),
+        if (_locationsError != null) ...[
+          Text(
+            _locationsError!,
+            style: const TextStyle(color: CaliuColors.red),
+          ),
+          TextButton(
+            onPressed: _loadLocations,
+            child: const Text('Tornar a carregar localitats'),
+          ),
+        ],
+      ],
+    );
   }
 
   Widget _buildFilterDates(StateSetter setModalState) {
