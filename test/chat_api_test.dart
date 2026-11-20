@@ -45,24 +45,31 @@ void main() {
       expect(jsonDecode(seen.body), {'message': 'I demà?', 'sessionId': 's1'});
     });
 
-    test('llegeix els esdeveniments opcionals i salta els mal formats', () async {
-      final api = _api(
-        (_) async => http.Response(
-          jsonEncode({
-            'sessionId': 's1',
-            'reply': 'Et proposo això',
-            'events': [eventJson, 'no-es-un-objecte', {'title': 'sense id'}],
-          }),
-          200,
-        ),
-      );
+    test(
+      'llegeix els esdeveniments opcionals i salta els mal formats',
+      () async {
+        final api = _api(
+          (_) async => http.Response(
+            jsonEncode({
+              'sessionId': 's1',
+              'reply': 'Et proposo això',
+              'events': [
+                eventJson,
+                'no-es-un-objecte',
+                {'title': 'sense id'},
+              ],
+            }),
+            200,
+          ),
+        );
 
-      final reply = await api.sendMessage(token: 'tok', message: 'Plans');
+        final reply = await api.sendMessage(token: 'tok', message: 'Plans');
 
-      expect(reply.events, hasLength(1));
-      expect(reply.events.single.id, 'evt-1');
-      expect(reply.events.single.title, 'Concert al Parc');
-    });
+        expect(reply.events, hasLength(1));
+        expect(reply.events.single.id, 'evt-1');
+        expect(reply.events.single.title, 'Concert al Parc');
+      },
+    );
 
     test('resposta 200 sense reply és un error', () async {
       final api = _api((_) async => http.Response('{"sessionId":"s1"}', 200));
@@ -110,7 +117,10 @@ void main() {
       final down = await errorFor(503);
       expect(down.message, contains('no està disponible'));
 
-      final invalid = await errorFor(400, '{"error":"Camp \\"message\\" obligatori"}');
+      final invalid = await errorFor(
+        400,
+        '{"error":"Camp \\"message\\" obligatori"}',
+      );
       expect(invalid.message, 'Camp "message" obligatori');
     });
 

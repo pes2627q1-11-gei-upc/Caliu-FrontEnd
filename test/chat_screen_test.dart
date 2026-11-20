@@ -55,7 +55,10 @@ void main() {
       },
     );
 
-    expect(find.text('Inicia sessió per parlar amb l\'assistent'), findsOneWidget);
+    expect(
+      find.text('Inicia sessió per parlar amb l\'assistent'),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('Inicia sessió'));
     await tester.pump();
@@ -92,7 +95,10 @@ void main() {
       expect(find.byType(TypingIndicator), findsOneWidget);
       // El camp es buida en enviar.
       expect(
-        tester.widget<TextField>(find.byKey(const ValueKey('chat-input'))).controller!.text,
+        tester
+            .widget<TextField>(find.byKey(const ValueKey('chat-input')))
+            .controller!
+            .text,
         isEmpty,
       );
 
@@ -135,7 +141,9 @@ void main() {
     expect(find.text('Ok'), findsOneWidget);
   });
 
-  testWidgets('un error mostra l\'avís i permet tornar a provar', (tester) async {
+  testWidgets('un error mostra l\'avís i permet tornar a provar', (
+    tester,
+  ) async {
     var fail = true;
     await _pump(tester, (_) async {
       if (fail) return http.Response('{}', 503);

@@ -132,10 +132,7 @@ class _ChatScreenState extends State<ChatScreen> {
               Expanded(
                 child: _chat.messages.isEmpty
                     ? _EmptyState(onSuggestion: _send)
-                    : _MessageList(
-                        chat: _chat,
-                        onOpenEvent: _openEvent,
-                      ),
+                    : _MessageList(chat: _chat, onOpenEvent: _openEvent),
               ),
               if (_chat.error != null)
                 _ErrorBanner(
@@ -307,7 +304,10 @@ class _ErrorBanner extends StatelessWidget {
               ),
             ),
             if (onLogin != null)
-              TextButton(onPressed: onLogin, child: const Text('Inicia sessió')),
+              TextButton(
+                onPressed: onLogin,
+                child: const Text('Inicia sessió'),
+              ),
             IconButton(
               tooltip: 'Tancar',
               onPressed: onClose,

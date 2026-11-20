@@ -40,7 +40,9 @@ class _TypingIndicatorState extends State<TypingIndicator>
               bottomRight: Radius.circular(18),
               bottomLeft: Radius.circular(4),
             ),
-            border: Border.all(color: CaliuColors.maroon.withValues(alpha: 0.1)),
+            border: Border.all(
+              color: CaliuColors.maroon.withValues(alpha: 0.1),
+            ),
           ),
           child: AnimatedBuilder(
             animation: _controller,

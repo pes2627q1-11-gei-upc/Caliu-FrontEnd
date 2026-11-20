@@ -55,7 +55,7 @@ class ChatApi {
   static const maxMessageLength = 500;
 
   /// Gemini + Render adormit poden trigar: més marge que la resta de l'API.
-  static const timeout = Duration(seconds: 45);
+  static const timeout = Duration(seconds: 90);
 
   final http.Client _client;
   final String _baseUrl;

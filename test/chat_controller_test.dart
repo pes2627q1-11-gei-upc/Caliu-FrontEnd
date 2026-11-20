@@ -21,11 +21,7 @@ ChatController _controller(
 
 http.Response _ok(String reply, {String session = 's1', List? events}) =>
     http.Response(
-      jsonEncode({
-        'sessionId': session,
-        'reply': reply,
-        'events': ?events,
-      }),
+      jsonEncode({'sessionId': session, 'reply': reply, 'events': ?events}),
       200,
     );
 
@@ -94,23 +90,26 @@ void main() {
     expect(chat.error, contains('massa llarg'));
   });
 
-  test('un error marca el missatge com a no enviat i es pot reintentar', () async {
-    var fail = true;
-    final chat = _controller((_) async {
-      if (fail) return http.Response('{}', 503);
-      return _ok('Ara sí');
-    });
+  test(
+    'un error marca el missatge com a no enviat i es pot reintentar',
+    () async {
+      var fail = true;
+      final chat = _controller((_) async {
+        if (fail) return http.Response('{}', 503);
+        return _ok('Ara sí');
+      });
 
-    await chat.send('Hola');
-    expect(chat.messages.single.failed, isTrue);
-    expect(chat.error, contains('no està disponible'));
+      await chat.send('Hola');
+      expect(chat.messages.single.failed, isTrue);
+      expect(chat.error, contains('no està disponible'));
 
-    fail = false;
-    await chat.retry(chat.messages.single.id);
-    expect(chat.messages.first.failed, isFalse);
-    expect(chat.messages.last.text, 'Ara sí');
-    expect(chat.error, isNull);
-  });
+      fail = false;
+      await chat.retry(chat.messages.single.id);
+      expect(chat.messages.first.failed, isFalse);
+      expect(chat.messages.last.text, 'Ara sí');
+      expect(chat.error, isNull);
+    },
+  );
 
   test('401: demana sessió i esborra el token caducat', () async {
     final session = MemorySession('caducat');
