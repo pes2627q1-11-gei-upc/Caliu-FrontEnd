@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Caliu fa servir la càmera per fer-te la foto de perfil.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Caliu accedeix a les teves fotos perquè en triïs una de perfil.</string>
 </dict>
 </plist>

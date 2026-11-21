@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 
+import 'data/avatar_controller.dart';
+import 'data/favorite_alerts_controller.dart';
+import 'data/favorites_controller.dart';
 import 'main_screen.dart';
 
 void main() {
+  AvatarController.shared.load();
+  FavoritesController.shared.load();
+  if (favoriteAlertsAvailable) FavoriteAlertsController.shared.load();
   runApp(const MyApp());
 }
 
