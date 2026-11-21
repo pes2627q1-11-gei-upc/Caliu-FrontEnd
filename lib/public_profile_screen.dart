@@ -1,0 +1,261 @@
+import 'package:flutter/material.dart';
+
+import 'data/users_api.dart';
+import 'login_screen.dart';
+import 'theme/caliu_colors.dart';
+import 'widgets/user_avatar.dart';
+
+/// Perfil públic d'un altre usuari (tasca #179, H.U #60): avatar, nick i
+/// recompte d'actes compartits. No mostra cap dada privada com l'email.
+class PublicProfileScreen extends StatefulWidget {
+  const PublicProfileScreen({
+    super.key,
+    required this.username,
+    this.initialUser,
+    this.api,
+    this.loginBuilder,
+  });
+
+  final String username;
+
+  /// Dades que ja es tenen (p. ex. de la llista on s'ha tocat l'avatar), per
+  /// mostrar alguna cosa mentre es carrega el perfil.
+  final PublicUser? initialUser;
+
+  /// Per defecte, [createUsersApi].
+  final UsersApi? api;
+
+  /// Per als tests; per defecte, la pantalla de login de l'app.
+  final WidgetBuilder? loginBuilder;
+
+  @override
+  State<PublicProfileScreen> createState() => _PublicProfileScreenState();
+}
+
+class _PublicProfileScreenState extends State<PublicProfileScreen> {
+  late final UsersApi _api = widget.api ?? createUsersApi();
+
+  late PublicUser? _user = widget.initialUser;
+  UsersApiException? _error;
+  bool _loading = true;
+
+  /// Les dades de [widget.initialUser] no porten el recompte: només es
+  /// mostra quan arriba el perfil del servidor.
+  bool _fetched = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final user = await _api.fetchPublicProfile(widget.username);
+      if (!mounted) return;
+      setState(() {
+        _user = user;
+        _fetched = true;
+        _loading = false;
+      });
+    } on UsersApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = e;
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = const UsersApiException('No s\'ha pogut carregar el perfil');
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _login() async {
+    final builder = widget.loginBuilder;
+    final loggedIn = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (context) => builder != null
+            ? builder(context)
+            : const LoginScreen(
+                notice: 'Inicia sessió per veure perfils d\'altres usuaris.',
+              ),
+      ),
+    );
+    if (loggedIn == true) await _load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: CaliuColors.beige,
+      appBar: AppBar(
+        backgroundColor: CaliuColors.maroonDeep,
+        foregroundColor: Colors.white,
+        title: Text('@${widget.username}'),
+      ),
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildBody() {
+    final error = _error;
+    if (error != null) {
+      if (error.isUnauthorized) {
+        return _Message(
+          icon: Icons.lock_outline,
+          title: 'Inicia sessió per veure perfils d\'altres usuaris',
+          action: FilledButton.icon(
+            onPressed: _login,
+            icon: const Icon(Icons.login),
+            label: const Text('Inicia sessió'),
+            style: FilledButton.styleFrom(backgroundColor: CaliuColors.red),
+          ),
+        );
+      }
+      if (error.isNotFound) {
+        return _Message(
+          icon: Icons.person_off_outlined,
+          title: 'Aquest usuari no existeix',
+          subtitle:
+              'Potser ha canviat de nom o ha eliminat el compte. '
+              'Comprova l\'enllaç i torna-ho a provar.',
+        );
+      }
+      return _Message(
+        icon: Icons.cloud_off,
+        title: error.message,
+        action: FilledButton(
+          onPressed: _load,
+          style: FilledButton.styleFrom(backgroundColor: CaliuColors.red),
+          child: const Text('Tornar a provar'),
+        ),
+      );
+    }
+
+    final user = _user;
+    if (user == null) {
+      return const Center(
+        child: CircularProgressIndicator(color: CaliuColors.red),
+      );
+    }
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 32, 20, 24),
+      children: [
+        if (_loading)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 16),
+            child: LinearProgressIndicator(
+              color: CaliuColors.red,
+              backgroundColor: CaliuColors.beige,
+            ),
+          ),
+        Center(
+          child: UserAvatar(
+            username: user.username,
+            avatarUrl: user.avatarUrl,
+            radius: 56,
+            // Ja som al seu perfil: tocar l'avatar no ha de tornar a obrir-lo.
+            openProfileOnTap: false,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          user.username,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w800,
+            color: CaliuColors.maroonDeep,
+          ),
+        ),
+        const SizedBox(height: 24),
+        if (_fetched)
+          Card(
+            color: CaliuColors.beigeCard,
+            elevation: 0,
+            child: ListTile(
+              leading: const CircleAvatar(
+                backgroundColor: CaliuColors.maroon,
+                foregroundColor: Colors.white,
+                child: Icon(Icons.event_available),
+              ),
+              title: Text(
+                sharedEventsLabel(user.sharedEventsCount),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: CaliuColors.maroonDeep,
+                ),
+              ),
+              subtitle: const Text('Esdeveniments als quals heu anat tots dos'),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// "Cap acte compartit", "1 acte compartit" o "N actes compartits".
+String sharedEventsLabel(int count) => switch (count) {
+  <= 0 => 'Cap acte compartit',
+  1 => '1 acte compartit',
+  _ => '$count actes compartits',
+};
+
+class _Message extends StatelessWidget {
+  const _Message({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+    this.action,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final Widget? action;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 56, color: CaliuColors.textMuted),
+            const SizedBox(height: 16),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: CaliuColors.maroonDeep,
+              ),
+            ),
+            if (subtitle case final subtitle?) ...[
+              const SizedBox(height: 8),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: CaliuColors.textMuted),
+              ),
+            ],
+            if (action case final action?) ...[
+              const SizedBox(height: 20),
+              action,
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
