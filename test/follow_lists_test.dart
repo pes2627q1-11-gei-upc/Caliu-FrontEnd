@@ -111,20 +111,32 @@ void main() {
       );
     });
 
-    test(
-      'sense id propi conegut, un id desconegut és el propi compte',
-      () async {
-        // A l'app, el mock no coneix l'id real del compte autenticat.
-        final api = MockUsersApi(latency: Duration.zero);
-        expect(_names(await api.fetchFollowing('id-real-del-backend')), [
-          'laia_museus',
-        ]);
-        expect(_names(await api.fetchFollowers('id-real-del-backend')), [
-          'laia_museus',
-          'marta_concerts',
-        ]);
-      },
-    );
+    test('el compte propi es demana amb l\'identificador explícit', () async {
+      final api = MockUsersApi(latency: Duration.zero);
+      expect(_names(await api.fetchFollowing(ownProfileId)), ['laia_museus']);
+      expect(_names(await api.fetchFollowers(ownProfileId)), [
+        'laia_museus',
+        'marta_concerts',
+      ]);
+    });
+
+    test('un id desconegut és sempre un 404, també sense id propi', () async {
+      // Abans, sense currentUserId, un id desconegut es tractava com el
+      // compte propi (revisió de la PR #32).
+      final api = MockUsersApi(latency: Duration.zero);
+      for (final call in [api.fetchFollowers, api.fetchFollowing]) {
+        await expectLater(
+          call('id-real-del-backend'),
+          throwsA(
+            isA<UsersApiException>().having(
+              (e) => e.isNotFound,
+              'notFound',
+              true,
+            ),
+          ),
+        );
+      }
+    });
   });
 
   group('FollowListsScreen', () {

@@ -158,11 +158,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (updated == true && mounted && _token == token) await _loadAccount();
   }
 
-  void _openFollowLists(String userId, FollowList list) {
+  /// Les llistes del compte propi fan servir [ownProfileId], no l'id real.
+  void _openFollowLists(FollowList list) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => FollowListsScreen(
-          userId: userId,
+          userId: ownProfileId,
           title: 'El meu perfil',
           initialList: list,
           api: widget.usersApi,
@@ -480,15 +481,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   TextButton.icon(
                     key: const Key('my-followers'),
-                    onPressed: () =>
-                        _openFollowLists(profile.id, FollowList.followers),
+                    onPressed: () => _openFollowLists(FollowList.followers),
                     icon: const Icon(Icons.group_outlined),
                     label: const Text('Seguidors'),
                   ),
                   TextButton.icon(
                     key: const Key('my-following'),
-                    onPressed: () =>
-                        _openFollowLists(profile.id, FollowList.following),
+                    onPressed: () => _openFollowLists(FollowList.following),
                     icon: const Icon(Icons.person_add_alt),
                     label: const Text('Seguits'),
                   ),

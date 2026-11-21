@@ -90,6 +90,13 @@ abstract interface class UsersApi {
   Future<List<PublicUser>> fetchFollowing(String userId);
 }
 
+/// Identificador explícit del compte propi per a les llistes de seguidors i
+/// seguits (revisió de la PR #32). El perfil propi el fa servir en lloc de
+/// l'id real perquè no depengui de com el backend identifica l'usuari: la
+/// implementació HTTP el traduirà a `/users/me/followers` i
+/// `/users/me/following`, o a l'id del token.
+const ownProfileId = 'me';
+
 /// Instància que fa servir l'app. Quan el backend estigui llest, aquí es
 /// canviarà la implementació simulada per la HTTP.
 UsersApi createUsersApi({AuthSessionStore? session}) =>
@@ -98,8 +105,9 @@ UsersApi createUsersApi({AuthSessionStore? session}) =>
 /// Implementació amb dades simulades mentre no hi ha backend.
 ///
 /// Guarda un graf de seguiments unidireccional (seguidor → seguits). L'usuari
-/// autenticat és [currentUserId] o, si no se sap (a l'app el mock no coneix
-/// l'id real del compte), [meKey].
+/// autenticat és [currentUserId] o, si no se'n dona cap, [ownProfileId]. Les
+/// llistes només accepten ids d'usuaris coneguts o [ownProfileId]: qualsevol
+/// altre id és un 404.
 class MockUsersApi implements UsersApi {
   MockUsersApi({
     this.session,
@@ -119,9 +127,6 @@ class MockUsersApi implements UsersApi {
     }
   }
 
-  /// Clau de l'usuari autenticat quan no se'n coneix l'id.
-  static const meKey = '@me';
-
   /// Id de l'usuari autenticat, per rebutjar que se segueixi a si mateix.
   final String? currentUserId;
 
@@ -136,7 +141,7 @@ class MockUsersApi implements UsersApi {
   /// Seguidor → ids dels usuaris que segueix.
   final Map<String, Set<String>> _graph = {};
 
-  String get _me => currentUserId ?? meKey;
+  String get _me => currentUserId ?? ownProfileId;
 
   Set<String> get _myFollowing => _graph.putIfAbsent(_me, () => {});
 
@@ -203,11 +208,11 @@ class MockUsersApi implements UsersApi {
     return null;
   }
 
-  /// Clau del graf per a [userId]. Un id desconegut és el propi compte si no
-  /// se sap l'id real de l'usuari autenticat; si se sap, és un 404.
+  /// Clau del graf per a [userId]: un usuari conegut o el compte propi
+  /// ([ownProfileId]). Qualsevol altre id és un 404.
   String _resolve(String userId) {
+    if (userId == ownProfileId || userId == _me) return _me;
     if (_users.values.any((u) => u.id == userId)) return userId;
-    if (userId == _me || currentUserId == null) return _me;
     throw const UsersApiException('Aquest usuari no existeix', statusCode: 404);
   }
 
@@ -231,9 +236,9 @@ class MockUsersApi implements UsersApi {
   }
 }
 
-/// Usuaris simulats de la comunitat, inclòs el propi compte ([MockUsersApi.meKey]).
+/// Usuaris simulats de la comunitat, inclòs el propi compte ([ownProfileId]).
 const samplePublicUsers = [
-  PublicUser(id: MockUsersApi.meKey, username: 'jo'),
+  PublicUser(id: ownProfileId, username: 'jo'),
   PublicUser(id: 'mock-user-1', username: 'laia_museus', sharedEventsCount: 4),
   PublicUser(id: 'mock-user-2', username: 'pau.fires', sharedEventsCount: 1),
   PublicUser(id: 'mock-user-3', username: 'marta_concerts'),
@@ -241,8 +246,8 @@ const samplePublicUsers = [
 
 /// Seguiments simulats (seguidor → seguits).
 const sampleFollows = <String, Set<String>>{
-  MockUsersApi.meKey: {'mock-user-1'},
-  'mock-user-1': {MockUsersApi.meKey, 'mock-user-2'},
+  ownProfileId: {'mock-user-1'},
+  'mock-user-1': {ownProfileId, 'mock-user-2'},
   'mock-user-2': {'mock-user-1'},
-  'mock-user-3': {MockUsersApi.meKey, 'mock-user-1'},
+  'mock-user-3': {ownProfileId, 'mock-user-1'},
 };
