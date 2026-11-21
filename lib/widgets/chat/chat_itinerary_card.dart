@@ -94,9 +94,7 @@ class ChatItineraryCard extends StatelessWidget {
                   onPressed: () => (onOpenRoute ?? _launch)(route),
                   icon: const Icon(Icons.map_outlined, size: 18),
                   label: const Text('Veure la ruta a Google Maps'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: CaliuColors.red,
-                  ),
+                  style: TextButton.styleFrom(foregroundColor: CaliuColors.red),
                 ),
               )
             else

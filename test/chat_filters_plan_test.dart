@@ -143,10 +143,9 @@ void main() {
         })!.labels(_now),
         ['Matinada', 'Fins a 15 €', 'Gironès'],
       );
-      expect(
-        ChatFilters.fromJson({'maxPrice': 7.5})!.labels(_now),
-        ['Fins a 7,50 €'],
-      );
+      expect(ChatFilters.fromJson({'maxPrice': 7.5})!.labels(_now), [
+        'Fins a 7,50 €',
+      ]);
     });
   });
 
@@ -260,29 +259,32 @@ void main() {
       expect(reply.filters, isNull);
     });
 
-    test('si el backend no accepta el locale (400), es reintenta sense', () async {
-      final bodies = <Map<String, dynamic>>[];
-      final api = _api((request) async {
-        final body = jsonDecode(request.body) as Map<String, dynamic>;
-        bodies.add(body);
-        if (body.containsKey('locale')) {
-          return http.Response('{"error":"Cos de la petició no vàlid"}', 400);
-        }
-        return http.Response('{"sessionId":"s1","reply":"Hola"}', 200);
-      });
+    test(
+      'si el backend no accepta el locale (400), es reintenta sense',
+      () async {
+        final bodies = <Map<String, dynamic>>[];
+        final api = _api((request) async {
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          bodies.add(body);
+          if (body.containsKey('locale')) {
+            return http.Response('{"error":"Cos de la petició no vàlid"}', 400);
+          }
+          return http.Response('{"sessionId":"s1","reply":"Hola"}', 200);
+        });
 
-      final reply = await api.sendMessage(
-        token: 'tok',
-        message: 'Hola',
-        locale: 'ca',
-      );
+        final reply = await api.sendMessage(
+          token: 'tok',
+          message: 'Hola',
+          locale: 'ca',
+        );
 
-      expect(reply.reply, 'Hola');
-      expect(bodies, [
-        {'message': 'Hola', 'locale': 'ca'},
-        {'message': 'Hola'},
-      ]);
-    });
+        expect(reply.reply, 'Hola');
+        expect(bodies, [
+          {'message': 'Hola', 'locale': 'ca'},
+          {'message': 'Hola'},
+        ]);
+      },
+    );
   });
 
   test('el controlador envia l\'idioma i desa filtres i pla', () async {
@@ -380,54 +382,53 @@ void main() {
       expect(find.byType(ChatFiltersRow), findsNothing);
     });
 
-    testWidgets(
-      'itinerari: passos en ordre, desplaçament, fitxa i ruta',
-      (tester) async {
-        Event? opened;
-        Uri? route;
-        await pumpBubble(
-          tester,
-          ChatMessage(
-            id: 'a1',
-            role: ChatRole.assistant,
-            text: 'Aquí tens un itinerari de 2 passos:\n1. Visita\n2. Concert',
-            plan: ChatPlan.fromJson(_planJson),
-          ),
-          onOpenEvent: (event) => opened = event,
-          onOpenRoute: (uri) async => route = uri,
-        );
+    testWidgets('itinerari: passos en ordre, desplaçament, fitxa i ruta', (
+      tester,
+    ) async {
+      Event? opened;
+      Uri? route;
+      await pumpBubble(
+        tester,
+        ChatMessage(
+          id: 'a1',
+          role: ChatRole.assistant,
+          text: 'Aquí tens un itinerari de 2 passos:\n1. Visita\n2. Concert',
+          plan: ChatPlan.fromJson(_planJson),
+        ),
+        onOpenEvent: (event) => opened = event,
+        onOpenRoute: (uri) async => route = uri,
+      );
 
-        // De la resposta només queda la introducció.
-        expect(find.text('Aquí tens un itinerari de 2 passos:'), findsOneWidget);
-        expect(find.textContaining('1. Visita'), findsNothing);
+      // De la resposta només queda la introducció.
+      expect(find.text('Aquí tens un itinerari de 2 passos:'), findsOneWidget);
+      expect(find.textContaining('1. Visita'), findsNothing);
 
-        expect(find.byType(ChatItineraryCard), findsOneWidget);
-        expect(find.text('Itinerari'), findsOneWidget);
-        expect(find.text('Demà · 2 parades'), findsOneWidget);
-        expect(find.text('Visita guiada al Call'), findsOneWidget);
-        expect(find.text('Call jueu, Girona'), findsOneWidget);
-        expect(
-          find.text(
-            '${_local('2026-11-21T10:30:00+01:00')} – '
-            '${_local('2026-11-21T12:00:00+01:00')}',
-          ),
-          findsOneWidget,
-        );
-        expect(find.text('400 m · 5 min a peu'), findsOneWidget);
+      expect(find.byType(ChatItineraryCard), findsOneWidget);
+      expect(find.text('Itinerari'), findsOneWidget);
+      expect(find.text('Demà · 2 parades'), findsOneWidget);
+      expect(find.text('Visita guiada al Call'), findsOneWidget);
+      expect(find.text('Call jueu, Girona'), findsOneWidget);
+      expect(
+        find.text(
+          '${_local('2026-11-21T10:30:00+01:00')} – '
+          '${_local('2026-11-21T12:00:00+01:00')}',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('400 m · 5 min a peu'), findsOneWidget);
 
-        final first = tester.getTopLeft(find.text('Visita guiada al Call'));
-        final second = tester.getTopLeft(find.text('Concert vermut'));
-        expect(first.dy, lessThan(second.dy));
+      final first = tester.getTopLeft(find.text('Visita guiada al Call'));
+      final second = tester.getTopLeft(find.text('Concert vermut'));
+      expect(first.dy, lessThan(second.dy));
 
-        await tester.tap(find.text('Concert vermut'));
-        await tester.pump();
-        expect(opened?.id, 'evt-2');
-        expect(opened?.title, 'Concert vermut');
+      await tester.tap(find.text('Concert vermut'));
+      await tester.pump();
+      expect(opened?.id, 'evt-2');
+      expect(opened?.title, 'Concert vermut');
 
-        await tester.tap(find.byKey(const ValueKey('plan-route')));
-        await tester.pump();
-        expect(route?.queryParameters['travelmode'], 'walking');
-      },
-    );
+      await tester.tap(find.byKey(const ValueKey('plan-route')));
+      await tester.pump();
+      expect(route?.queryParameters['travelmode'], 'walking');
+    });
   });
 }

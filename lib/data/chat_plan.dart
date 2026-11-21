@@ -47,10 +47,7 @@ class ChatPlan {
       'origin': format(points.first),
       'destination': format(points.last),
       if (points.length > 2)
-        'waypoints': points
-            .sublist(1, points.length - 1)
-            .map(format)
-            .join('|'),
+        'waypoints': points.sublist(1, points.length - 1).map(format).join('|'),
       'travelmode': 'walking',
     });
   }
