@@ -166,10 +166,34 @@ void main() {
         expect(seen.queryParameters['limit'], '10');
         expect(seen.queryParameters['from'], from.toUtc().toIso8601String());
         expect(seen.queryParameters['to'], to.toUtc().toIso8601String());
-        // EventQuery no té filtre de preu: no ha d'aparèixer a la URL.
+        // Sense price al query: no ha d'aparèixer a la URL.
         expect(seen.queryParameters.containsKey('price'), isFalse);
       },
     );
+
+    test('envia price=free o price=paid quan el filtre hi és (#157)', () async {
+      Uri? seen;
+      final client = MockClient((request) async {
+        seen = request.url;
+        return http.Response(_pageBody(), 200);
+      });
+      final api = EventsApi(client: client, baseUrl: _baseUrl);
+
+      await api.fetchEvents(
+        const EventQuery(price: EventPriceFilter.free, limit: 5),
+      );
+      expect(seen!.queryParameters['price'], 'free');
+
+      await api.fetchEvents(
+        const EventQuery(price: EventPriceFilter.paid, q: 'jazz'),
+      );
+      expect(seen!.queryParameters['price'], 'paid');
+      expect(seen!.queryParameters['q'], 'jazz');
+
+      await api.fetchNearby(lat: 41.4, lng: 2.1, price: EventPriceFilter.paid);
+      expect(seen!.queryParameters['price'], 'paid');
+      expect(seen!.queryParameters['lat'], '41.4');
+    });
   });
 
   group('EventsApi.fetchById', () {

@@ -141,9 +141,16 @@ class EventsApi {
     required double lng,
     double radiusKm = 15,
     int limit = 50,
+    String? price,
   }) async {
     final page = await fetchEvents(
-      EventQuery(lat: lat, lng: lng, radiusKm: radiusKm, limit: limit),
+      EventQuery(
+        lat: lat,
+        lng: lng,
+        radiusKm: radiusKm,
+        limit: limit,
+        price: price,
+      ),
     );
     return page.items;
   }

@@ -1,8 +1,9 @@
 import 'dart:async';
 
+import 'package:caliu/data/event_query.dart';
+import 'package:caliu/data/search_radius.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:caliu/data/search_radius.dart';
 
 void main() {
   test('canviar el radi reutilitza la ubicació real ja obtinguda', () async {
@@ -64,5 +65,19 @@ void main() {
     await radius.apply(500);
     expect(radius.radiusKm, 500);
     radius.dispose();
+  });
+
+  test('price es copia amb fork/adopt i es neteja amb clear (#157)', () {
+    final radius = SearchRadius(locate: () async => const LatLng(42, 1));
+    radius.updatePrice(EventPriceFilter.free);
+    final draft = radius.fork();
+    expect(draft.price, EventPriceFilter.free);
+    draft.updatePrice(EventPriceFilter.paid);
+    radius.adopt(draft);
+    expect(radius.price, EventPriceFilter.paid);
+    radius.clear();
+    expect(radius.price, isNull);
+    radius.dispose();
+    draft.dispose();
   });
 }
