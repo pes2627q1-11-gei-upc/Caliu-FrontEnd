@@ -6,7 +6,8 @@ import 'theme/caliu_colors.dart';
 import 'widgets/user_avatar.dart';
 
 /// Perfil públic d'un altre usuari (tasca #179, H.U #60): avatar, nick i
-/// recompte d'actes compartits. No mostra cap dada privada com l'email.
+/// recompte d'actes compartits, amb el botó Seguir (tasca #182, H.U #61).
+/// No mostra cap dada privada com l'email.
 class PublicProfileScreen extends StatefulWidget {
   const PublicProfileScreen({
     super.key,
@@ -43,6 +44,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   /// mostra quan arriba el perfil del servidor.
   bool _fetched = false;
 
+  /// Hi ha una petició de seguir / deixar de seguir en curs.
+  bool _followPending = false;
+
   @override
   void initState() {
     super.initState();
@@ -74,6 +78,49 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
         _error = const UsersApiException('No s\'ha pogut carregar el perfil');
         _loading = false;
       });
+    }
+  }
+
+  /// Seguir o deixar de seguir, amb canvi optimista: el botó canvia a
+  /// l'instant i, si la petició falla, torna a l'estat anterior.
+  Future<void> _toggleFollow() async {
+    final user = _user;
+    if (user == null || _followPending) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final wasFollowing = user.isFollowing;
+    setState(() {
+      _followPending = true;
+      _user = user.copyWith(isFollowing: !wasFollowing);
+    });
+    try {
+      if (wasFollowing) {
+        await _api.unfollow(user.id);
+      } else {
+        await _api.follow(user.id);
+      }
+      if (!mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              wasFollowing
+                  ? 'Has deixat de seguir ${user.username}'
+                  : 'Ara segueixes ${user.username}',
+            ),
+          ),
+        );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _user = _user?.copyWith(isFollowing: wasFollowing));
+      final message = e is UsersApiException
+          ? e.message
+          : 'No s\'ha pogut actualitzar el seguiment';
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) setState(() => _followPending = false);
     }
   }
 
@@ -176,6 +223,16 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
             color: CaliuColors.maroonDeep,
           ),
         ),
+        if (_fetched) ...[
+          const SizedBox(height: 16),
+          Center(
+            child: _FollowButton(
+              following: user.isFollowing,
+              pending: _followPending,
+              onPressed: _toggleFollow,
+            ),
+          ),
+        ],
         const SizedBox(height: 24),
         if (_fetched)
           Card(
@@ -198,6 +255,48 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// "Seguir" (ple) o "Seguint" (contornejat). Tornar-lo a tocar deixa de
+/// seguir.
+class _FollowButton extends StatelessWidget {
+  const _FollowButton({
+    required this.following,
+    required this.pending,
+    required this.onPressed,
+  });
+
+  final bool following;
+  final bool pending;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final onTap = pending ? null : onPressed;
+    if (following) {
+      return OutlinedButton.icon(
+        key: const Key('follow-button'),
+        onPressed: onTap,
+        icon: const Icon(Icons.check),
+        label: const Text('Seguint'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: CaliuColors.maroon,
+          side: const BorderSide(color: CaliuColors.maroon),
+          minimumSize: const Size(160, 44),
+        ),
+      );
+    }
+    return FilledButton.icon(
+      key: const Key('follow-button'),
+      onPressed: onTap,
+      icon: const Icon(Icons.person_add_alt_1),
+      label: const Text('Seguir'),
+      style: FilledButton.styleFrom(
+        backgroundColor: CaliuColors.red,
+        minimumSize: const Size(160, 44),
+      ),
     );
   }
 }

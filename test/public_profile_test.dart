@@ -54,6 +54,12 @@ class _FlakyApi implements UsersApi {
     }
     return _laia;
   }
+
+  @override
+  Future<void> follow(String userId) async {}
+
+  @override
+  Future<void> unfollow(String userId) async {}
 }
 
 MockUsersApi _api({AuthSessionStore? session}) =>
