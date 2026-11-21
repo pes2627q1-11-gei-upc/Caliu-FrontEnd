@@ -1,8 +1,10 @@
 // Carrega tot lib/ perquè `flutter test --coverage` compti també fitxers
 // sense tests (p. ex. map_view). Sense això lcov només té el que els tests toquen.
+import 'package:caliu/achievements_screen.dart';
 import 'package:caliu/activity_list.dart';
 import 'package:caliu/attended_list.dart';
 import 'package:caliu/config.dart';
+import 'package:caliu/data/achievements_api.dart';
 import 'package:caliu/data/activity_api.dart';
 import 'package:caliu/data/attended_api.dart';
 import 'package:caliu/data/auth_api.dart';
@@ -49,6 +51,8 @@ void main() {
   test('inclou tot lib/ a la cobertura', () {
     // Referències mínimes perquè l'analitzador no elimini els imports.
     expect(apiBaseUrl, isA<String>());
+    expect(AchievementsScreen, isNotNull);
+    expect(MockAchievementsApi, isNotNull);
     expect(AuthApi, isNotNull);
     expect(AuthSession, isNotNull);
     expect(AuthValidators.username, isA<Function>());

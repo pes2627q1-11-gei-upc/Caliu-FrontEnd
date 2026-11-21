@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'achievements_screen.dart';
 import 'activity_list.dart';
 import 'attended_list.dart';
 import 'config.dart';
+import 'data/achievements_api.dart';
 import 'data/activity_api.dart';
 import 'data/attended_api.dart';
 import 'data/auth_api.dart';
@@ -484,6 +486,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
               if (_profileError case final error?) ...[
                 const SizedBox(height: 12),
                 Text(error, style: const TextStyle(color: CaliuColors.red)),
+              ],
+              // Catàleg de medalles (tasca #177): amagat fins que es pugui
+              // carregar el progrés real del compte.
+              if (achievementsAvailable) ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  key: const Key('open-achievements'),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const AchievementsScreen(),
+                    ),
+                  ),
+                  icon: const Icon(Icons.emoji_events_outlined),
+                  label: const Text('Assoliments'),
+                ),
               ],
               const SizedBox(height: 12),
               OutlinedButton.icon(
