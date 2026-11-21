@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../config.dart';
+import 'chat_filters.dart';
+import 'chat_plan.dart';
 import 'event.dart';
 
 class ChatApiException implements Exception {
@@ -35,6 +37,8 @@ class ChatReply {
     required this.sessionId,
     required this.reply,
     this.events = const [],
+    this.filters,
+    this.plan,
   });
 
   final String sessionId;
@@ -43,6 +47,13 @@ class ChatReply {
   /// Esdeveniments que esmenta la resposta (H.U #11, tasca #134).
   /// Camp opcional: si el backend no l'envia, la llista és buida.
   final List<Event> events;
+
+  /// Filtres que l'assistent ha interpretat del missatge (tasca #138).
+  /// Null si no n'hi ha cap o el backend no els envia.
+  final ChatFilters? filters;
+
+  /// Itinerari quan la resposta és de tipus `plan` (tasca #141).
+  final ChatPlan? plan;
 }
 
 /// Client del xatbot (api-node, ruta protegida amb JWT).
@@ -60,34 +71,27 @@ class ChatApi {
   final http.Client _client;
   final String _baseUrl;
 
+  /// [locale] és l'idioma de l'app (`ca`, `es` o `en`, tasca #147): el
+  /// backend el fa servir quan no pot detectar l'idioma del missatge.
   Future<ChatReply> sendMessage({
     required String token,
     required String message,
     String? sessionId,
+    String? locale,
   }) async {
-    final uri = Uri.parse('$_baseUrl/chat/messages');
-    late final http.Response response;
-    try {
-      response = await _client
-          .post(
-            uri,
-            headers: {
-              'Authorization': 'Bearer $token',
-              'Content-Type': 'application/json',
-            },
-            body: jsonEncode({
-              'message': message,
-              if (sessionId != null) 'sessionId': sessionId,
-            }),
-          )
-          .timeout(timeout);
-    } on TimeoutException {
-      throw const ChatApiException(
-        'L\'assistent està trigant massa a respondre. Torna-ho a provar.',
-      );
-    } on Exception {
-      throw const ChatApiException(
-        'No s\'ha pogut connectar amb l\'assistent. Comprova la connexió.',
+    var response = await _post(
+      token: token,
+      message: message,
+      sessionId: sessionId,
+      locale: locale,
+    );
+    // Un backend anterior a la #147 rebutja camps desconeguts amb un 400:
+    // es torna a provar sense l'idioma perquè el xat no deixi de funcionar.
+    if (response.statusCode == 400 && locale != null) {
+      response = await _post(
+        token: token,
+        message: message,
+        sessionId: sessionId,
       );
     }
 
@@ -110,11 +114,47 @@ class ChatApi {
         'L\'assistent ha retornat una resposta inesperada.',
       );
     }
+    final body = decoded as Map<String, dynamic>;
     return ChatReply(
       sessionId: newSessionId,
       reply: reply.trim(),
-      events: _parseEvents((decoded as Map<String, dynamic>)['events']),
+      events: _parseEvents(body['events']),
+      filters: ChatFilters.fromJson(body['filters']),
+      plan: body['type'] == 'plan' ? ChatPlan.fromJson(body['plan']) : null,
     );
+  }
+
+  Future<http.Response> _post({
+    required String token,
+    required String message,
+    String? sessionId,
+    String? locale,
+  }) async {
+    final uri = Uri.parse('$_baseUrl/chat/messages');
+    try {
+      return await _client
+          .post(
+            uri,
+            headers: {
+              'Authorization': 'Bearer $token',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode({
+              'message': message,
+              'sessionId': ?sessionId,
+              'locale': ?locale,
+            }),
+          )
+          .timeout(timeout);
+    } on TimeoutException {
+      throw const ChatApiException(
+        'L\'assistent està trigant massa a respondre. Torna-ho a provar.',
+      );
+    } on Exception {
+      throw const ChatApiException(
+        'No s\'ha pogut connectar amb l\'assistent. Comprova la connexió.',
+      );
+    }
   }
 
   static List<Event> _parseEvents(dynamic raw) {
