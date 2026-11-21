@@ -13,6 +13,7 @@ import 'package:caliu/data/event.dart';
 import 'package:caliu/data/event_query.dart';
 import 'package:caliu/data/event_when.dart';
 import 'package:caliu/data/events_api.dart';
+import 'package:caliu/data/users_api.dart';
 import 'package:caliu/data/favorites_api.dart';
 import 'package:caliu/data/favorites_controller.dart';
 import 'package:caliu/data/map_event_markers.dart';
@@ -24,6 +25,7 @@ import 'package:caliu/main_screen.dart';
 import 'package:caliu/map_view.dart';
 import 'package:caliu/preferences_screen.dart';
 import 'package:caliu/profile_screen.dart';
+import 'package:caliu/public_profile_screen.dart';
 import 'package:caliu/register_screen.dart';
 import 'package:caliu/search_screen.dart';
 import 'package:caliu/theme/caliu_colors.dart';
@@ -34,6 +36,7 @@ import 'package:caliu/widgets/event_preview_card.dart';
 import 'package:caliu/widgets/favorite_button.dart';
 import 'package:caliu/widgets/favorites_login_prompt.dart';
 import 'package:caliu/widgets/map_event_preview.dart';
+import 'package:caliu/widgets/user_avatar.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -48,6 +51,9 @@ void main() {
     expect(EventQuery, isNotNull);
     expect(previewWhen, isA<Function>());
     expect(EventsApi, isNotNull);
+    expect(MockUsersApi, isNotNull);
+    expect(PublicProfileScreen, isNotNull);
+    expect(UserAvatar, isNotNull);
     expect(kEventClusterManagerIdPrefix, isNotEmpty);
     expect(eventClusterManagerId(1), isNotNull);
     expect(kMapMaxZoom, greaterThan(kStopClusteringZoom));
