@@ -4,7 +4,7 @@ import 'package:caliu/data/event.dart';
 import 'package:caliu/data/events_api.dart';
 import 'package:caliu/data/favorites_api.dart';
 import 'package:caliu/data/favorites_controller.dart';
-import 'package:caliu/favorites_screen.dart';
+import 'package:caliu/favorites_list.dart';
 import 'package:caliu/profile_screen.dart';
 import 'package:caliu/widgets/favorite_button.dart';
 import 'package:flutter/material.dart';
@@ -234,9 +234,11 @@ void main() {
     final setup = _Setup(serverFavorites: const [_concert]);
     await tester.pumpWidget(
       MaterialApp(
-        home: FavoritesScreen(
-          favorites: setup.favorites,
-          loginBuilder: (_) => _FakeLogin(setup.session),
+        home: Scaffold(
+          body: FavoritesList(
+            favorites: setup.favorites,
+            loginBuilder: (_) => _FakeLogin(setup.session),
+          ),
         ),
       ),
     );
