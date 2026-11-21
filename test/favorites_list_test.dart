@@ -4,7 +4,7 @@ import 'package:caliu/data/event.dart';
 import 'package:caliu/data/events_api.dart';
 import 'package:caliu/data/favorites_api.dart';
 import 'package:caliu/data/favorites_controller.dart';
-import 'package:caliu/favorites_screen.dart';
+import 'package:caliu/favorites_list.dart';
 import 'package:caliu/profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -51,20 +51,21 @@ Future<void> _pumpScreen(
 ) async {
   await tester.pumpWidget(
     MaterialApp(
-      home: FavoritesScreen(favorites: favorites, now: DateTime(2026, 11, 18)),
+      home: Scaffold(
+        body: FavoritesList(favorites: favorites, now: DateTime(2026, 11, 18)),
+      ),
     ),
   );
   await tester.pumpAndSettle();
 }
 
 void main() {
-  group('FavoritesScreen', () {
+  group('FavoritesList', () {
     testWidgets('mostra els preferits amb el lloc, el més recent primer', (
       tester,
     ) async {
       await _pumpScreen(tester, _controller(seed: const [_fira, _concert]));
 
-      expect(find.text('Preferits'), findsOneWidget);
       final first = tester.getTopLeft(find.text('Fira del Llibre'));
       final second = tester.getTopLeft(find.text('Concert al Parc'));
       expect(first.dy, lessThan(second.dy));
@@ -132,7 +133,9 @@ void main() {
     });
   });
 
-  testWidgets('el perfil obre la pantalla de Preferits', (tester) async {
+  testWidgets('el perfil mostra els preferits a la pestanya Guardats', (
+    tester,
+  ) async {
     final authApi = AuthApi(
       client: MockClient((request) async {
         if (request.url.path == '/users/me') {
@@ -165,10 +168,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Preferits'));
+    await tester.tap(find.text('Guardats'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(FavoritesScreen), findsOneWidget);
+    expect(find.byType(FavoritesList), findsOneWidget);
     expect(find.text('Concert al Parc'), findsOneWidget);
   });
 }
