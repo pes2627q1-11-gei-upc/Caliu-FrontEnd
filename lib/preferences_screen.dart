@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'data/auth_api.dart';
+import 'data/preferred_radius.dart';
 import 'theme/caliu_colors.dart';
 
 class PreferencesScreen extends StatefulWidget {
@@ -9,11 +10,21 @@ class PreferencesScreen extends StatefulWidget {
     required this.authApi,
     required this.token,
     this.onSessionExpired,
+    this.preferredRadius,
   });
 
   final AuthApi authApi;
   final String token;
   final VoidCallback? onSessionExpired;
+
+  /// On es publica el radi desat perquè el mapa i la cerca el facin servir
+  /// (tasca #125). Per defecte, [PreferredRadius.shared].
+  final PreferredRadius? preferredRadius;
+
+  /// Límits del slider de radi: els mateixos que el filtre de la cerca.
+  static const minRadiusKm = 1.0;
+  static const maxRadiusKm = 50.0;
+  static const defaultRadiusKm = 10.0;
 
   @override
   State<PreferencesScreen> createState() => _PreferencesScreenState();
@@ -22,6 +33,10 @@ class PreferencesScreen extends StatefulWidget {
 class _PreferencesScreenState extends State<PreferencesScreen> {
   List<String>? _categories;
   Set<String> _selected = {};
+
+  /// Radi d'activitat (tasca #124). Si està desactivat, es desa `null`.
+  bool _radiusEnabled = false;
+  double _radiusKm = PreferencesScreen.defaultRadiusKm;
   String? _errorMessage;
   bool _loading = true;
   bool _saving = false;
@@ -42,12 +57,23 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     try {
       final results = await Future.wait([
         widget.authApi.fetchCategories(),
-        widget.authApi.fetchPreferences(widget.token),
+        widget.authApi.fetchUserPreferences(widget.token),
       ]);
       if (!mounted) return;
+      final preferences = results[1] as UserPreferences;
+      final radius = preferences.proximitatKm;
       setState(() {
-        _categories = results[0];
-        _selected = results[1].toSet();
+        _categories = results[0] as List<String>;
+        _selected = preferences.categories.toSet();
+        _radiusEnabled = radius != null;
+        if (radius != null) {
+          _radiusKm = radius
+              .clamp(
+                PreferencesScreen.minRadiusKm,
+                PreferencesScreen.maxRadiusKm,
+              )
+              .roundToDouble();
+        }
         _loading = false;
       });
     } on AuthApiException catch (error) {
@@ -78,9 +104,13 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     });
 
     try {
-      await widget.authApi.updatePreferences(
+      final saved = await widget.authApi.saveUserPreferences(
         token: widget.token,
-        preferences: _categories!.where(_selected.contains).toList(),
+        categories: _categories!.where(_selected.contains).toList(),
+        proximitatKm: _radiusEnabled ? _radiusKm : null,
+      );
+      (widget.preferredRadius ?? PreferredRadius.shared).set(
+        saved.proximitatKm,
       );
       if (mounted) Navigator.of(context).pop(true);
     } on AuthApiException catch (error) {
@@ -145,19 +175,82 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
     );
   }
 
+  /// Radi d'activitat (H.U #9, tasca #124): s'aplica per defecte al mapa i a
+  /// la cerca, al voltant de la ubicació de l'usuari.
+  Widget _radiusSection() {
+    return Column(
+      key: const ValueKey('preferences-radius'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(height: 24),
+        SwitchListTile(
+          key: const ValueKey('preferences-radius-switch'),
+          contentPadding: EdgeInsets.zero,
+          value: _radiusEnabled,
+          onChanged: _saving
+              ? null
+              : (value) => setState(() => _radiusEnabled = value),
+          title: Text(
+            'Radi d’activitat',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: CaliuColors.maroon,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          subtitle: Text(
+            _radiusEnabled
+                ? 'El mapa i la cerca mostraran els esdeveniments a menys de '
+                      '${_radiusKm.toStringAsFixed(0)} km de la teva ubicació.'
+                : 'Sense límit de distància.',
+          ),
+        ),
+        if (_radiusEnabled)
+          Row(
+            children: [
+              Expanded(
+                child: Slider(
+                  key: const ValueKey('preferences-radius-slider'),
+                  min: PreferencesScreen.minRadiusKm,
+                  max: PreferencesScreen.maxRadiusKm,
+                  divisions: 49,
+                  value: _radiusKm,
+                  label: '${_radiusKm.toStringAsFixed(0)} km',
+                  activeColor: CaliuColors.maroon,
+                  onChanged: _saving
+                      ? null
+                      : (value) =>
+                            setState(() => _radiusKm = value.roundToDouble()),
+                ),
+              ),
+              SizedBox(
+                width: 56,
+                child: Text(
+                  '${_radiusKm.toStringAsFixed(0)} km',
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(
+                    color: CaliuColors.maroon,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+      ],
+    );
+  }
+
   Widget _content() {
     final categories = _categories!;
     return SafeArea(
       child: Column(
         children: [
           Expanded(
-            child: categories.isEmpty
-                ? const Center(
-                    child: Text('Ara mateix no hi ha categories disponibles.'),
-                  )
-                : ListView(
+            child: ListView(
                     padding: const EdgeInsets.all(20),
                     children: [
+                      if (categories.isEmpty)
+                        const Text('Ara mateix no hi ha categories disponibles.')
+                      else ...[
                       Text(
                         'Tria les categories que t’interessen',
                         style: Theme.of(context).textTheme.titleMedium
@@ -195,6 +288,9 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
                             )
                             .toList(),
                       ),
+                      ],
+                      const SizedBox(height: 24),
+                      _radiusSection(),
                     ],
                   ),
           ),
