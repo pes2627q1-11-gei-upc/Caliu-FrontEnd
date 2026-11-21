@@ -4,22 +4,37 @@ import '../../data/chat_message.dart';
 import '../../data/event.dart';
 import '../../theme/caliu_colors.dart';
 import 'chat_event_card.dart';
+import 'chat_filters_row.dart';
+import 'chat_itinerary_card.dart';
 
-/// Bombolla d'un missatge. Les respostes de l'assistent poden portar targetes
-/// d'esdeveniment a sota (tasca #134).
+/// Bombolla d'un missatge. Les respostes de l'assistent poden portar a sota
+/// els filtres interpretats (tasca #138), un itinerari (tasca #141) i
+/// targetes d'esdeveniment (tasca #134).
 class ChatBubble extends StatelessWidget {
   const ChatBubble({
     super.key,
     required this.message,
     required this.onOpenEvent,
     this.onRetry,
+    this.onOpenRoute,
     this.now,
   });
 
   final ChatMessage message;
   final ValueChanged<Event> onOpenEvent;
   final VoidCallback? onRetry;
+
+  /// Com obrir la ruta d'un itinerari. Per defecte, Google Maps.
+  final Future<void> Function(Uri uri)? onOpenRoute;
   final DateTime? now;
+
+  /// Amb itinerari, el widget ja mostra els passos: de la resposta només
+  /// es mostra la introducció (la primera línia).
+  String get _text {
+    if (message.plan == null) return message.text;
+    final intro = message.text.split('\n').first.trim();
+    return intro.isEmpty ? message.text : intro;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +56,7 @@ class ChatBubble extends StatelessWidget {
             : Border.all(color: CaliuColors.maroon.withValues(alpha: 0.1)),
       ),
       child: SelectableText(
-        message.text,
+        _text,
         style: TextStyle(
           color: isUser ? Colors.white : CaliuColors.maroonDeep,
           fontSize: 15,
@@ -69,6 +84,26 @@ class ChatBubble extends StatelessWidget {
               icon: const Icon(Icons.refresh, size: 16),
               label: const Text('No enviat · Tornar a provar'),
               style: TextButton.styleFrom(foregroundColor: CaliuColors.red),
+            ),
+          if (message.filters case final filters? when !isUser)
+            Padding(
+              padding: const EdgeInsets.only(top: 6, right: 24),
+              child: ChatFiltersRow(
+                key: ValueKey('chat-filters-${message.id}'),
+                filters: filters,
+                now: now,
+              ),
+            ),
+          if (message.plan case final plan? when !isUser)
+            Padding(
+              padding: const EdgeInsets.only(top: 6, right: 24),
+              child: ChatItineraryCard(
+                key: ValueKey('chat-plan-${message.id}'),
+                plan: plan,
+                now: now,
+                onOpenRoute: onOpenRoute,
+                onOpenStep: (step) => onOpenEvent(step.toEvent()),
+              ),
             ),
           for (final event in message.events)
             Padding(

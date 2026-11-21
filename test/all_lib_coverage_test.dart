@@ -51,9 +51,15 @@ import 'package:caliu/widgets/map_event_preview.dart';
 import 'package:caliu/chat_screen.dart';
 import 'package:caliu/data/chat_api.dart';
 import 'package:caliu/data/chat_controller.dart';
+import 'package:caliu/data/chat_dates.dart';
+import 'package:caliu/data/chat_filters.dart';
+import 'package:caliu/data/chat_locale.dart';
 import 'package:caliu/data/chat_message.dart';
+import 'package:caliu/data/chat_plan.dart';
 import 'package:caliu/widgets/chat/chat_bubble.dart';
 import 'package:caliu/widgets/chat/chat_event_card.dart';
+import 'package:caliu/widgets/chat/chat_filters_row.dart';
+import 'package:caliu/widgets/chat/chat_itinerary_card.dart';
 import 'package:caliu/widgets/chat/typing_indicator.dart';
 import 'package:caliu/widgets/profile_avatar.dart';
 import 'package:caliu/widgets/user_avatar.dart';
@@ -122,5 +128,11 @@ void main() {
     expect(ChatBubble, isNotNull);
     expect(ChatEventCard, isNotNull);
     expect(TypingIndicator, isNotNull);
+    expect(ChatFilters, isNotNull);
+    expect(ChatPlan, isNotNull);
+    expect(chatDayLabel, isA<Function>());
+    expect(appChatLocale, isA<Function>());
+    expect(ChatFiltersRow, isNotNull);
+    expect(ChatItineraryCard, isNotNull);
   });
 }

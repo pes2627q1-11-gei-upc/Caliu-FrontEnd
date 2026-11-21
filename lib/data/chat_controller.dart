@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'auth_session.dart';
 import 'chat_api.dart';
+import 'chat_locale.dart';
 import 'chat_message.dart';
 
 /// Estat del xat, separat de la UI (H.U #11).
@@ -9,12 +10,19 @@ import 'chat_message.dart';
 /// La pantalla només llegeix aquest estat i crida [send], [retry], [reset]...
 /// Així la lògica es pot testejar sense widgets.
 class ChatController extends ChangeNotifier {
-  ChatController({ChatApi? api, AuthSessionStore? session})
-    : _api = api ?? ChatApi(),
-      _session = session ?? AuthSession();
+  ChatController({
+    ChatApi? api,
+    AuthSessionStore? session,
+    String Function()? locale,
+  }) : _api = api ?? ChatApi(),
+       _session = session ?? AuthSession(),
+       _locale = locale ?? appChatLocale;
 
   final ChatApi _api;
   final AuthSessionStore _session;
+
+  /// Idioma de l'app que s'envia amb cada missatge (tasca #147).
+  final String Function() _locale;
 
   final List<ChatMessage> _messages = [];
   List<ChatMessage> get messages => List.unmodifiable(_messages);
@@ -113,6 +121,7 @@ class ChatController extends ChangeNotifier {
         token: token,
         message: message.text,
         sessionId: sessionId,
+        locale: _locale(),
       );
       if (_disposed) return;
       sessionId = reply.sessionId;
@@ -122,6 +131,8 @@ class ChatController extends ChangeNotifier {
           role: ChatRole.assistant,
           text: reply.reply,
           events: reply.events,
+          filters: reply.filters,
+          plan: reply.plan,
         ),
       );
     } on ChatApiException catch (e) {
