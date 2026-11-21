@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'achievements_screen.dart';
 import 'activity_list.dart';
 import 'attended_list.dart';
 import 'config.dart';
+import 'data/achievements_api.dart';
 import 'data/activity_api.dart';
 import 'data/attended_api.dart';
 import 'data/auth_api.dart';
@@ -10,6 +12,7 @@ import 'data/auth_session.dart';
 import 'data/auth_validators.dart';
 import 'data/avatar_controller.dart';
 import 'data/events_api.dart';
+import 'data/favorite_alerts_controller.dart';
 import 'data/favorites_controller.dart';
 import 'favorites_list.dart';
 import 'login_screen.dart';
@@ -30,6 +33,7 @@ class ProfileScreen extends StatefulWidget {
     this.favorites,
     this.avatar,
     this.loginBuilder,
+    this.alerts,
     this.activityApi,
     this.attendedApi,
   });
@@ -46,6 +50,9 @@ class ProfileScreen extends StatefulWidget {
 
   /// Per als tests; per defecte, la pantalla de login de l'app.
   final WidgetBuilder? loginBuilder;
+
+  /// Per defecte, [FavoriteAlertsController.shared].
+  final FavoriteAlertsController? alerts;
 
   /// Per defecte, [createActivityApi].
   final ActivityApi? activityApi;
@@ -66,6 +73,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       widget.favorites ?? FavoritesController.shared;
   late final AvatarController _avatar =
       widget.avatar ?? AvatarController.shared;
+  late final FavoriteAlertsController _alerts =
+      widget.alerts ?? FavoriteAlertsController.shared;
   ApiHealth? _health;
   AuthenticatedProfile? _profile;
   String? _token;
@@ -150,6 +159,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _favorites.load();
     // La foto és del compte que acaba d'entrar (revisió de la PR #35).
     _avatar.load();
+    if (favoriteAlertsAvailable) _alerts.load();
     await _loadAccount();
   }
 
@@ -181,6 +191,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
     _favorites.clear();
     _avatar.clear();
+    _alerts.clear();
     if (!mounted || _token != token) return;
     setState(() {
       _token = null;
@@ -282,6 +293,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
     _favorites.clear();
     _avatar.clear();
+    _alerts.clear();
     if (!mounted || _token != token) return;
     setState(() {
       _token = null;
@@ -360,6 +372,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             FavoritesList(
               key: ValueKey('guardats-$sessionKey'),
               favorites: _favorites,
+              // Campana amagada fins que hi hagi notificacions reals.
+              alerts: favoriteAlertsAvailable ? _alerts : null,
             ),
             ActivityList(
               key: ValueKey('activitat-$sessionKey'),
@@ -488,6 +502,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
               if (_profileError case final error?) ...[
                 const SizedBox(height: 12),
                 Text(error, style: const TextStyle(color: CaliuColors.red)),
+              ],
+              // Catàleg de medalles (tasca #177): amagat fins que es pugui
+              // carregar el progrés real del compte.
+              if (achievementsAvailable) ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  key: const Key('open-achievements'),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const AchievementsScreen(),
+                    ),
+                  ),
+                  icon: const Icon(Icons.emoji_events_outlined),
+                  label: const Text('Assoliments'),
+                ),
               ],
               const SizedBox(height: 12),
               OutlinedButton.icon(
