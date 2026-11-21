@@ -44,6 +44,12 @@ class _ControlledApi implements UsersApi {
 
   @override
   Future<void> unfollow(String userId) => _next('unfollow $userId');
+
+  @override
+  Future<List<PublicUser>> fetchFollowers(String userId) async => const [];
+
+  @override
+  Future<List<PublicUser>> fetchFollowing(String userId) async => const [];
 }
 
 MockUsersApi _api({String? currentUserId}) => MockUsersApi(

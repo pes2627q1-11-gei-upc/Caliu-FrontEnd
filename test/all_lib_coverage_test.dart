@@ -24,6 +24,7 @@ import 'package:caliu/data/favorites_controller.dart';
 import 'package:caliu/data/map_event_markers.dart';
 import 'package:caliu/event_detail_screen.dart';
 import 'package:caliu/favorites_list.dart';
+import 'package:caliu/follow_lists_screen.dart';
 import 'package:caliu/forgot_password_screen.dart';
 import 'package:caliu/login_screen.dart';
 import 'package:caliu/main.dart';
@@ -66,6 +67,7 @@ void main() {
     expect(NewPasswordScreen, isNotNull);
     expect(MockUsersApi, isNotNull);
     expect(PublicProfileScreen, isNotNull);
+    expect(FollowListsScreen, isNotNull);
     expect(UserAvatar, isNotNull);
     expect(kEventClusterManagerIdPrefix, isNotEmpty);
     expect(eventClusterManagerId(1), isNotNull);

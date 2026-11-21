@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'data/users_api.dart';
+import 'follow_lists_screen.dart';
 import 'login_screen.dart';
 import 'theme/caliu_colors.dart';
 import 'widgets/user_avatar.dart';
@@ -47,6 +48,11 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   /// Hi ha una petició de seguir / deixar de seguir en curs.
   bool _followPending = false;
 
+  /// Recomptes de seguidors i seguits (H.U #62). Null mentre es carreguen o
+  /// si no s'han pogut carregar.
+  int? _followersCount;
+  int? _followingCount;
+
   @override
   void initState() {
     super.initState();
@@ -66,6 +72,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
         _fetched = true;
         _loading = false;
       });
+      await _loadCounts(user.id);
     } on UsersApiException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -81,6 +88,40 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     }
   }
 
+  /// El recompte es calcula a partir de les llistes, perquè coincideixi
+  /// sempre amb el nombre d'elements que es veuran en obrir-les.
+  Future<void> _loadCounts(String userId) async {
+    try {
+      final results = await Future.wait([
+        _api.fetchFollowers(userId),
+        _api.fetchFollowing(userId),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _followersCount = results[0].length;
+        _followingCount = results[1].length;
+      });
+    } catch (_) {
+      // Els recomptes són secundaris: si fallen, no es mostren.
+    }
+  }
+
+  Future<void> _openFollowLists(FollowList list) async {
+    final user = _user;
+    if (user == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => FollowListsScreen(
+          userId: user.id,
+          title: '@${user.username}',
+          initialList: list,
+          api: widget.api,
+        ),
+      ),
+    );
+    if (mounted) await _load();
+  }
+
   /// Seguir o deixar de seguir, amb canvi optimista: el botó canvia a
   /// l'instant i, si la petició falla, torna a l'estat anterior.
   Future<void> _toggleFollow() async {
@@ -91,6 +132,10 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     setState(() {
       _followPending = true;
       _user = user.copyWith(isFollowing: !wasFollowing);
+      // Jo passo a ser (o deixo de ser) un dels seus seguidors.
+      if (_followersCount case final count?) {
+        _followersCount = count + (wasFollowing ? -1 : 1);
+      }
     });
     try {
       if (wasFollowing) {
@@ -112,7 +157,12 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
         );
     } catch (e) {
       if (!mounted) return;
-      setState(() => _user = _user?.copyWith(isFollowing: wasFollowing));
+      setState(() {
+        _user = _user?.copyWith(isFollowing: wasFollowing);
+        if (_followersCount case final count?) {
+          _followersCount = count + (wasFollowing ? 1 : -1);
+        }
+      });
       final message = e is UsersApiException
           ? e.message
           : 'No s\'ha pogut actualitzar el seguiment';
@@ -232,6 +282,27 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
               onPressed: _toggleFollow,
             ),
           ),
+          if (_followersCount != null && _followingCount != null) ...[
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _CountButton(
+                  key: const Key('followers-count'),
+                  count: _followersCount!,
+                  label: _followersCount == 1 ? 'seguidor' : 'seguidors',
+                  onTap: () => _openFollowLists(FollowList.followers),
+                ),
+                const SizedBox(width: 24),
+                _CountButton(
+                  key: const Key('following-count'),
+                  count: _followingCount!,
+                  label: _followingCount == 1 ? 'seguit' : 'seguits',
+                  onTap: () => _openFollowLists(FollowList.following),
+                ),
+              ],
+            ),
+          ],
         ],
         const SizedBox(height: 24),
         if (_fetched)
@@ -296,6 +367,44 @@ class _FollowButton extends StatelessWidget {
       style: FilledButton.styleFrom(
         backgroundColor: CaliuColors.red,
         minimumSize: const Size(160, 44),
+      ),
+    );
+  }
+}
+
+/// Recompte tocable ("3 seguidors") que obre la llista corresponent.
+class _CountButton extends StatelessWidget {
+  const _CountButton({
+    super.key,
+    required this.count,
+    required this.label,
+    required this.onTap,
+  });
+
+  final int count;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Column(
+          children: [
+            Text(
+              '$count',
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: CaliuColors.maroonDeep,
+              ),
+            ),
+            Text(label, style: const TextStyle(color: CaliuColors.textMuted)),
+          ],
+        ),
       ),
     );
   }
