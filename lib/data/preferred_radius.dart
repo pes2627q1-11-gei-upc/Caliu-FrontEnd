@@ -63,7 +63,10 @@ class PreferredRadius extends ChangeNotifier {
 ///
 /// Si l'usuari canvia o treu el radi a mà, no es trepitja fins que les
 /// preferències tornin a canviar. Retorna la funció per deixar d'escoltar.
-VoidCallback bindPreferredRadius(PreferredRadius preferred, SearchRadius radius) {
+VoidCallback bindPreferredRadius(
+  PreferredRadius preferred,
+  SearchRadius radius,
+) {
   double? applied;
 
   // El radi actual és el que es va posar per defecte (o encara s'està

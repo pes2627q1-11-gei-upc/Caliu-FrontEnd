@@ -36,7 +36,8 @@ http.Response _prefs({List<String> categories = const [], double? km}) =>
       200,
     );
 
-SearchRadius _radius() => SearchRadius(locate: () async => const LatLng(41.4, 2.17));
+SearchRadius _radius() =>
+    SearchRadius(locate: () async => const LatLng(41.4, 2.17));
 
 void main() {
   group('AuthApi: radi d\'activitat (#124)', () {
@@ -54,22 +55,23 @@ void main() {
       expect(preferences.proximitatKm, 15);
     });
 
-    test('proximitatKm null vol dir sense radi; un tipus erroni falla', () async {
-      expect(
-        (await _api((_) async => _prefs()).fetchUserPreferences('tok'))
-            .proximitatKm,
-        isNull,
-      );
-      await expectLater(
-        _api(
-          (_) async => http.Response(
-            '{"preferences":[],"proximitatKm":"10"}',
-            200,
-          ),
-        ).fetchUserPreferences('tok'),
-        throwsA(isA<AuthApiException>()),
-      );
-    });
+    test(
+      'proximitatKm null vol dir sense radi; un tipus erroni falla',
+      () async {
+        expect(
+          (await _api((_) async => _prefs()).fetchUserPreferences('tok'))
+              .proximitatKm,
+          isNull,
+        );
+        await expectLater(
+          _api(
+            (_) async =>
+                http.Response('{"preferences":[],"proximitatKm":"10"}', 200),
+          ).fetchUserPreferences('tok'),
+          throwsA(isA<AuthApiException>()),
+        );
+      },
+    );
 
     test('desa les categories i el radi, o null per esborrar-lo', () async {
       final bodies = <Object?>[];
@@ -187,26 +189,33 @@ void main() {
       await radius.apply(3);
       preferred.clear();
       await pumpEventQueue();
-      expect(radius.radiusKm, 3, reason: 'tancar sessió no esborra el radi manual');
+      expect(
+        radius.radiusKm,
+        3,
+        reason: 'tancar sessió no esborra el radi manual',
+      );
 
       unbind();
       radius.dispose();
     });
 
-    test('en tancar sessió treu el radi que venia de les preferències', () async {
-      final preferred = PreferredRadius(api: _api((_) async => _prefs()))
-        ..set(15);
-      final radius = _radius();
-      final unbind = bindPreferredRadius(preferred, radius);
-      await pumpEventQueue();
+    test(
+      'en tancar sessió treu el radi que venia de les preferències',
+      () async {
+        final preferred = PreferredRadius(api: _api((_) async => _prefs()))
+          ..set(15);
+        final radius = _radius();
+        final unbind = bindPreferredRadius(preferred, radius);
+        await pumpEventQueue();
 
-      preferred.clear();
-      await pumpEventQueue();
-      expect(radius.radiusKm, isNull);
+        preferred.clear();
+        await pumpEventQueue();
+        expect(radius.radiusKm, isNull);
 
-      unbind();
-      radius.dispose();
-    });
+        unbind();
+        radius.dispose();
+      },
+    );
 
     test('sense radi desat, el filtre no canvia', () async {
       final preferred = PreferredRadius(api: _api((_) async => _prefs()));

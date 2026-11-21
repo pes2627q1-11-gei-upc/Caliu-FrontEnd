@@ -246,53 +246,52 @@ class _PreferencesScreenState extends State<PreferencesScreen> {
         children: [
           Expanded(
             child: ListView(
-                    padding: const EdgeInsets.all(20),
-                    children: [
-                      if (categories.isEmpty)
-                        const Text('Ara mateix no hi ha categories disponibles.')
-                      else ...[
-                      Text(
-                        'Tria les categories que t’interessen',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              color: CaliuColors.maroon,
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                      const SizedBox(height: 16),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: categories
-                            .map(
-                              (category) => FilterChip(
-                                label: Text(category),
-                                selected: _selected.contains(category),
-                                onSelected: _saving
-                                    ? null
-                                    : (selected) => setState(() {
-                                        if (selected) {
-                                          _selected.add(category);
-                                        } else {
-                                          _selected.remove(category);
-                                        }
-                                      }),
-                                selectedColor: CaliuColors.maroon,
-                                checkmarkColor: Colors.white,
-                                labelStyle: TextStyle(
-                                  color: _selected.contains(category)
-                                      ? Colors.white
-                                      : CaliuColors.maroon,
-                                ),
-                              ),
-                            )
-                            .toList(),
-                      ),
-                      ],
-                      const SizedBox(height: 24),
-                      _radiusSection(),
-                    ],
+              padding: const EdgeInsets.all(20),
+              children: [
+                if (categories.isEmpty)
+                  const Text('Ara mateix no hi ha categories disponibles.')
+                else ...[
+                  Text(
+                    'Tria les categories que t’interessen',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: CaliuColors.maroon,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: categories
+                        .map(
+                          (category) => FilterChip(
+                            label: Text(category),
+                            selected: _selected.contains(category),
+                            onSelected: _saving
+                                ? null
+                                : (selected) => setState(() {
+                                    if (selected) {
+                                      _selected.add(category);
+                                    } else {
+                                      _selected.remove(category);
+                                    }
+                                  }),
+                            selectedColor: CaliuColors.maroon,
+                            checkmarkColor: Colors.white,
+                            labelStyle: TextStyle(
+                              color: _selected.contains(category)
+                                  ? Colors.white
+                                  : CaliuColors.maroon,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+                ],
+                const SizedBox(height: 24),
+                _radiusSection(),
+              ],
+            ),
           ),
           if (_errorMessage case final message?)
             Padding(
