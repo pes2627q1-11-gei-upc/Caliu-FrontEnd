@@ -65,6 +65,13 @@ class Achievement {
   }
 }
 
+/// El progrés real depèn de les assistències validades per GPS, que encara no
+/// existeixen: amb dades simulades es podrien confondre amb assoliments reals.
+/// Per això l'accés des del perfil s'amaga fins que es pugui carregar el
+/// progrés real del compte (revisió de la PR #34). Per provar-lo:
+/// `flutter run --dart-define=ACHIEVEMENTS=true`.
+const achievementsAvailable = bool.fromEnvironment('ACHIEVEMENTS');
+
 /// Catàleg d'assoliments amb el progrés de l'usuari autenticat.
 ///
 /// El backend encara no l'exposa (tasques #175 i #176). Proposta de contracte

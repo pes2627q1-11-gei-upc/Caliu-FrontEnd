@@ -1,8 +1,15 @@
 import 'package:caliu/achievements_screen.dart';
 import 'package:caliu/data/achievements_api.dart';
+import 'package:caliu/data/auth_api.dart';
 import 'package:caliu/data/auth_session.dart';
+import 'package:caliu/data/events_api.dart';
+import 'package:caliu/data/favorites_api.dart';
+import 'package:caliu/data/favorites_controller.dart';
+import 'package:caliu/profile_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 const _done = Achievement(
   id: 'done',
@@ -93,6 +100,53 @@ MockAchievementsApi _api(List<Achievement> seed, {AuthSessionStore? session}) =>
     MockAchievementsApi(seed: seed, session: session, latency: Duration.zero);
 
 void main() {
+  group('Accés amagat fins que hi hagi progrés real (revisió PR #34)', () {
+    test('per defecte, els assoliments no estan disponibles', () {
+      expect(achievementsAvailable, isFalse);
+    });
+
+    testWidgets('el perfil no mostra el botó «Assoliments»', (tester) async {
+      final session = _MemorySession()..token = 'test-token';
+      final authApi = AuthApi(
+        client: MockClient((request) async {
+          if (request.url.path == '/users/me') {
+            return http.Response(
+              '{"id":"u1","username":"Nuria_42","email":"nuria@example.cat",'
+              '"preferences":[]}',
+              200,
+            );
+          }
+          throw StateError('Crida inesperada: ${request.url}');
+        }),
+        baseUrl: 'http://localhost:3000',
+      );
+      final eventsApi = EventsApi(
+        client: MockClient(
+          (_) async => http.Response('{"status":"ok","service":"test"}', 200),
+        ),
+        baseUrl: 'http://localhost:3000',
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProfileScreen(
+            authApi: authApi,
+            authSession: session,
+            eventsApi: eventsApi,
+            favorites: FavoritesController(
+              MockFavoritesApi(seed: const [], latency: Duration.zero),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Nuria_42'), findsOneWidget);
+      expect(find.text('Assoliments'), findsNothing);
+      expect(find.byKey(const Key('open-achievements')), findsNothing);
+    });
+  });
+
   group('Achievement', () {
     test('es desbloqueja en arribar al límit', () {
       expect(_done.unlocked, isTrue);
