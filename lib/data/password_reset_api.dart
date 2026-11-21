@@ -16,6 +16,13 @@ class PasswordResetException implements Exception {
   String toString() => message;
 }
 
+/// El backend encara no envia el correu de recuperació (tasques #172 i #173):
+/// sense correu, l'usuari no pot aconseguir el codi i quedaria encallat. Per
+/// això l'enllaç «He oblidat la contrasenya» s'amaga fins que funcioni
+/// (revisió de la PR #33). Per provar-lo:
+/// `flutter run --dart-define=PASSWORD_RESET=true`.
+const passwordResetAvailable = bool.fromEnvironment('PASSWORD_RESET');
+
 /// Recuperació de contrasenya per correu (H.U #57).
 ///
 /// El backend encara no l'exposa (tasques #172 i #173). Proposta de contracte

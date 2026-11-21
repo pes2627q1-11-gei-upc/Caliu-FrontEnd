@@ -46,6 +46,20 @@ Future<void> _fillNewPassword(
 }
 
 void main() {
+  group('Enllaç amagat fins que hi hagi backend (revisió PR #33)', () {
+    test('per defecte, la recuperació no està disponible', () {
+      expect(passwordResetAvailable, isFalse);
+    });
+
+    testWidgets('el login no mostra «He oblidat la contrasenya»', (
+      tester,
+    ) async {
+      await tester.pumpWidget(const MaterialApp(home: LoginScreen()));
+      expect(find.text('He oblidat la contrasenya'), findsNothing);
+      expect(find.text('Correu electrònic'), findsOneWidget);
+    });
+  });
+
   group('MockPasswordResetApi', () {
     test('envia un token als comptes que existeixen', () async {
       final api = _api();
@@ -215,7 +229,9 @@ void main() {
   ) async {
     final api = _api();
     await tester.pumpWidget(
-      MaterialApp(home: LoginScreen(passwordResetApi: api)),
+      MaterialApp(
+        home: LoginScreen(passwordResetApi: api, showForgotPassword: true),
+      ),
     );
 
     await tester.enterText(

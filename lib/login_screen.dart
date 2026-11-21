@@ -14,6 +14,7 @@ class LoginScreen extends StatefulWidget {
     this.authApi,
     this.authSession,
     this.passwordResetApi,
+    this.showForgotPassword = passwordResetAvailable,
   });
 
   final String? notice;
@@ -22,6 +23,10 @@ class LoginScreen extends StatefulWidget {
 
   /// Per a "He oblidat la contrasenya"; per defecte, [createPasswordResetApi].
   final PasswordResetApi? passwordResetApi;
+
+  /// Mostrar l'enllaç «He oblidat la contrasenya». Per defecte, només si el
+  /// backend ja envia el correu ([passwordResetAvailable]).
+  final bool showForgotPassword;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -181,13 +186,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         validator: AuthValidators.password,
                       ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: _isSubmitting ? null : _openForgotPassword,
-                          child: const Text('He oblidat la contrasenya'),
+                      if (widget.showForgotPassword)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: _isSubmitting
+                                ? null
+                                : _openForgotPassword,
+                            child: const Text('He oblidat la contrasenya'),
+                          ),
                         ),
-                      ),
                       if (_errorMessage case final message?) ...[
                         const SizedBox(height: 16),
                         _LoginError(message: message),
