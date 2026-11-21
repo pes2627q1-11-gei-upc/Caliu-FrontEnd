@@ -1,19 +1,26 @@
 import 'package:flutter/material.dart';
 
+import 'activity_list.dart';
+import 'attended_list.dart';
 import 'config.dart';
+import 'data/activity_api.dart';
+import 'data/attended_api.dart';
 import 'data/auth_api.dart';
 import 'data/auth_session.dart';
 import 'data/auth_validators.dart';
+import 'data/avatar_controller.dart';
 import 'data/events_api.dart';
 import 'data/favorites_controller.dart';
-import 'favorites_screen.dart';
+import 'favorites_list.dart';
 import 'login_screen.dart';
 import 'preferences_screen.dart';
 import 'register_screen.dart';
 import 'theme/caliu_colors.dart';
 import 'widgets/profile_avatar.dart';
 
-/// Pestanya Perfil: mostra el compte autenticat i l’estat de connexió de l’API.
+/// Pestanya Perfil: compte i estat de l’API, preferits guardats, activitat
+/// recent (tasca #152) i historial d’assistència (tasca #169), cadascun a la
+/// seva pestanya.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
     super.key,
@@ -21,6 +28,10 @@ class ProfileScreen extends StatefulWidget {
     this.authSession,
     this.eventsApi,
     this.favorites,
+    this.avatar,
+    this.loginBuilder,
+    this.activityApi,
+    this.attendedApi,
   });
 
   final AuthApi? authApi;
@@ -29,6 +40,18 @@ class ProfileScreen extends StatefulWidget {
 
   /// Per defecte, [FavoritesController.shared].
   final FavoritesController? favorites;
+
+  /// Foto de perfil. Per defecte, [AvatarController.shared].
+  final AvatarController? avatar;
+
+  /// Per als tests; per defecte, la pantalla de login de l'app.
+  final WidgetBuilder? loginBuilder;
+
+  /// Per defecte, [createActivityApi].
+  final ActivityApi? activityApi;
+
+  /// Per defecte, [createAttendedApi].
+  final AttendedApi? attendedApi;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -41,6 +64,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       widget.authSession ?? AuthSession();
   late final FavoritesController _favorites =
       widget.favorites ?? FavoritesController.shared;
+  late final AvatarController _avatar =
+      widget.avatar ?? AvatarController.shared;
   ApiHealth? _health;
   AuthenticatedProfile? _profile;
   String? _token;
@@ -105,9 +130,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _openLogin() async {
-    final loggedIn = await Navigator.of(
-      context,
-    ).push<bool>(MaterialPageRoute<bool>(builder: (_) => const LoginScreen()));
+    final loggedIn = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: widget.loginBuilder ?? (_) => const LoginScreen(),
+      ),
+    );
     if (loggedIn == true) await _onSignedIn();
   }
 
@@ -121,6 +148,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// Nou compte o nova sessió: carrega el perfil i els seus preferits.
   Future<void> _onSignedIn() async {
     _favorites.load();
+    // La foto és del compte que acaba d'entrar (revisió de la PR #35).
+    _avatar.load();
     await _loadAccount();
   }
 
@@ -139,14 +168,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (updated == true && mounted && _token == token) await _loadAccount();
   }
 
-  void _openFavorites() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => FavoritesScreen(favorites: _favorites),
-      ),
-    );
-  }
-
   Future<void> _expireSession([String? expectedToken]) async {
     final token = expectedToken ?? _token;
     if (token == null || _token != token) return;
@@ -159,6 +180,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // The expired account must no longer be visible even if storage fails.
     }
     _favorites.clear();
+    _avatar.clear();
     if (!mounted || _token != token) return;
     setState(() {
       _token = null;
@@ -259,6 +281,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       errorMessage = 'No s’ha pogut esborrar la sessió desada al dispositiu.';
     }
     _favorites.clear();
+    _avatar.clear();
     if (!mounted || _token != token) return;
     setState(() {
       _token = null;
@@ -304,49 +327,90 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: CaliuColors.beige,
-      appBar: AppBar(
-        backgroundColor: CaliuColors.maroonDeep,
-        foregroundColor: Colors.white,
-        title: const Text('Perfil'),
-      ),
-      body: RefreshIndicator(
-        onRefresh: _check,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
+    // Les pestanyes es reconstrueixen en iniciar o tancar sessió.
+    final sessionKey = _token ?? 'sense-sessio';
+    return DefaultTabController(
+      length: 4,
+      child: Scaffold(
+        backgroundColor: CaliuColors.beige,
+        appBar: AppBar(
+          backgroundColor: CaliuColors.maroonDeep,
+          foregroundColor: Colors.white,
+          title: const Text('Perfil'),
+          bottom: const TabBar(
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
+            indicatorColor: CaliuColors.redSoft,
+            // Quatre pestanyes: menys marge i lletra més petita perquè els
+            // noms no es tallin en mòbils estrets.
+            labelPadding: EdgeInsets.symmetric(horizontal: 4),
+            labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            unselectedLabelStyle: TextStyle(fontSize: 12),
+            tabs: [
+              Tab(icon: Icon(Icons.person_outline), text: 'Compte'),
+              Tab(icon: Icon(Icons.favorite_border), text: 'Guardats'),
+              Tab(icon: Icon(Icons.history), text: 'Activitat'),
+              Tab(icon: Icon(Icons.event_available), text: 'Historial'),
+            ],
+          ),
+        ),
+        body: TabBarView(
           children: [
-            _accountCard(context),
-            const SizedBox(height: 20),
-            Text(
-              'Estat del servidor',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: CaliuColors.maroon,
-                fontWeight: FontWeight.w600,
-              ),
+            _accountTab(context),
+            FavoritesList(
+              key: ValueKey('guardats-$sessionKey'),
+              favorites: _favorites,
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Comprova que el mòbil arriba a l’API ($apiBaseUrl). '
-              'Estira cap avall per tornar a provar.',
-              style: TextStyle(color: CaliuColors.textMuted, fontSize: 13),
+            ActivityList(
+              key: ValueKey('activitat-$sessionKey'),
+              api: widget.activityApi,
             ),
-            const SizedBox(height: 16),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else
-              _HealthCard(health: _health!),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: _loading ? null : _check,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Tornar a comprovar'),
+            AttendedList(
+              key: ValueKey('historial-$sessionKey'),
+              api: widget.attendedApi,
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _accountTab(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: _check,
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          _accountCard(context),
+          const SizedBox(height: 20),
+          Text(
+            'Estat del servidor',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: CaliuColors.maroon,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Comprova que el mòbil arriba a l’API ($apiBaseUrl). '
+            'Estira cap avall per tornar a provar.',
+            style: TextStyle(color: CaliuColors.textMuted, fontSize: 13),
+          ),
+          const SizedBox(height: 16),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else
+            _HealthCard(health: _health!),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _loading ? null : _check,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Tornar a comprovar'),
+          ),
+        ],
       ),
     );
   }
@@ -374,7 +438,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Row(
                 children: [
                   // Foto de perfil, que es pot canviar tocant-la (tasca #150).
-                  ProfileAvatar(username: profile.username, radius: 26),
+                  ProfileAvatar(
+                    username: profile.username,
+                    controller: _avatar,
+                    radius: 26,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -416,12 +484,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onPressed: _openPreferences,
                 icon: const Icon(Icons.tune),
                 label: const Text('Edita les preferències'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: _openFavorites,
-                icon: const Icon(Icons.favorite_border),
-                label: const Text('Preferits'),
               ),
               if (_profileError case final error?) ...[
                 const SizedBox(height: 12),
