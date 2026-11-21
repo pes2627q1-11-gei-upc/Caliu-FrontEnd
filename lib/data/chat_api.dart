@@ -75,10 +75,7 @@ class ChatApi {
               'Authorization': 'Bearer $token',
               'Content-Type': 'application/json',
             },
-            body: jsonEncode({
-              'message': message,
-              if (sessionId != null) 'sessionId': sessionId,
-            }),
+            body: jsonEncode({'message': message, 'sessionId': ?sessionId}),
           )
           .timeout(timeout);
     } on TimeoutException {

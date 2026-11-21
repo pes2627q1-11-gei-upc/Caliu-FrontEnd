@@ -14,6 +14,7 @@ import 'data/avatar_controller.dart';
 import 'data/events_api.dart';
 import 'data/favorite_alerts_controller.dart';
 import 'data/favorites_controller.dart';
+import 'data/preferred_radius.dart';
 import 'data/users_api.dart';
 import 'favorites_list.dart';
 import 'follow_lists_screen.dart';
@@ -39,7 +40,12 @@ class ProfileScreen extends StatefulWidget {
     this.alerts,
     this.activityApi,
     this.attendedApi,
+    this.preferredRadius,
   });
+
+  /// Radi d'activitat de les preferències (H.U #9); per defecte,
+  /// [PreferredRadius.shared].
+  final PreferredRadius? preferredRadius;
 
   /// Per a les llistes de seguidors i seguits; per defecte, [createUsersApi].
   final UsersApi? usersApi;
@@ -77,6 +83,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       widget.authSession ?? AuthSession();
   late final FavoritesController _favorites =
       widget.favorites ?? FavoritesController.shared;
+  late final PreferredRadius _preferredRadius =
+      widget.preferredRadius ?? PreferredRadius.shared;
   late final AvatarController _avatar =
       widget.avatar ?? AvatarController.shared;
   late final FavoriteAlertsController _alerts =
@@ -165,6 +173,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _favorites.load();
     // La foto és del compte que acaba d'entrar (revisió de la PR #35).
     _avatar.load();
+    // El radi de les preferències passa a ser el del mapa i la cerca (#125).
+    _preferredRadius.load();
     if (favoriteAlertsAvailable) _alerts.load();
     await _loadAccount();
   }
@@ -178,6 +188,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           authApi: _authApi,
           token: token,
           onSessionExpired: () => _expireSession(token),
+          preferredRadius: _preferredRadius,
         ),
       ),
     );
@@ -212,6 +223,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _favorites.clear();
     _avatar.clear();
     _alerts.clear();
+    _preferredRadius.clear();
     if (!mounted || _token != token) return;
     setState(() {
       _token = null;
@@ -314,6 +326,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _favorites.clear();
     _avatar.clear();
     _alerts.clear();
+    _preferredRadius.clear();
     if (!mounted || _token != token) return;
     setState(() {
       _token = null;

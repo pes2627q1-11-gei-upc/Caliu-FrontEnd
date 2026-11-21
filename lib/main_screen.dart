@@ -2,12 +2,17 @@ import 'package:flutter/material.dart';
 
 import 'chat_screen.dart';
 import 'map_view.dart';
+import 'data/preferred_radius.dart';
 import 'data/search_radius.dart';
 import 'profile_screen.dart';
 import 'search_screen.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  const MainScreen({super.key, this.preferredRadius});
+
+  /// Radi de les preferències que fan servir per defecte el mapa i la cerca
+  /// (H.U #9, tasca #125). Per defecte, [PreferredRadius.shared].
+  final PreferredRadius? preferredRadius;
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -21,9 +26,20 @@ class _MainScreenState extends State<MainScreen> {
 
   int _selectedIndex = 0;
   final _radius = SearchRadius();
+  late final VoidCallback _unbindPreferredRadius;
+
+  @override
+  void initState() {
+    super.initState();
+    _unbindPreferredRadius = bindPreferredRadius(
+      widget.preferredRadius ?? PreferredRadius.shared,
+      _radius,
+    );
+  }
 
   @override
   void dispose() {
+    _unbindPreferredRadius();
     _radius.dispose();
     super.dispose();
   }
