@@ -77,7 +77,7 @@ class ChatApi {
             },
             body: jsonEncode({
               'message': message,
-              if (sessionId != null) 'sessionId': sessionId,
+              'sessionId': ?sessionId,
             }),
           )
           .timeout(timeout);
