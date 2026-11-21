@@ -10,6 +10,8 @@ import 'package:caliu/data/attended_api.dart';
 import 'package:caliu/data/auth_api.dart';
 import 'package:caliu/data/auth_session.dart';
 import 'package:caliu/data/auth_validators.dart';
+import 'package:caliu/data/avatar_api.dart';
+import 'package:caliu/data/avatar_controller.dart';
 import 'package:caliu/data/date_range_filter.dart';
 import 'package:caliu/data/event.dart';
 import 'package:caliu/data/event_query.dart';
@@ -36,6 +38,7 @@ import 'package:caliu/profile_screen.dart';
 import 'package:caliu/public_profile_screen.dart';
 import 'package:caliu/register_screen.dart';
 import 'package:caliu/search_screen.dart';
+import 'package:caliu/square_crop_screen.dart';
 import 'package:caliu/theme/caliu_colors.dart';
 import 'package:caliu/widgets/alerts_toggle_button.dart';
 import 'package:caliu/widgets/caliu_chip.dart';
@@ -45,6 +48,7 @@ import 'package:caliu/widgets/event_preview_card.dart';
 import 'package:caliu/widgets/favorite_button.dart';
 import 'package:caliu/widgets/favorites_login_prompt.dart';
 import 'package:caliu/widgets/map_event_preview.dart';
+import 'package:caliu/widgets/profile_avatar.dart';
 import 'package:caliu/widgets/user_avatar.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -52,6 +56,10 @@ void main() {
   test('inclou tot lib/ a la cobertura', () {
     // Referències mínimes perquè l'analitzador no elimini els imports.
     expect(apiBaseUrl, isA<String>());
+    expect(MockAvatarApi, isNotNull);
+    expect(AvatarController, isNotNull);
+    expect(SquareCropScreen, isNotNull);
+    expect(ProfileAvatar, isNotNull);
     expect(AchievementsScreen, isNotNull);
     expect(MockAchievementsApi, isNotNull);
     expect(AuthApi, isNotNull);

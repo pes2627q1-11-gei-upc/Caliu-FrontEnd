@@ -10,6 +10,7 @@ import 'data/attended_api.dart';
 import 'data/auth_api.dart';
 import 'data/auth_session.dart';
 import 'data/auth_validators.dart';
+import 'data/avatar_controller.dart';
 import 'data/events_api.dart';
 import 'data/favorite_alerts_controller.dart';
 import 'data/favorites_controller.dart';
@@ -20,6 +21,7 @@ import 'login_screen.dart';
 import 'preferences_screen.dart';
 import 'register_screen.dart';
 import 'theme/caliu_colors.dart';
+import 'widgets/profile_avatar.dart';
 
 /// Pestanya Perfil: compte i estat de l’API, preferits guardats, activitat
 /// recent (tasca #152) i historial d’assistència (tasca #169), cadascun a la
@@ -32,6 +34,8 @@ class ProfileScreen extends StatefulWidget {
     this.authSession,
     this.eventsApi,
     this.favorites,
+    this.avatar,
+    this.loginBuilder,
     this.alerts,
     this.activityApi,
     this.attendedApi,
@@ -46,6 +50,12 @@ class ProfileScreen extends StatefulWidget {
 
   /// Per defecte, [FavoritesController.shared].
   final FavoritesController? favorites;
+
+  /// Foto de perfil. Per defecte, [AvatarController.shared].
+  final AvatarController? avatar;
+
+  /// Per als tests; per defecte, la pantalla de login de l'app.
+  final WidgetBuilder? loginBuilder;
 
   /// Per defecte, [FavoriteAlertsController.shared].
   final FavoriteAlertsController? alerts;
@@ -67,6 +77,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       widget.authSession ?? AuthSession();
   late final FavoritesController _favorites =
       widget.favorites ?? FavoritesController.shared;
+  late final AvatarController _avatar =
+      widget.avatar ?? AvatarController.shared;
   late final FavoriteAlertsController _alerts =
       widget.alerts ?? FavoriteAlertsController.shared;
   ApiHealth? _health;
@@ -133,9 +145,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _openLogin() async {
-    final loggedIn = await Navigator.of(
-      context,
-    ).push<bool>(MaterialPageRoute<bool>(builder: (_) => const LoginScreen()));
+    final loggedIn = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: widget.loginBuilder ?? (_) => const LoginScreen(),
+      ),
+    );
     if (loggedIn == true) await _onSignedIn();
   }
 
@@ -149,6 +163,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   /// Nou compte o nova sessió: carrega el perfil i els seus preferits.
   Future<void> _onSignedIn() async {
     _favorites.load();
+    // La foto és del compte que acaba d'entrar (revisió de la PR #35).
+    _avatar.load();
     if (favoriteAlertsAvailable) _alerts.load();
     await _loadAccount();
   }
@@ -194,6 +210,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       // The expired account must no longer be visible even if storage fails.
     }
     _favorites.clear();
+    _avatar.clear();
     _alerts.clear();
     if (!mounted || _token != token) return;
     setState(() {
@@ -295,6 +312,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       errorMessage = 'No s’ha pogut esborrar la sessió desada al dispositiu.';
     }
     _favorites.clear();
+    _avatar.clear();
     _alerts.clear();
     if (!mounted || _token != token) return;
     setState(() {
@@ -453,13 +471,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             children: [
               Row(
                 children: [
-                  CircleAvatar(
-                    backgroundColor: CaliuColors.maroon,
-                    foregroundColor: Colors.white,
-                    child: Text(() {
-                      final name = profile.username?.trim() ?? '';
-                      return name.isEmpty ? '?' : name[0].toUpperCase();
-                    }()),
+                  // Foto de perfil, que es pot canviar tocant-la (tasca #150).
+                  ProfileAvatar(
+                    username: profile.username,
+                    controller: _avatar,
+                    radius: 26,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
