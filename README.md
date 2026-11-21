@@ -25,7 +25,7 @@ App mòbil **Flutter** de **Caliu**: mapa i agenda d’esdeveniments culturals a
 ## Què fa
 
 - **Mapa** amb esdeveniments propers (geolocalització) i **clustering** de marcadors (#114; el zoom en tocar un clúster és la #115).
-- **Fitxa** d’esdeveniment (imatge, categories, lloc, enllaç web oficial quan hi ha `url`).
+- **Fitxa** d’esdeveniment amb imatge, categories, lloc i enllaç web oficial quan hi ha `url`. **Veure ruta** obre les indicacions a Google Maps quan l’esdeveniment té una ubicació o un lloc concret.
 - **Cerca i filtres** (text, categories/chips, radi).
 - Parla amb el backend **només** per HTTP/JSON; contracte: OpenAPI del repo backend.
 

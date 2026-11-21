@@ -80,6 +80,20 @@ class Event {
     });
   }
 
+  Uri? get googleMapsDirectionsUri {
+    final point = location;
+    final hasVenue = venue?.trim().isNotEmpty == true;
+    final hasAddress = address?.trim().isNotEmpty == true;
+    if (point == null && !hasVenue && !hasAddress) return null;
+
+    return Uri.https('www.google.com', '/maps/dir/', {
+      'api': '1',
+      'destination': point == null
+          ? placeLine
+          : '${point.latitude},${point.longitude}',
+    });
+  }
+
   factory Event.fromJson(Map<String, dynamic> json) {
     LatLng? location;
     final rawLocation = json['location'];

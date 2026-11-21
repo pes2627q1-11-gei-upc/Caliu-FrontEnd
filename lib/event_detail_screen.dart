@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'data/event.dart';
@@ -153,12 +154,32 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
       return;
     }
 
-    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok && mounted) {
+    await _launchExternalUrl(uri, 'No s\'ha pogut obrir l\'enllaç');
+  }
+
+  Future<void> _openRoute(Event event) async {
+    final uri = event.googleMapsDirectionsUri;
+    if (uri == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No s\'ha pogut obrir l\'enllaç')),
+        const SnackBar(
+          content: Text('La ubicació de l’esdeveniment no està disponible'),
+        ),
       );
+      return;
     }
+
+    await _launchExternalUrl(uri, 'No s’ha pogut obrir la ruta a Google Maps');
+  }
+
+  Future<void> _launchExternalUrl(Uri uri, String errorMessage) async {
+    try {
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+    } on PlatformException {
+      // El dispositiu no ha pogut obrir l'enllaç.
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(errorMessage)));
   }
 
   @override
@@ -434,7 +455,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: FilledButton(
-                    onPressed: () => _stub('Veure ruta'),
+                    onPressed: () => _openRoute(event),
                     style: FilledButton.styleFrom(
                       backgroundColor: CaliuColors.red,
                       foregroundColor: Colors.white,
