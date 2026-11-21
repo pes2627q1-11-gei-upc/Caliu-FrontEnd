@@ -1,0 +1,161 @@
+import 'package:flutter/foundation.dart';
+
+import 'auth_session.dart';
+import 'chat_api.dart';
+import 'chat_message.dart';
+
+/// Estat del xat, separat de la UI (H.U #11).
+///
+/// La pantalla només llegeix aquest estat i crida [send], [retry], [reset]...
+/// Així la lògica es pot testejar sense widgets.
+class ChatController extends ChangeNotifier {
+  ChatController({ChatApi? api, AuthSessionStore? session})
+    : _api = api ?? ChatApi(),
+      _session = session ?? AuthSession();
+
+  final ChatApi _api;
+  final AuthSessionStore _session;
+
+  final List<ChatMessage> _messages = [];
+  List<ChatMessage> get messages => List.unmodifiable(_messages);
+
+  /// L'assistent està processant la resposta (indicador "escrivint...").
+  bool isTyping = false;
+
+  /// Encara no sabem si hi ha sessió iniciada.
+  bool checkingSession = true;
+
+  /// No hi ha token (o ha caducat): el xat demana iniciar sessió.
+  bool needsLogin = false;
+
+  /// Últim error a mostrar (es pot tancar amb [dismissError]).
+  String? error;
+
+  /// Sessió de xat del backend; es reutilitza perquè l'assistent tingui context.
+  String? sessionId;
+
+  int _nextId = 0;
+  bool _disposed = false;
+
+  Future<void> checkSession() async {
+    checkingSession = true;
+    _notify();
+    final token = await _session.readToken();
+    if (_disposed) return;
+    needsLogin = token == null || token.isEmpty;
+    checkingSession = false;
+    _notify();
+  }
+
+  /// Envia un missatge nou. Ignora textos buits o enviaments simultanis.
+  Future<void> send(String rawText) async {
+    final text = rawText.trim();
+    if (text.isEmpty || isTyping) return;
+    if (text.length > ChatApi.maxMessageLength) {
+      error =
+          'El missatge és massa llarg (màxim ${ChatApi.maxMessageLength} caràcters).';
+      _notify();
+      return;
+    }
+    final message = ChatMessage(
+      id: 'u${_nextId++}',
+      role: ChatRole.user,
+      text: text,
+    );
+    _messages.add(message);
+    await _request(message);
+  }
+
+  /// Torna a enviar un missatge que ha fallat.
+  Future<void> retry(String messageId) async {
+    if (isTyping) return;
+    final index = _messages.indexWhere(
+      (m) => m.id == messageId && m.isUser && m.failed,
+    );
+    if (index == -1) return;
+    final message = _messages[index].copyWith(status: ChatMessageStatus.sent);
+    _messages[index] = message;
+    await _request(message);
+  }
+
+  /// Comença una conversa nova (base per a la H.U #47).
+  void reset() {
+    _messages.clear();
+    sessionId = null;
+    error = null;
+    isTyping = false;
+    _notify();
+  }
+
+  void dismissError() {
+    if (error == null) return;
+    error = null;
+    _notify();
+  }
+
+  Future<void> _request(ChatMessage message) async {
+    error = null;
+    isTyping = true;
+    _notify();
+
+    final token = await _session.readToken();
+    if (_disposed) return;
+    if (token == null || token.isEmpty) {
+      needsLogin = true;
+      _markFailed(message.id);
+      isTyping = false;
+      _notify();
+      return;
+    }
+
+    try {
+      final reply = await _api.sendMessage(
+        token: token,
+        message: message.text,
+        sessionId: sessionId,
+      );
+      if (_disposed) return;
+      sessionId = reply.sessionId;
+      _messages.add(
+        ChatMessage(
+          id: 'a${_nextId++}',
+          role: ChatRole.assistant,
+          text: reply.reply,
+          events: reply.events,
+        ),
+      );
+    } on ChatApiException catch (e) {
+      if (_disposed) return;
+      if (e.isSessionLost) sessionId = null;
+      if (e.isUnauthorized) {
+        needsLogin = true;
+        // Només esborrem el token si és el mateix que ha fallat.
+        if (await _session.readToken() == token) await _session.clear();
+        if (_disposed) return;
+      }
+      _markFailed(message.id);
+      error = e.message;
+    }
+    isTyping = false;
+    _notify();
+  }
+
+  void _markFailed(String messageId) {
+    final index = _messages.indexWhere((m) => m.id == messageId);
+    if (index != -1) {
+      _messages[index] = _messages[index].copyWith(
+        status: ChatMessageStatus.failed,
+      );
+    }
+  }
+
+  void _notify() {
+    if (!_disposed) notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+}

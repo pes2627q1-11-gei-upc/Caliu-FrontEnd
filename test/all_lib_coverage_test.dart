@@ -48,6 +48,13 @@ import 'package:caliu/widgets/event_preview_card.dart';
 import 'package:caliu/widgets/favorite_button.dart';
 import 'package:caliu/widgets/favorites_login_prompt.dart';
 import 'package:caliu/widgets/map_event_preview.dart';
+import 'package:caliu/chat_screen.dart';
+import 'package:caliu/data/chat_api.dart';
+import 'package:caliu/data/chat_controller.dart';
+import 'package:caliu/data/chat_message.dart';
+import 'package:caliu/widgets/chat/chat_bubble.dart';
+import 'package:caliu/widgets/chat/chat_event_card.dart';
+import 'package:caliu/widgets/chat/typing_indicator.dart';
 import 'package:caliu/widgets/profile_avatar.dart';
 import 'package:caliu/widgets/user_avatar.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -108,5 +115,12 @@ void main() {
     expect(CaliuChip, isNotNull);
     expect(EventPreviewCard, isNotNull);
     expect(MapEventPreview, isNotNull);
+    expect(ChatScreen, isNotNull);
+    expect(ChatApi, isNotNull);
+    expect(ChatController, isNotNull);
+    expect(ChatRole.values, isNotEmpty);
+    expect(ChatBubble, isNotNull);
+    expect(ChatEventCard, isNotNull);
+    expect(TypingIndicator, isNotNull);
   });
 }
