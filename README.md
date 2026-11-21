@@ -28,6 +28,7 @@ App mòbil **Flutter** de **Caliu**: mapa i agenda d’esdeveniments culturals a
 - **Fitxa** d’esdeveniment (imatge, categories, lloc, enllaç web oficial quan hi ha `url`).
 - **Cerca i filtres** (text, categories/chips, radi).
 - Parla amb el backend **només** per HTTP/JSON; contracte: OpenAPI del repo backend.
+- **Veure al mapa** des de la fitxa centra el mapa de Caliu en l’esdeveniment i obre la previsualització del marcador quan hi ha coordenades.
 
 El selector de radi de la cerca permet aplicar entre 1 i 50 km, d'1 en 1, des de la
 ubicació real, amb un valor inicial de 5 km. El filtre es comparteix amb el
