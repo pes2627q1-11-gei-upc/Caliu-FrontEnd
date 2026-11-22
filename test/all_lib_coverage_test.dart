@@ -56,6 +56,7 @@ import 'package:caliu/data/chat_filters.dart';
 import 'package:caliu/data/chat_locale.dart';
 import 'package:caliu/data/chat_message.dart';
 import 'package:caliu/data/chat_plan.dart';
+import 'package:caliu/data/chat_demo.dart';
 import 'package:caliu/widgets/chat/chat_bubble.dart';
 import 'package:caliu/widgets/chat/chat_event_card.dart';
 import 'package:caliu/widgets/chat/chat_filters_row.dart';
@@ -130,6 +131,8 @@ void main() {
     expect(TypingIndicator, isNotNull);
     expect(ChatFilters, isNotNull);
     expect(ChatPlan, isNotNull);
+    expect(DemoChatApi, isNotNull);
+    expect(chatDemoMode, isFalse);
     expect(chatDayLabel, isA<Function>());
     expect(appChatLocale, isA<Function>());
     expect(ChatFiltersRow, isNotNull);

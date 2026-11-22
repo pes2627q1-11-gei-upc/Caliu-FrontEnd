@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'auth_session.dart';
 import 'chat_api.dart';
+import 'chat_demo.dart';
 import 'chat_locale.dart';
 import 'chat_message.dart';
 
@@ -14,8 +15,9 @@ class ChatController extends ChangeNotifier {
     ChatApi? api,
     AuthSessionStore? session,
     String Function()? locale,
-  }) : _api = api ?? ChatApi(),
-       _session = session ?? AuthSession(),
+  }) : _api = api ?? (chatDemoMode ? DemoChatApi() : ChatApi()),
+       _session =
+           session ?? (chatDemoMode ? DemoChatSession() : AuthSession()),
        _locale = locale ?? appChatLocale;
 
   final ChatApi _api;
