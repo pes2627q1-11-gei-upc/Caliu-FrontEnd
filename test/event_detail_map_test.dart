@@ -74,6 +74,21 @@ void main() {
     expect(find.byType(EventDetailScreen), findsOneWidget);
   });
 
+  testWidgets('enrere torna a la fitxa amb la previsualització oberta', (
+    tester,
+  ) async {
+    await _showEvent(tester, hasLocation: true);
+    await tester.tap(find.text('Veure al mapa'));
+    await tester.pumpAndSettle();
+    expect(find.byType(EventPreviewCard), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(GoogleMap), findsNothing);
+    expect(find.byType(EventDetailScreen), findsOneWidget);
+  });
+
   testWidgets('sense coordenades el botó Veure al mapa no apareix', (
     tester,
   ) async {

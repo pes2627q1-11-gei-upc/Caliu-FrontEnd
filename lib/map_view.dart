@@ -67,7 +67,7 @@ class MapView extends StatefulWidget {
 
 class _MapViewState extends State<MapView> {
   late final EventsApi _eventsApi = widget.eventsApi ?? EventsApi();
-  late final SearchRadius _radius = widget.radius ?? SearchRadius();
+  late final SearchRadius _radius;
 
   GoogleMapController? mapController;
   Set<Marker> _markers = {};
@@ -134,6 +134,7 @@ class _MapViewState extends State<MapView> {
       _mapReadyToShow = true;
       return;
     }
+    _radius = widget.radius ?? SearchRadius();
     _radius.addListener(_radiusChanged);
     unawaited(_bootstrap());
   }
@@ -805,6 +806,7 @@ class _MapViewState extends State<MapView> {
                         child: MapEventPreview(
                           selected: _selected,
                           active: widget.isActive,
+                          closeOnBack: !_showingEventLocation,
                           onOpen: _openDetail,
                           onClose: _clearSelection,
                         ),
