@@ -16,8 +16,7 @@ class ChatController extends ChangeNotifier {
     AuthSessionStore? session,
     String Function()? locale,
   }) : _api = api ?? (chatDemoMode ? DemoChatApi() : ChatApi()),
-       _session =
-           session ?? (chatDemoMode ? DemoChatSession() : AuthSession()),
+       _session = session ?? (chatDemoMode ? DemoChatSession() : AuthSession()),
        _locale = locale ?? appChatLocale;
 
   final ChatApi _api;
