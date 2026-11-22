@@ -149,12 +149,12 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('L\'enllaç oficial no és vàlid')),
+        const SnackBar(content: Text('L’enllaç oficial no és vàlid')),
       );
       return;
     }
 
-    await _launchExternalUrl(uri, 'No s\'ha pogut obrir l\'enllaç');
+    await _launchExternalUrl(uri, 'No s’ha pogut obrir l’enllaç');
   }
 
   Future<void> _openRoute(Event event) async {
