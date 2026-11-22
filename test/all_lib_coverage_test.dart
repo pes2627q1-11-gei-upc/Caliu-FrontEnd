@@ -34,6 +34,7 @@ import 'package:caliu/main_screen.dart';
 import 'package:caliu/new_password_screen.dart';
 import 'package:caliu/map_view.dart';
 import 'package:caliu/preferences_screen.dart';
+import 'package:caliu/data/preferred_radius.dart';
 import 'package:caliu/profile_screen.dart';
 import 'package:caliu/public_profile_screen.dart';
 import 'package:caliu/register_screen.dart';
@@ -110,6 +111,8 @@ void main() {
     expect(MainScreen, isNotNull);
     expect(MapView, isNotNull);
     expect(PreferencesScreen, isNotNull);
+    expect(PreferredRadius, isNotNull);
+    expect(bindPreferredRadius, isA<Function>());
     expect(ProfileScreen, isNotNull);
     expect(RegisterScreen, isNotNull);
     expect(SearchScreen, isNotNull);
