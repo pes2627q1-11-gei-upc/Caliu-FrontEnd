@@ -43,7 +43,16 @@ enum _LocationMode {
 }
 
 class MapView extends StatefulWidget {
-  const MapView({super.key, this.isActive = true, this.radius, this.eventsApi});
+  const MapView({super.key, this.isActive = true, this.radius, this.eventsApi})
+    : focusedEvent = null;
+
+  const MapView.forEvent({super.key, required Event event})
+    : focusedEvent = event,
+      isActive = true,
+      radius = null,
+      eventsApi = null;
+
+  final Event? focusedEvent;
 
   /// Si la pestanya Mapa és la visible (el mapa continua muntat a l'`IndexedStack`).
   final bool isActive;
@@ -58,7 +67,7 @@ class MapView extends StatefulWidget {
 
 class _MapViewState extends State<MapView> {
   late final EventsApi _eventsApi = widget.eventsApi ?? EventsApi();
-  late final SearchRadius _radius = widget.radius ?? SearchRadius();
+  late final SearchRadius _radius;
 
   GoogleMapController? mapController;
   Set<Marker> _markers = {};
@@ -100,18 +109,32 @@ class _MapViewState extends State<MapView> {
   bool _clusterZoomInFlight = false;
 
   bool get _hasUserLocation => _locationMode == _LocationMode.user;
+  bool get _showingEventLocation => widget.focusedEvent?.hasLocation == true;
 
   @override
   void dispose() {
     _cameraIdleTimer?.cancel();
-    _radius.removeListener(_radiusChanged);
-    if (widget.radius == null) _radius.dispose();
+    if (!_showingEventLocation) {
+      _radius.removeListener(_radiusChanged);
+      if (widget.radius == null) _radius.dispose();
+    }
     super.dispose();
   }
 
   @override
   void initState() {
     super.initState();
+    if (_showingEventLocation) {
+      final event = widget.focusedEvent!;
+      _focus = event.location!;
+      _selected = event;
+      _eventsById[event.id] = event;
+      _clusteringEnabled = false;
+      _applyMarkersFromEvents([event], recreateClusterManager: false);
+      _mapReadyToShow = true;
+      return;
+    }
+    _radius = widget.radius ?? SearchRadius();
     _radius.addListener(_radiusChanged);
     unawaited(_bootstrap());
   }
@@ -587,6 +610,10 @@ class _MapViewState extends State<MapView> {
   }
 
   void _openDetail(Event event) {
+    if (_showingEventLocation) {
+      Navigator.of(context).pop();
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => EventDetailScreen(
@@ -661,45 +688,47 @@ class _MapViewState extends State<MapView> {
         backgroundColor: CaliuColors.maroonDeep,
         foregroundColor: Colors.white,
         title: const Text('Mapa'),
-        actions: [
-          IconButton(
-            tooltip: _hasUserLocation
-                ? 'Centrar a la meva ubicació'
-                : 'Activar ubicació',
-            onPressed: _locating ? null : _onRecenterPressed,
-            icon: _locating
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : Icon(
-                    _hasUserLocation
-                        ? Icons.my_location
-                        : Icons.location_disabled,
-                  ),
-          ),
-          IconButton(
-            tooltip: 'Cerca',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      SearchScreen(radius: _radius, api: _eventsApi),
+        actions: _showingEventLocation
+            ? null
+            : [
+                IconButton(
+                  tooltip: _hasUserLocation
+                      ? 'Centrar a la meva ubicació'
+                      : 'Activar ubicació',
+                  onPressed: _locating ? null : _onRecenterPressed,
+                  icon: _locating
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Icon(
+                          _hasUserLocation
+                              ? Icons.my_location
+                              : Icons.location_disabled,
+                        ),
                 ),
-              );
-            },
-            icon: const Icon(Icons.search),
-          ),
-          IconButton(
-            tooltip: 'Actualitzar',
-            onPressed: _eventsRequestInFlight ? null : _refresh,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
+                IconButton(
+                  tooltip: 'Cerca',
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            SearchScreen(radius: _radius, api: _eventsApi),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.search),
+                ),
+                IconButton(
+                  tooltip: 'Actualitzar',
+                  onPressed: _eventsRequestInFlight ? null : _refresh,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
       ),
       body: !_mapReadyToShow
           ? const ColoredBox(color: CaliuColors.beige)
@@ -736,16 +765,18 @@ class _MapViewState extends State<MapView> {
                     children: [
                       Positioned.fill(
                         child: GoogleMap(
-                          onMapCreated: _onMapCreated,
+                          onMapCreated: _showingEventLocation
+                              ? null
+                              : _onMapCreated,
                           style: _mapStyleNoPois,
                           initialCameraPosition: CameraPosition(
                             target: _focus,
                             zoom: _initialZoom,
                           ),
                           // #117: càmera limitada a Catalunya.
-                          cameraTargetBounds: CameraTargetBounds(
-                            _cataloniaBounds,
-                          ),
+                          cameraTargetBounds: _showingEventLocation
+                              ? CameraTargetBounds.unbounded
+                              : CameraTargetBounds(_cataloniaBounds),
                           minMaxZoomPreference: const MinMaxZoomPreference(
                             7,
                             kMapMaxZoom,
@@ -758,8 +789,12 @@ class _MapViewState extends State<MapView> {
                           // #114/#115: clustering natiu + zoom en tocar el clúster.
                           clusterManagers: _clusterManagers,
                           markers: _markers,
-                          onCameraMove: _onCameraMove,
-                          onCameraIdle: _onCameraIdle,
+                          onCameraMove: _showingEventLocation
+                              ? null
+                              : _onCameraMove,
+                          onCameraIdle: _showingEventLocation
+                              ? null
+                              : _onCameraIdle,
                           // #44: tocar el mapa fora d'un marcador tanca la previsualització.
                           onTap: (_) => _clearSelection(),
                         ),
@@ -771,6 +806,7 @@ class _MapViewState extends State<MapView> {
                         child: MapEventPreview(
                           selected: _selected,
                           active: widget.isActive,
+                          closeOnBack: !_showingEventLocation,
                           onOpen: _openDetail,
                           onClose: _clearSelection,
                         ),

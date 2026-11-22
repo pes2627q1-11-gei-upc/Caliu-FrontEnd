@@ -6,8 +6,7 @@ import 'event_preview_card.dart';
 /// Previsualització animada del marcador seleccionat al mapa (H.U #44).
 ///
 /// També gestiona el botó enrere: si hi ha una targeta oberta, el primer "enrere"
-/// la tanca en lloc de sortir. Només ho fa si [active] és cert (pestanya Mapa
-/// visible): el mapa continua muntat dins de l'`IndexedStack` de `MainScreen`.
+/// la tanca en lloc de sortir si [active] i [closeOnBack] són certs.
 class MapEventPreview extends StatelessWidget {
   const MapEventPreview({
     super.key,
@@ -15,6 +14,7 @@ class MapEventPreview extends StatelessWidget {
     required this.onOpen,
     required this.onClose,
     this.active = true,
+    this.closeOnBack = true,
     this.now,
   });
 
@@ -22,6 +22,7 @@ class MapEventPreview extends StatelessWidget {
   final ValueChanged<Event> onOpen;
   final VoidCallback onClose;
   final bool active;
+  final bool closeOnBack;
 
   /// Per als tests; per defecte, `DateTime.now()`.
   final DateTime? now;
@@ -31,10 +32,11 @@ class MapEventPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final event = selected;
+    final interceptBack = event != null && active && closeOnBack;
     return PopScope(
-      canPop: event == null || !active,
+      canPop: !interceptBack,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) onClose();
+        if (!didPop && interceptBack) onClose();
       },
       child: AnimatedSwitcher(
         duration: animationDuration,

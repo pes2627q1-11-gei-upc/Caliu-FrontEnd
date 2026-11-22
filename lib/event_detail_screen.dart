@@ -6,6 +6,7 @@ import 'data/event.dart';
 import 'data/events_api.dart';
 import 'data/favorite_alerts_controller.dart';
 import 'data/favorites_controller.dart';
+import 'map_view.dart';
 import 'theme/caliu_colors.dart';
 import 'widgets/alerts_toggle_button.dart';
 import 'widgets/caliu_chip.dart';
@@ -364,6 +365,20 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             const SizedBox(height: 8),
                             _infoRow(Icons.place_outlined, place),
                           ],
+                          if (event.hasLocation)
+                            TextButton.icon(
+                              onPressed: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) =>
+                                      MapView.forEvent(event: event),
+                                ),
+                              ),
+                              icon: const Icon(Icons.map_outlined),
+                              label: const Text('Veure al mapa'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: CaliuColors.red,
+                              ),
+                            ),
                           if (price != null) ...[
                             const SizedBox(height: 8),
                             _infoRow(Icons.payments_outlined, price),
