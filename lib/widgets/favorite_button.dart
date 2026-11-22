@@ -6,7 +6,7 @@ import '../data/favorites_controller.dart';
 import '../theme/caliu_colors.dart';
 import 'favorites_login_prompt.dart';
 
-/// Cor per afegir o treure un esdeveniment dels preferits (tasca #189).
+/// Botó per afegir o treure un esdeveniment dels preferits (tasca #189).
 ///
 /// Canvia a l'instant (estat optimista) i, si la petició falla, torna a
 /// l'estat anterior i ho explica amb un SnackBar. Sense sessió, demana
@@ -21,6 +21,7 @@ class FavoriteButton extends StatelessWidget {
     this.size = 24,
     this.loginBuilder,
     this.onRemoved,
+    this.showBookmark = false,
   });
 
   final Event event;
@@ -42,6 +43,9 @@ class FavoriteButton extends StatelessWidget {
   /// del canvi optimista (p. ex. per oferir "Desfer", tasca #167).
   final VoidCallback? onRemoved;
 
+  /// Mostra el marcador amb l'etiqueta «Desar» o «Desat» a la fitxa.
+  final bool showBookmark;
+
   @override
   Widget build(BuildContext context) {
     final favorites = controller ?? FavoritesController.shared;
@@ -49,9 +53,22 @@ class FavoriteButton extends StatelessWidget {
       listenable: favorites,
       builder: (context, _) {
         final active = favorites.isFavorite(event.id);
+        Future<void> onPressed() => _onPressed(context, favorites);
+        if (showBookmark) {
+          return OutlinedButton.icon(
+            onPressed: onPressed,
+            icon: Icon(active ? Icons.bookmark : Icons.bookmark_border),
+            label: Text(active ? 'Desat' : 'Desar'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Colors.white54),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          );
+        }
         return IconButton(
           tooltip: active ? 'Treure de preferits' : 'Afegir a preferits',
-          onPressed: () => _onPressed(context, favorites),
+          onPressed: onPressed,
           iconSize: size,
           icon: AnimatedSwitcher(
             duration: const Duration(milliseconds: 180),

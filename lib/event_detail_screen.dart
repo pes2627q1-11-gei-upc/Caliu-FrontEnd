@@ -456,15 +456,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             child: Row(
               children: [
                 Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _stub('Desar'),
-                    icon: const Icon(Icons.bookmark_border),
-                    label: const Text('Desar'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white54),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
+                  child: FavoriteButton(
+                    event: event,
+                    controller: widget.favorites,
+                    showBookmark: true,
                   ),
                 ),
                 const SizedBox(width: 12),
