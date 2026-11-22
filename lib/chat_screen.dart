@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'data/chat_api.dart';
 import 'data/chat_controller.dart';
+import 'data/chat_demo.dart';
 import 'data/event.dart';
 import 'event_detail_screen.dart';
 import 'login_screen.dart';
@@ -113,6 +114,11 @@ class _ChatScreenState extends State<ChatScreen> {
             Icon(Icons.auto_awesome, size: 20),
             SizedBox(width: 8),
             Text('Assistent Caliu'),
+            // Respostes d'exemple sense backend (--dart-define=CHAT_DEMO=true).
+            if (chatDemoMode) ...[
+              SizedBox(width: 8),
+              Text('· demo', style: TextStyle(fontSize: 14)),
+            ],
           ],
         ),
       ),
