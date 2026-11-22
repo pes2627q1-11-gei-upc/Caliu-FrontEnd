@@ -74,4 +74,47 @@ void main() {
       expect(_event().googleMapsUri, isNull);
     });
   });
+
+  group('Event.googleMapsDirectionsUri', () {
+    test('prioritza les coordenades i deixa l’origen obert', () {
+      final uri = _event(
+        location: const LatLng(41.3851, 2.1734),
+        address: 'Carrer Major, 5',
+      ).googleMapsDirectionsUri!;
+
+      expect(uri.scheme, 'https');
+      expect(uri.host, 'www.google.com');
+      expect(uri.path, '/maps/dir/');
+      expect(uri.queryParameters, {
+        'api': '1',
+        'destination': '41.3851,2.1734',
+      });
+    });
+
+    test('sense coordenades fa servir l’adreça i el municipi', () {
+      final uri = _event(
+        address: ' Rambla d’Ègara, 340 ',
+        municipality: 'Terrassa',
+      ).googleMapsDirectionsUri!;
+
+      expect(
+        uri.queryParameters['destination'],
+        'Rambla d’Ègara, 340, Terrassa',
+      );
+    });
+
+    test('permet indicar un recinte amb nom', () {
+      final uri = _event(
+        venue: 'Teatre Principal',
+        municipality: 'Olot',
+      ).googleMapsDirectionsUri!;
+
+      expect(uri.queryParameters['destination'], 'Teatre Principal, Olot');
+    });
+
+    test('un municipi sol no identifica la destinació', () {
+      final event = _event(venue: ' ', address: ' ', municipality: 'Reus');
+      expect(event.googleMapsDirectionsUri, isNull);
+    });
+  });
 }
