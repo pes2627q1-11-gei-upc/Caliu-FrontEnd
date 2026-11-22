@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import 'event_query.dart';
+
 /// Estat compartit per la cerca i el mapa; no modifica les preferències.
 class SearchRadius extends ChangeNotifier {
   SearchRadius({Future<LatLng> Function()? locate})
@@ -14,6 +16,9 @@ class SearchRadius extends ChangeNotifier {
   final Future<LatLng> Function() _locate;
   LatLng? center;
   double? radiusKm;
+
+  /// Filtre de preu confirmat (#157): `free` | `paid` | null.
+  String? price;
   bool locating = false;
   String? error;
   bool _disposed = false;
@@ -22,14 +27,27 @@ class SearchRadius extends ChangeNotifier {
   /// Còpia d'edició: comparteix el proveïdor de GPS, però no notifica el mapa.
   SearchRadius fork() => SearchRadius(locate: _locate)
     ..center = center
-    ..radiusKm = radiusKm;
+    ..radiusKm = radiusKm
+    ..price = price;
 
   void adopt(SearchRadius draft) {
     ++_generation;
     center = draft.center;
     radiusKm = draft.radiusKm;
+    price = draft.price;
     locating = false;
     error = null;
+    notifyListeners();
+  }
+
+  /// Actualitza el preu provisional (draft) o confirmat i notifica.
+  void updatePrice(String? value) {
+    assert(
+      EventPriceFilter.isValid(value),
+      'price ha de ser free, paid o null',
+    );
+    if (price == value) return;
+    price = value;
     notifyListeners();
   }
 
@@ -63,6 +81,7 @@ class SearchRadius extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Treu el radi i cancel·la la localització pendent.
   void clear() {
     ++_generation;
     radiusKm = null;
@@ -70,6 +89,11 @@ class SearchRadius extends ChangeNotifier {
     locating = false;
     error = null;
     notifyListeners();
+  }
+
+  void clearAll() {
+    price = null;
+    clear();
   }
 
   static Future<LatLng> _currentPosition() async {

@@ -479,6 +479,7 @@ class _MapViewState extends State<MapView> {
         lng: lng,
         radiusKm: radiusKm,
         limit: 250,
+        price: _radius.price,
       );
       if (!mounted || generation != _loadGeneration) return;
 

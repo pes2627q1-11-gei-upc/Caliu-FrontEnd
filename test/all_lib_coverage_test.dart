@@ -75,6 +75,8 @@ void main() {
     expect(DateRangeFilter.values, isNotEmpty);
     expect(Event, isNotNull);
     expect(EventQuery, isNotNull);
+    expect(EventPriceFilter.free, 'free');
+    expect(EventPriceFilter.paid, 'paid');
     expect(previewWhen, isA<Function>());
     expect(EventsApi, isNotNull);
     expect(MockPasswordResetApi, isNotNull);

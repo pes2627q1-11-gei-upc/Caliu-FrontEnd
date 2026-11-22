@@ -1,3 +1,12 @@
+/// Valors admesos de `price` a `GET /events` (backend #156 / front #157).
+abstract final class EventPriceFilter {
+  static const free = 'free';
+  static const paid = 'paid';
+
+  static bool isValid(String? value) =>
+      value == null || value == free || value == paid;
+}
+
 class EventQuery {
   const EventQuery({
     this.q,
@@ -5,6 +14,7 @@ class EventQuery {
     this.tag,
     this.comarca,
     this.municipality,
+    this.price,
     this.lat,
     this.lng,
     this.radiusKm,
@@ -12,13 +22,20 @@ class EventQuery {
     this.to,
     this.page = 1,
     this.limit = 20,
-  });
+  }) : assert(
+         price == null ||
+             price == EventPriceFilter.free ||
+             price == EventPriceFilter.paid,
+       );
 
   final String? q;
   final String? category;
   final String? tag;
   final String? comarca;
   final String? municipality;
+
+  /// `free` | `paid` | null (sense filtre).
+  final String? price;
   final double? lat;
   final double? lng;
   final double? radiusKm;
@@ -36,6 +53,7 @@ class EventQuery {
         filled(tag) ||
         filled(comarca) ||
         filled(municipality) ||
+        price != null ||
         from != null ||
         to != null;
   }
@@ -58,6 +76,7 @@ class EventQuery {
     add('tag', tag);
     add('comarca', comarca);
     add('municipality', municipality);
+    add('price', price);
 
     // toUtc(): un DateTime local s'escriuria sense zona i el servidor
     // l'interpretaria com a UTC (desfasament d'1-2 hores).
@@ -81,6 +100,7 @@ class EventQuery {
     String? tag,
     String? comarca,
     String? municipality,
+    String? price,
     double? lat,
     double? lng,
     double? radiusKm,
@@ -93,6 +113,7 @@ class EventQuery {
     bool clearMunicipality = false,
     bool clearQ = false,
     bool clearDates = false,
+    bool clearPrice = false,
   }) {
     return EventQuery(
       q: clearQ ? null : (q ?? this.q),
@@ -102,6 +123,7 @@ class EventQuery {
       municipality: clearMunicipality
           ? null
           : (municipality ?? this.municipality),
+      price: clearPrice ? null : (price ?? this.price),
       lat: lat ?? this.lat,
       lng: lng ?? this.lng,
       radiusKm: radiusKm ?? this.radiusKm,

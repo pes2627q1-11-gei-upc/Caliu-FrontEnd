@@ -123,6 +123,7 @@ class _SearchScreenState extends State<SearchScreen> {
       category: categories.isEmpty ? null : categories.join(','),
       comarca: _comarcaController.text,
       municipality: _municipalityController.text,
+      price: radius.price,
       lat: radius.center?.latitude,
       lng: radius.center?.longitude,
       radiusKm: radius.radiusKm,
@@ -175,7 +176,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _comarcaController.clear();
       _municipalityController.clear();
     });
-    _filterRadius.clear();
+    _filterRadius.clearAll();
   }
 
   Future<void> _openFilters() async {
@@ -429,6 +430,8 @@ class _SearchScreenState extends State<SearchScreen> {
                             const SizedBox(height: 20),
                             _buildLocations(setModalState),
                             const SizedBox(height: 20),
+                            _buildPriceFilter(setModalState),
+                            const SizedBox(height: 20),
                           ],
                         ),
                       ),
@@ -580,6 +583,51 @@ class _SearchScreenState extends State<SearchScreen> {
             child: const Text('Tornar a carregar localitats'),
           ),
         ],
+      ],
+    );
+  }
+
+  Widget _buildPriceFilter(StateSetter setModalState) {
+    Widget option(String label, String? value) {
+      final selected = _filterRadius.price == value;
+      return FilterChip(
+        key: ValueKey('price-filter-$label'),
+        label: Text(label),
+        selected: selected,
+        showCheckmark: false,
+        onSelected: (_) {
+          setModalState(() => _filterRadius.updatePrice(value));
+          _updateFilterPreview();
+        },
+        selectedColor: CaliuColors.red,
+        labelStyle: TextStyle(
+          color: selected ? CaliuColors.filterField : CaliuColors.maroonDeep,
+          fontWeight: FontWeight.w600,
+        ),
+        backgroundColor: Colors.white,
+        side: BorderSide(
+          color: selected ? CaliuColors.red : CaliuColors.filterBorder,
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'PREU',
+          style: TextStyle(color: CaliuColors.red, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            option('Tots', null),
+            option('Gratuïts', EventPriceFilter.free),
+            option('De pagament', EventPriceFilter.paid),
+          ],
+        ),
       ],
     );
   }
@@ -819,7 +867,8 @@ class _SearchScreenState extends State<SearchScreen> {
         _selectedCategories.length +
         (_comarcaController.text.trim().isEmpty ? 0 : 1) +
         (_municipalityController.text.trim().isEmpty ? 0 : 1) +
-        (_radius.radiusKm == null ? 0 : 1);
+        (_radius.radiusKm == null ? 0 : 1) +
+        (_radius.price == null ? 0 : 1);
 
     return Scaffold(
       backgroundColor: CaliuColors.beige,

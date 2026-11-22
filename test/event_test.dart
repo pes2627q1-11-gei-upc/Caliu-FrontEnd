@@ -323,6 +323,30 @@ void main() {
       expect(params['lng'], '2.1');
       expect(params['radiusKm'], anyOf('15', '15.0'));
     });
+
+    test('price free/paid s’envia; Tots l’omet (#157)', () {
+      expect(
+        const EventQuery().toQueryParameters().containsKey('price'),
+        isFalse,
+      );
+      expect(
+        const EventQuery(price: EventPriceFilter.free)
+            .toQueryParameters()['price'],
+        'free',
+      );
+      expect(
+        const EventQuery(price: EventPriceFilter.paid)
+            .toQueryParameters()['price'],
+        'paid',
+      );
+      expect(const EventQuery(price: EventPriceFilter.free).hasFilters, isTrue);
+      expect(
+        const EventQuery(price: EventPriceFilter.paid)
+            .copyWith(clearPrice: true)
+            .price,
+        isNull,
+      );
+    });
   });
 
   group('EventsApi.fetchHealth', () {
