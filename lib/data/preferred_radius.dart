@@ -24,9 +24,15 @@ class PreferredRadius extends ChangeNotifier {
   double? get km => _km;
   double? _km;
 
+  /// L'últim canvi el va desar l'usuari a Preferències (no és una càrrega).
+  /// Llavors el radi nou s'aplica encara que hagi canviat el filtre a mà.
+  bool get savedByUser => _savedByUser;
+  bool _savedByUser = false;
+
   int _generation = 0;
 
-  /// Llegeix el radi de les preferències. Sense sessió o si falla, no n'hi ha.
+  /// Llegeix el radi de les preferències. Sense sessió no n'hi ha; si la
+  /// petició falla, es manté el valor que ja hi havia.
   Future<void> load() async {
     final generation = ++_generation;
     double? km;
@@ -36,20 +42,26 @@ class PreferredRadius extends ChangeNotifier {
         km = (await _api.fetchUserPreferences(token)).proximitatKm;
       }
     } catch (_) {
-      km = null;
+      return;
     }
     if (generation != _generation) return;
+    _savedByUser = false;
     _set(km);
   }
 
   /// Nou valor desat des de la pantalla de preferències.
   void set(double? km) {
     ++_generation;
+    _savedByUser = true;
     _set(km);
   }
 
   /// En tancar o caducar la sessió.
-  void clear() => set(null);
+  void clear() {
+    ++_generation;
+    _savedByUser = false;
+    _set(null);
+  }
 
   void _set(double? km) {
     if (km == _km) return;
@@ -61,8 +73,10 @@ class PreferredRadius extends ChangeNotifier {
 /// Aplica el radi de les preferències com a valor per defecte de [radius]
 /// (el filtre que comparteixen el mapa i la cerca, tasca #125).
 ///
-/// Si l'usuari canvia o treu el radi a mà, no es trepitja fins que les
-/// preferències tornin a canviar. Retorna la funció per deixar d'escoltar.
+/// Si l'usuari canvia o treu el radi a mà, una càrrega de les preferències
+/// (obrir l'app o iniciar sessió) no el trepitja; en canvi, quan desa un radi
+/// nou a Preferències, s'aplica. En tancar sessió només es treu el radi si
+/// era el de les preferències. Retorna la funció per deixar d'escoltar.
 VoidCallback bindPreferredRadius(
   PreferredRadius preferred,
   SearchRadius radius,
@@ -83,7 +97,7 @@ VoidCallback bindPreferredRadius(
       return;
     }
     final untouched = radius.radiusKm == null && !radius.locating;
-    if (!wasDefault && !untouched) return;
+    if (!wasDefault && !untouched && !preferred.savedByUser) return;
     final value = km.clamp(SearchRadius.minKm, SearchRadius.maxKm).toDouble();
     applied = value;
     radius.apply(value).ignore();

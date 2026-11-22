@@ -131,6 +131,26 @@ void main() {
       expect(failing.km, isNull);
     });
 
+    test('si una recàrrega falla, es manté el radi anterior', () async {
+      var broken = false;
+      final preferred = PreferredRadius(
+        api: _api(
+          (_) async => broken ? http.Response('{}', 500) : _prefs(km: 12),
+        ),
+        session: _Session('tok'),
+      );
+      await preferred.load();
+      expect(preferred.km, 12);
+
+      broken = true;
+      var notifications = 0;
+      preferred.addListener(() => notifications++);
+      await preferred.load();
+
+      expect(preferred.km, 12);
+      expect(notifications, 0);
+    });
+
     test('set i clear avisen només quan el valor canvia', () {
       final preferred = PreferredRadius(api: _api((_) async => _prefs()));
       var notifications = 0;
@@ -211,6 +231,34 @@ void main() {
         preferred.clear();
         await pumpEventQueue();
         expect(radius.radiusKm, isNull);
+
+        unbind();
+        radius.dispose();
+      },
+    );
+
+    test(
+      'amb un radi manual, carregar no el trepitja però desar-ne un de nou sí',
+      () async {
+        final preferred = PreferredRadius(
+          api: _api((_) async => _prefs(km: 20)),
+          session: _Session('tok'),
+        )..set(15);
+        final radius = _radius();
+        final unbind = bindPreferredRadius(preferred, radius);
+        await pumpEventQueue();
+
+        await radius.apply(3);
+        // Iniciar sessió o obrir l'app torna a carregar les preferències.
+        await preferred.load();
+        await pumpEventQueue();
+        expect(preferred.km, 20);
+        expect(radius.radiusKm, 3);
+
+        // Desar un radi nou a Preferències sí que s'aplica.
+        preferred.set(30);
+        await pumpEventQueue();
+        expect(radius.radiusKm, 30);
 
         unbind();
         radius.dispose();
