@@ -176,7 +176,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _comarcaController.clear();
       _municipalityController.clear();
     });
-    _filterRadius.clear();
+    _filterRadius.clearAll();
   }
 
   Future<void> _openFilters() async {

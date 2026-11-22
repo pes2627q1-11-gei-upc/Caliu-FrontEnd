@@ -81,14 +81,19 @@ class SearchRadius extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Treu el radi i cancel·la la localització pendent.
   void clear() {
     ++_generation;
     radiusKm = null;
     center = null;
-    price = null;
     locating = false;
     error = null;
     notifyListeners();
+  }
+
+  void clearAll() {
+    price = null;
+    clear();
   }
 
   static Future<LatLng> _currentPosition() async {

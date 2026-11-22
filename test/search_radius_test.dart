@@ -67,7 +67,7 @@ void main() {
     radius.dispose();
   });
 
-  test('price es copia amb fork/adopt i es neteja amb clear (#157)', () {
+  test('el preu es copia amb fork/adopt i només clearAll el treu (#157)', () {
     final radius = SearchRadius(locate: () async => const LatLng(42, 1));
     radius.updatePrice(EventPriceFilter.free);
     final draft = radius.fork();
@@ -76,6 +76,8 @@ void main() {
     radius.adopt(draft);
     expect(radius.price, EventPriceFilter.paid);
     radius.clear();
+    expect(radius.price, EventPriceFilter.paid);
+    radius.clearAll();
     expect(radius.price, isNull);
     radius.dispose();
     draft.dispose();
