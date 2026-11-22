@@ -79,21 +79,12 @@ class ChatApi {
     String? sessionId,
     String? locale,
   }) async {
-    var response = await _post(
+    final response = await _post(
       token: token,
       message: message,
       sessionId: sessionId,
       locale: locale,
     );
-    // Un backend anterior a la #147 rebutja camps desconeguts amb un 400:
-    // es torna a provar sense l'idioma perquè el xat no deixi de funcionar.
-    if (response.statusCode == 400 && locale != null) {
-      response = await _post(
-        token: token,
-        message: message,
-        sessionId: sessionId,
-      );
-    }
 
     if (response.statusCode != 200) {
       final sessionLost = response.statusCode == 404 && sessionId != null;

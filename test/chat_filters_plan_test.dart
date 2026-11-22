@@ -259,32 +259,23 @@ void main() {
       expect(reply.filters, isNull);
     });
 
-    test(
-      'si el backend no accepta el locale (400), es reintenta sense',
-      () async {
-        final bodies = <Map<String, dynamic>>[];
-        final api = _api((request) async {
-          final body = jsonDecode(request.body) as Map<String, dynamic>;
-          bodies.add(body);
-          if (body.containsKey('locale')) {
-            return http.Response('{"error":"Cos de la petició no vàlid"}', 400);
-          }
-          return http.Response('{"sessionId":"s1","reply":"Hola"}', 200);
-        });
+    test('un 400 no es reintenta: es mostra l\'error del servidor', () async {
+      var calls = 0;
+      final api = _api((_) async {
+        calls++;
+        return http.Response('{"error":"Camp \\"locale\\" no vàlid"}', 400);
+      });
 
-        final reply = await api.sendMessage(
-          token: 'tok',
-          message: 'Hola',
-          locale: 'ca',
-        );
-
-        expect(reply.reply, 'Hola');
-        expect(bodies, [
-          {'message': 'Hola', 'locale': 'ca'},
-          {'message': 'Hola'},
-        ]);
-      },
-    );
+      await expectLater(
+        api.sendMessage(token: 'tok', message: 'Hola', locale: 'ca'),
+        throwsA(
+          isA<ChatApiException>()
+              .having((e) => e.statusCode, 'statusCode', 400)
+              .having((e) => e.message, 'message', 'Camp "locale" no vàlid'),
+        ),
+      );
+      expect(calls, 1);
+    });
   });
 
   test('el controlador envia l\'idioma i desa filtres i pla', () async {
