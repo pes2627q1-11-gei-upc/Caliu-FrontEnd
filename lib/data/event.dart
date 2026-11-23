@@ -94,6 +94,27 @@ class Event {
     });
   }
 
+  Uri? get googleCalendarUri {
+    final start = startDate;
+    final end = endDate;
+    if (start == null || end == null || !end.isAfter(start)) return null;
+
+    String formatUtc(DateTime date) {
+      final isoDate = date.toUtc().toIso8601String().split('.').first;
+      return '${isoDate.replaceAll('-', '').replaceAll(':', '')}Z';
+    }
+
+    final place = placeLine;
+    return Uri.https('calendar.google.com', '/calendar/r/eventedit', {
+      'action': 'TEMPLATE',
+      'text': title,
+      'dates': '${formatUtc(start)}/${formatUtc(end)}',
+      'stz': 'Europe/Madrid',
+      'etz': 'Europe/Madrid',
+      if (place.isNotEmpty) 'location': place,
+    });
+  }
+
   factory Event.fromJson(Map<String, dynamic> json) {
     LatLng? location;
     final rawLocation = json['location'];

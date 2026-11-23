@@ -228,6 +228,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     final chips = <String>{...event.categories, ...event.tags}.toList();
     final price = _priceLabel(event);
     final place = event.placeLine;
+    final calendarUri = event.googleCalendarUri;
 
     return Scaffold(
       backgroundColor: CaliuColors.beige,
@@ -361,6 +362,18 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                           ),
                           const SizedBox(height: 14),
                           _infoRow(Icons.schedule, _formatWhen(event)),
+                          if (calendarUri != null)
+                            TextButton.icon(
+                              onPressed: () => _launchExternalUrl(
+                                calendarUri,
+                                'No s’ha pogut obrir Google Calendar',
+                              ),
+                              icon: const Icon(Icons.event_available_outlined),
+                              label: const Text('Afegir al calendari'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: CaliuColors.red,
+                              ),
+                            ),
                           if (place.isNotEmpty) ...[
                             const SizedBox(height: 8),
                             _infoRow(Icons.place_outlined, place),
