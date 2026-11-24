@@ -182,11 +182,21 @@ class _MessageList extends StatelessWidget {
           return const TypingIndicator(key: ValueKey('chat-typing'));
         }
         final message = messages[messages.length - 1 - (index - typing)];
+        // Una resposta alternativa només es pot reintentar si és l'última.
+        final isLast = identical(message, messages.last);
+        final VoidCallback? onRetry;
+        if (chat.isTyping || (message.isFallback && !isLast)) {
+          onRetry = null;
+        } else if (message.isFallback) {
+          onRetry = () => chat.retryFallback(message.id);
+        } else {
+          onRetry = () => chat.retry(message.id);
+        }
         return ChatBubble(
           key: ValueKey('chat-message-${message.id}'),
           message: message,
           onOpenEvent: onOpenEvent,
-          onRetry: chat.isTyping ? null : () => chat.retry(message.id),
+          onRetry: onRetry,
         );
       },
     );

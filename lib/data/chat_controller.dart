@@ -87,6 +87,21 @@ class ChatController extends ChangeNotifier {
     await _request(message);
   }
 
+  /// Torna a enviar el missatge d'una resposta alternativa (tasca #144):
+  /// treu la resposta alternativa i repeteix la pregunta. El backend no l'ha
+  /// desat a l'historial, així que no queda duplicada.
+  Future<void> retryFallback(String fallbackId) async {
+    if (isTyping) return;
+    final index = _messages.indexWhere(
+      (m) => m.id == fallbackId && m.isFallback,
+    );
+    if (index == -1) return;
+    final question = _messages.where((m) => m.id == _messages[index].retryOf);
+    if (question.isEmpty) return;
+    _messages.removeAt(index);
+    await _request(question.first);
+  }
+
   /// Comença una conversa nova (base per a la H.U #47).
   void reset() {
     _messages.clear();
@@ -125,7 +140,8 @@ class ChatController extends ChangeNotifier {
         locale: _locale(),
       );
       if (_disposed) return;
-      sessionId = reply.sessionId;
+      // Una resposta alternativa d'una conversa nova no porta sessió.
+      sessionId = reply.sessionId ?? sessionId;
       _messages.add(
         ChatMessage(
           id: 'a${_nextId++}',
@@ -134,6 +150,7 @@ class ChatController extends ChangeNotifier {
           events: reply.events,
           filters: reply.filters,
           plan: reply.plan,
+          retryOf: reply.isFallback ? message.id : null,
         ),
       );
     } on ChatApiException catch (e) {

@@ -26,7 +26,7 @@ class DemoChatSession implements AuthSessionStore {
   Future<void> clear() async {}
 }
 
-/// Respostes d'exemple. Si el missatge demana un itinerari, una ruta o
+/// Respostes d'exemple (també «prova error» i «prova timeout», tasca #144). Si el missatge demana un itinerari, una ruta o
 /// "un pla", retorna un itinerari; si no, una resposta amb filtres i targetes.
 /// Els esdeveniments són inventats: la fitxa mostrarà les dades de la targeta
 /// però no les trobarà al backend.
@@ -34,6 +34,10 @@ class DemoChatApi extends ChatApi {
   DemoChatApi({this.latency = const Duration(milliseconds: 900)});
 
   final Duration latency;
+
+  /// Missatges de prova d'errors (#144) que ja han fallat una vegada: en
+  /// reintentar-los, responen bé.
+  final Set<String> _failedOnce = {};
 
   @override
   Future<ChatReply> sendMessage({
@@ -44,6 +48,25 @@ class DemoChatApi extends ChatApi {
   }) async {
     if (latency > Duration.zero) await Future<void>.delayed(latency);
     final text = message.toLowerCase();
+    // Prova dels errors (#144): «prova error» dona una resposta alternativa i
+    // «prova timeout» un error; en tornar-ho a provar, responen bé.
+    if (text.contains('prova error') && _failedOnce.add(text)) {
+      return const ChatReply(
+        sessionId: null,
+        isFallback: true,
+        reply:
+            'Ara mateix no puc respondre del tot. Mentrestant, aquí tens '
+            'algunes activitats d\'avui. Torna a enviar el missatge d\'aquí a '
+            'una estona.',
+      );
+    }
+    if (text.contains('prova timeout') && _failedOnce.add(text)) {
+      throw const ChatApiException(
+        'L\'assistent ha tardat massa a respondre. Torna-ho a provar.',
+        statusCode: 504,
+        code: 'CHATBOT_TIMEOUT',
+      );
+    }
     final wantsPlan = [
       'itinerari',
       'itinerario',

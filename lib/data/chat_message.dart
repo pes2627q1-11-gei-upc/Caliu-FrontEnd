@@ -16,6 +16,7 @@ class ChatMessage {
     this.filters,
     this.plan,
     this.status = ChatMessageStatus.sent,
+    this.retryOf,
   });
 
   final String id;
@@ -32,6 +33,13 @@ class ChatMessage {
   final ChatPlan? plan;
   final ChatMessageStatus status;
 
+  /// Resposta alternativa (tasca #144): l'assistent no ha pogut respondre i
+  /// el backend ha enviat un text fix. Guarda l'id del missatge de l'usuari
+  /// que es pot tornar a enviar; null en una resposta normal.
+  final String? retryOf;
+
+  bool get isFallback => retryOf != null;
+
   bool get isUser => role == ChatRole.user;
   bool get failed => status == ChatMessageStatus.failed;
 
@@ -43,5 +51,6 @@ class ChatMessage {
     filters: filters,
     plan: plan,
     status: status ?? this.status,
+    retryOf: retryOf,
   );
 }
