@@ -96,10 +96,11 @@ class ChatController extends ChangeNotifier {
       (m) => m.id == fallbackId && m.isFallback,
     );
     if (index == -1) return;
-    final question = _messages.where((m) => m.id == _messages[index].retryOf);
-    if (question.isEmpty) return;
+    final questionId = _messages[index].retryOf;
+    final question = _messages.where((m) => m.id == questionId).firstOrNull;
+    if (question == null) return;
     _messages.removeAt(index);
-    await _request(question.first);
+    await _request(question);
   }
 
   /// Comença una conversa nova (base per a la H.U #47).

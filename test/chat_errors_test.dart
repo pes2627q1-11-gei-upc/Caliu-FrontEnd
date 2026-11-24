@@ -177,6 +177,23 @@ void main() {
       await tester.pump();
     }
 
+    // L'indicador «escrivint» és una animació infinita (pumpAndSettle no
+    // acabaria): es fan pumps curts fins que no queda cap petició en curs.
+    Future<void> settleChat(WidgetTester tester, ChatController chat) async {
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        if (!chat.isTyping) break;
+      }
+      await tester.pump();
+    }
+
+    Future<void> sendFromInput(WidgetTester tester, String text) async {
+      await tester.enterText(find.byKey(const ValueKey('chat-input')), text);
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('chat-send')));
+      await tester.pump();
+    }
+
     testWidgets('mostra l\'avís i el botó, i en tornar-ho a provar respon', (
       tester,
     ) async {
@@ -188,8 +205,8 @@ void main() {
       addTearDown(chat.dispose);
       await pumpChat(tester, chat);
 
-      await chat.send('Concerts avui');
-      await tester.pump();
+      await sendFromInput(tester, 'Concerts avui');
+      await settleChat(tester, chat);
 
       expect(
         find.text('L\'assistent no ha pogut respondre del tot.'),
@@ -197,7 +214,7 @@ void main() {
       );
       await tester.tap(find.byKey(const ValueKey('chat-fallback-retry')));
       await tester.pump();
-      await tester.pump();
+      await settleChat(tester, chat);
 
       expect(find.text('Et recomano un concert.'), findsOneWidget);
       expect(
@@ -217,9 +234,10 @@ void main() {
       addTearDown(chat.dispose);
       await pumpChat(tester, chat);
 
-      await chat.send('Concerts avui');
-      await chat.send('Hola');
-      await tester.pump();
+      await sendFromInput(tester, 'Concerts avui');
+      await settleChat(tester, chat);
+      await sendFromInput(tester, 'Hola');
+      await settleChat(tester, chat);
 
       expect(
         find.text('L\'assistent no ha pogut respondre del tot.'),
