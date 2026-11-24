@@ -141,7 +141,11 @@ class _FallbackNotice extends StatelessWidget {
         crossAxisAlignment: WrapCrossAlignment.center,
         spacing: 4,
         children: [
-          const Icon(Icons.info_outline, size: 16, color: CaliuColors.textMuted),
+          const Icon(
+            Icons.info_outline,
+            size: 16,
+            color: CaliuColors.textMuted,
+          ),
           const Text(
             'L\'assistent no ha pogut respondre del tot.',
             style: TextStyle(color: CaliuColors.textMuted, fontSize: 13),

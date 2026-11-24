@@ -44,9 +44,8 @@ ChatController _controller(
 void main() {
   group('ChatApi: resposta alternativa i codis d\'error (#144)', () {
     test('una resposta alternativa pot venir sense sessió', () async {
-      final reply = await _api(
-        (_) async => _fallback(),
-      ).sendMessage(token: 'tok', message: 'Hola');
+      final reply = await _api((_) async => _fallback())
+          .sendMessage(token: 'tok', message: 'Hola');
 
       expect(reply.isFallback, isTrue);
       expect(reply.sessionId, isNull);
@@ -68,9 +67,8 @@ void main() {
       String? sessionId,
     }) async {
       try {
-        await _api(
-          (_) async => _json(body, status),
-        ).sendMessage(token: 'tok', message: 'x', sessionId: sessionId);
+        await _api((_) async => _json(body, status))
+            .sendMessage(token: 'tok', message: 'x', sessionId: sessionId);
       } on ChatApiException catch (e) {
         return e;
       }
@@ -137,23 +135,29 @@ void main() {
       ]);
       expect(chat.messages.last.isFallback, isFalse);
       expect(chat.sessionId, 's1');
-      expect(bodies.map((b) => b['message']), ['Concerts avui', 'Concerts avui']);
+      expect(bodies.map((b) => b['message']), [
+        'Concerts avui',
+        'Concerts avui',
+      ]);
     });
 
-    test('una resposta alternativa conserva la sessió que ja hi havia', () async {
-      var call = 0;
-      final chat = _controller((_) async {
-        call++;
-        return call == 1 ? _text('Hola!') : _fallback(session: 's1');
-      });
-      addTearDown(chat.dispose);
+    test(
+      'una resposta alternativa conserva la sessió que ja hi havia',
+      () async {
+        var call = 0;
+        final chat = _controller((_) async {
+          call++;
+          return call == 1 ? _text('Hola!') : _fallback(session: 's1');
+        });
+        addTearDown(chat.dispose);
 
-      await chat.send('Hola');
-      await chat.send('I demà?');
+        await chat.send('Hola');
+        await chat.send('I demà?');
 
-      expect(chat.sessionId, 's1');
-      expect(chat.messages.last.isFallback, isTrue);
-    });
+        expect(chat.sessionId, 's1');
+        expect(chat.messages.last.isFallback, isTrue);
+      },
+    );
 
     test('ignora ids que no són respostes alternatives', () async {
       final chat = _controller((_) async => _text('Hola!'));
@@ -226,18 +230,24 @@ void main() {
   });
 
   group('Mode demo: proves d\'errors', () {
-    test('«prova error» dona una resposta alternativa i després respon', () async {
-      final api = DemoChatApi(latency: Duration.zero);
+    test(
+      '«prova error» dona una resposta alternativa i després respon',
+      () async {
+        final api = DemoChatApi(latency: Duration.zero);
 
-      final first = await api.sendMessage(token: 'demo', message: 'prova error');
-      final second = await api.sendMessage(
-        token: 'demo',
-        message: 'prova error',
-      );
+        final first = await api.sendMessage(
+          token: 'demo',
+          message: 'prova error',
+        );
+        final second = await api.sendMessage(
+          token: 'demo',
+          message: 'prova error',
+        );
 
-      expect(first.isFallback, isTrue);
-      expect(second.isFallback, isFalse);
-    });
+        expect(first.isFallback, isTrue);
+        expect(second.isFallback, isFalse);
+      },
+    );
 
     test('«prova timeout» falla una vegada amb CHATBOT_TIMEOUT', () async {
       final api = DemoChatApi(latency: Duration.zero);
@@ -245,7 +255,11 @@ void main() {
       await expectLater(
         api.sendMessage(token: 'demo', message: 'prova timeout'),
         throwsA(
-          isA<ChatApiException>().having((e) => e.code, 'code', 'CHATBOT_TIMEOUT'),
+          isA<ChatApiException>().having(
+            (e) => e.code,
+            'code',
+            'CHATBOT_TIMEOUT',
+          ),
         ),
       );
       final retry = await api.sendMessage(
