@@ -29,7 +29,7 @@ App mòbil **Flutter** de **Caliu**: mapa i agenda d’esdeveniments culturals a
 - **Cerca i filtres** (text, categories/chips, radi).
 - Parla amb el backend **només** per HTTP/JSON; contracte: OpenAPI del repo backend.
 - **Veure al mapa** des de la fitxa centra el mapa de Caliu en l’esdeveniment i obre la previsualització del marcador quan hi ha coordenades.
-- **Afegir al calendari** obre un esborrany a Google Calendar amb el lloc i l’enllaç oficial, si estan disponibles. Si l’agenda només indica el dia, l’esborrany és de dia sencer. Si hi ha hora d’inici però falta la de fi, proposa una durada de 2 hores. El botó s’amaga per als intervals de 14 dies o més.
+- **Afegir al calendari** obre un esborrany a Google Calendar amb el lloc i l’enllaç oficial, si estan disponibles. Si l’agenda només indica el dia, l’esborrany és de dia sencer. Si hi ha hora d’inici però falta la de fi, proposa una durada de 2 hores. Si l’interval dura 14 dies o més, l’esborrany només cobreix el primer dia.
 
 El selector de radi de la cerca permet aplicar entre 1 i 50 km, d'1 en 1, des de la
 ubicació real, amb un valor inicial de 5 km. El filtre es comparteix amb el

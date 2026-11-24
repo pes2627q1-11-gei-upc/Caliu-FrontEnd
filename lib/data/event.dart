@@ -114,6 +114,11 @@ class Event {
       startInMadrid.month,
       startInMadrid.day,
     );
+    final nextDay = DateTime.utc(
+      firstDay.year,
+      firstDay.month,
+      firstDay.day + 1,
+    );
     final String dates;
     // L’agenda representa els dies sense hora d’inici amb la mitjanit local.
     if (startInMadrid == firstDay) {
@@ -123,15 +128,21 @@ class Event {
         lastDay.month,
         lastDay.day + 1,
       );
-      if (exclusiveEnd.difference(firstDay) >= maxSpan) return null;
-      dates = '${formatDay(firstDay)}/${formatDay(exclusiveEnd)}';
+      // Exposicions llargues: només el primer dia (dia sencer).
+      final dayEnd = exclusiveEnd.difference(firstDay) >= maxSpan
+          ? nextDay
+          : exclusiveEnd;
+      dates = '${formatDay(firstDay)}/${formatDay(dayEnd)}';
     } else {
       // El backend també pot repetir l’inici quan no disposa de data de fi.
       final calendarEnd = end == null || end.isAtSameMomentAs(start)
           ? start.add(const Duration(hours: 2))
           : end;
-      if (calendarEnd.difference(start) >= maxSpan) return null;
-      dates = '${formatUtc(start)}/${formatUtc(calendarEnd)}';
+      // Intervals llargs: primer dia amb la hora d’inici i 2 h de durada.
+      final eventEnd = calendarEnd.difference(start) >= maxSpan
+          ? start.add(const Duration(hours: 2))
+          : calendarEnd;
+      dates = '${formatUtc(start)}/${formatUtc(eventEnd)}';
     }
 
     final place = placeLine;

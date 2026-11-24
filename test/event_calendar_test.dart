@@ -116,12 +116,20 @@ void main() {
     );
   });
 
-  test('a partir de catorze dies sencers no genera un esborrany', () {
+  test('menys de catorze dies sencers conserva tot l’interval', () {
     final shorter = Event.fromJson({
       ..._eventJson,
       'startDate': '2026-11-29T23:00:00.000Z',
       'endDate': '2026-12-12T22:59:59.000Z',
     });
+
+    expect(
+      shorter.googleCalendarUri?.queryParameters['dates'],
+      '20261130/20261213',
+    );
+  });
+
+  test('a partir de catorze dies sencers només agafa el primer dia', () {
     final longer = Event.fromJson({
       ..._eventJson,
       'startDate': '2026-11-29T23:00:00.000Z',
@@ -129,10 +137,21 @@ void main() {
     });
 
     expect(
-      shorter.googleCalendarUri?.queryParameters['dates'],
-      '20261130/20261213',
+      longer.googleCalendarUri?.queryParameters['dates'],
+      '20261130/20261201',
     );
-    expect(longer.googleCalendarUri, isNull);
+  });
+
+  test('una exposició amb hora i interval llarg només usa el primer dia', () {
+    final event = Event.fromJson({
+      ..._eventJson,
+      'endDate': '2027-01-31T20:00:00+01:00',
+    });
+
+    expect(
+      event.googleCalendarUri?.queryParameters['dates'],
+      '20261130T173000Z/20261130T193000Z',
+    );
   });
 
   test('sense un interval vàlid no genera un esborrany', () {
@@ -170,13 +189,39 @@ void main() {
     );
   });
 
-  testWidgets('la fitxa d’una exposició llarga amaga el botó', (tester) async {
-    await _openEvent(tester, {
-      ..._eventJson,
-      'endDate': '2027-01-31T20:00:00+01:00',
+  testWidgets('la fitxa d’una exposició llarga mostra el botó del primer dia', (
+    tester,
+  ) async {
+    MethodCall? launch;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(_launcher, (
+      call,
+    ) async {
+      launch = call;
+      return true;
     });
+    final json = {..._eventJson, 'endDate': '2027-01-31T20:00:00+01:00'};
+    await _openEvent(tester, json);
 
     expect(find.text('Música & dansa'), findsOneWidget);
-    expect(find.text('Afegir al calendari'), findsNothing);
+    expect(find.text('Afegir al calendari'), findsOneWidget);
+
+    await tester.tap(find.text('Afegir al calendari'));
+    await tester.pumpAndSettle();
+
+    final expected = Event.fromJson(json).googleCalendarUri!;
+    expect(
+      expected.queryParameters['dates'],
+      '20261130T173000Z/20261130T193000Z',
+    );
+    expect(launch?.method, 'launch');
+    expect(launch?.arguments['url'], expected.toString());
+  });
+
+  testWidgets('la fitxa d’un esdeveniment curt també mostra el botó', (
+    tester,
+  ) async {
+    await _openEvent(tester, _eventJson);
+
+    expect(find.text('Afegir al calendari'), findsOneWidget);
   });
 }
