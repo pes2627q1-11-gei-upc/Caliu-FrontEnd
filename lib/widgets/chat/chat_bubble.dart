@@ -85,6 +85,13 @@ class ChatBubble extends StatelessWidget {
               label: const Text('No enviat · Tornar a provar'),
               style: TextButton.styleFrom(foregroundColor: CaliuColors.red),
             ),
+          // Resposta alternativa (tasca #144): l'assistent no ha pogut
+          // respondre del tot. El botó només surt a l'última resposta.
+          if (message.isFallback && !isUser)
+            _FallbackNotice(
+              key: ValueKey('chat-fallback-${message.id}'),
+              onRetry: onRetry,
+            ),
           if (message.filters case final filters? when !isUser)
             Padding(
               padding: const EdgeInsets.only(top: 6, right: 24),
@@ -114,6 +121,42 @@ class ChatBubble extends StatelessWidget {
                 now: now,
                 onTap: () => onOpenEvent(event),
               ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FallbackNotice extends StatelessWidget {
+  const _FallbackNotice({super.key, this.onRetry});
+
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, right: 24),
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 4,
+        children: [
+          const Icon(
+            Icons.info_outline,
+            size: 16,
+            color: CaliuColors.textMuted,
+          ),
+          const Text(
+            'L\'assistent no ha pogut respondre del tot.',
+            style: TextStyle(color: CaliuColors.textMuted, fontSize: 13),
+          ),
+          if (onRetry != null)
+            TextButton.icon(
+              key: const ValueKey('chat-fallback-retry'),
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('Tornar a provar'),
+              style: TextButton.styleFrom(foregroundColor: CaliuColors.red),
             ),
         ],
       ),
