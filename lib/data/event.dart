@@ -97,22 +97,71 @@ class Event {
   Uri? get googleCalendarUri {
     final start = startDate;
     final end = endDate;
-    if (start == null || end == null || !end.isAfter(start)) return null;
+    if (start == null || (end != null && end.isBefore(start))) return null;
 
     String formatUtc(DateTime date) {
       final isoDate = date.toUtc().toIso8601String().split('.').first;
       return '${isoDate.replaceAll('-', '').replaceAll(':', '')}Z';
     }
 
+    String formatDay(DateTime date) =>
+        date.toIso8601String().split('T').first.replaceAll('-', '');
+
+    const maxSpan = Duration(days: 14);
+    final startInMadrid = _madridDateTime(start);
+    final firstDay = DateTime.utc(
+      startInMadrid.year,
+      startInMadrid.month,
+      startInMadrid.day,
+    );
+    final String dates;
+    // L’agenda representa els dies sense hora d’inici amb la mitjanit local.
+    if (startInMadrid == firstDay) {
+      final lastDay = _madridDateTime(end ?? start);
+      final exclusiveEnd = DateTime.utc(
+        lastDay.year,
+        lastDay.month,
+        lastDay.day + 1,
+      );
+      if (exclusiveEnd.difference(firstDay) >= maxSpan) return null;
+      dates = '${formatDay(firstDay)}/${formatDay(exclusiveEnd)}';
+    } else {
+      // El backend també pot repetir l’inici quan no disposa de data de fi.
+      final calendarEnd = end == null || end.isAtSameMomentAs(start)
+          ? start.add(const Duration(hours: 2))
+          : end;
+      if (calendarEnd.difference(start) >= maxSpan) return null;
+      dates = '${formatUtc(start)}/${formatUtc(calendarEnd)}';
+    }
+
     final place = placeLine;
+    final officialUrl = Uri.tryParse(url?.trim() ?? '');
     return Uri.https('calendar.google.com', '/calendar/r/eventedit', {
       'action': 'TEMPLATE',
       'text': title,
-      'dates': '${formatUtc(start)}/${formatUtc(end)}',
+      'dates': dates,
       'stz': 'Europe/Madrid',
       'etz': 'Europe/Madrid',
       if (place.isNotEmpty) 'location': place,
+      if (officialUrl != null &&
+          officialUrl.host.isNotEmpty &&
+          (officialUrl.isScheme('https') || officialUrl.isScheme('http')))
+        'details': officialUrl.toString(),
     });
+  }
+
+  // Mateixa regla que el sincronitzador de l’agenda. Emprem un DateTime UTC
+  // per llegir els components de Madrid sense dependre de la zona del mòbil.
+  static DateTime _madridDateTime(DateTime date) {
+    final utc = date.toUtc();
+    DateTime clockChange(int month) {
+      final lastDay = DateTime.utc(utc.year, month + 1, 0, 1);
+      return lastDay.subtract(Duration(days: lastDay.weekday % 7));
+    }
+
+    final summerTime =
+        !utc.isBefore(clockChange(3)) && utc.isBefore(clockChange(10));
+    return utc.add(Duration(hours: summerTime ? 2 : 1));
   }
 
   factory Event.fromJson(Map<String, dynamic> json) {
