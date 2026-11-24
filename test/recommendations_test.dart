@@ -89,9 +89,8 @@ void main() {
 
     test('un 401 és una sessió caducada', () async {
       await expectLater(
-        _api(
-          (_) async => http.Response('{"error":"Token no vàlid"}', 401),
-        ).fetchRecommendations(token: 'tok'),
+        _api((_) async => http.Response('{"error":"Token no vàlid"}', 401))
+            .fetchRecommendations(token: 'tok'),
         throwsA(
           isA<RecommendationsApiException>().having(
             (e) => e.isUnauthorized,
