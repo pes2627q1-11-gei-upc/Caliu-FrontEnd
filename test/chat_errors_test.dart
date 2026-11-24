@@ -36,7 +36,7 @@ http.Response _text(String reply) => _json({
 ChatController _controller(
   Future<http.Response> Function(http.Request) handler,
 ) => ChatController(
-  api: _api(handler),
+  api: _api(withoutHistory(handler)),
   session: MemorySession('tok'),
   locale: () => 'ca',
 );

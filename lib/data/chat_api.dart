@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../config.dart';
 import 'chat_filters.dart';
+import 'chat_message.dart';
 import 'chat_plan.dart';
 import 'event.dart';
 
@@ -69,6 +70,37 @@ class ChatReply {
   final ChatPlan? plan;
 }
 
+/// Una conversa de l'historial (`GET /chat/sessions`, tasca #164).
+class ChatSessionSummary {
+  const ChatSessionSummary({required this.id, this.title, this.lastActivityAt});
+
+  final String id;
+
+  /// Inici del primer missatge. Null si la sessió encara no té missatges
+  /// (p. ex. una "Nova conversa" on encara no s'ha escrit res).
+  final String? title;
+
+  /// Últim missatge desat (o creació de la sessió), en hora local.
+  final DateTime? lastActivityAt;
+
+  bool get isEmpty => title == null;
+
+  static ChatSessionSummary? fromJson(dynamic json) {
+    if (json is! Map<String, dynamic>) return null;
+    final id = json['id'];
+    if (id is! String || id.isEmpty) return null;
+    final title = json['title'];
+    final last = json['lastActivityAt'] ?? json['createdAt'];
+    return ChatSessionSummary(
+      id: id,
+      title: title is String && title.trim().isNotEmpty ? title.trim() : null,
+      lastActivityAt: last is String
+          ? DateTime.tryParse(last)?.toLocal()
+          : null,
+    );
+  }
+}
+
 /// Client del xatbot (api-node, ruta protegida amb JWT).
 class ChatApi {
   ChatApi({http.Client? client, String? baseUrl})
@@ -92,27 +124,14 @@ class ChatApi {
     String? sessionId,
     String? locale,
   }) async {
-    final response = await _post(
+    final response = await _request(
+      'POST',
+      '/chat/messages',
       token: token,
-      message: message,
-      sessionId: sessionId,
-      locale: locale,
+      body: {'message': message, 'sessionId': ?sessionId, 'locale': ?locale},
     );
-
     if (response.statusCode != 200) {
-      final error = _decode(response.body);
-      final code = error is Map && error['code'] is String
-          ? error['code'] as String
-          : null;
-      final sessionLost =
-          code == 'SESSION_NOT_FOUND' ||
-          (code == null && response.statusCode == 404 && sessionId != null);
-      throw ChatApiException(
-        _errorMessage(response, code: code, hadSession: sessionId != null),
-        statusCode: response.statusCode,
-        code: code,
-        sessionLost: sessionLost,
-      );
+      throw _failure(response, sessionId: sessionId);
     }
 
     final decoded = _decode(response.body);
@@ -125,9 +144,7 @@ class ChatApi {
     final validSession =
         newSessionId is String || (isFallback && newSessionId == null);
     if (reply is! String || reply.trim().isEmpty || !validSession) {
-      throw const ChatApiException(
-        'L\'assistent ha retornat una resposta inesperada.',
-      );
+      throw const ChatApiException(_unexpected);
     }
     final body = decoded as Map<String, dynamic>;
     return ChatReply(
@@ -140,28 +157,92 @@ class ChatApi {
     );
   }
 
-  Future<http.Response> _post({
+  /// "Nova conversa" (`POST /chat/sessions`, tasca #162): crea una sessió
+  /// buida i en retorna l'id. Els missatges que s'hi enviïn no porten el
+  /// context de les converses anteriors, que es conserven a l'historial.
+  Future<String> createSession({required String token}) async {
+    final response = await _request(
+      'POST',
+      '/chat/sessions',
+      token: token,
+      body: const <String, Object>{},
+    );
+    if (response.statusCode != 201 && response.statusCode != 200) {
+      throw _failure(response);
+    }
+    final decoded = _decode(response.body);
+    final id = decoded is Map ? decoded['sessionId'] : null;
+    if (id is! String || id.isEmpty) {
+      throw const ChatApiException(_unexpected);
+    }
+    return id;
+  }
+
+  /// Historial de converses (`GET /chat/sessions`, tasca #164), de la més
+  /// recent a la més antiga. Inclou les sessions buides.
+  Future<List<ChatSessionSummary>> listSessions({required String token}) async {
+    final response = await _request('GET', '/chat/sessions', token: token);
+    if (response.statusCode != 200) throw _failure(response);
+    final items = _items(response.body);
+    return [for (final item in items) ?ChatSessionSummary.fromJson(item)];
+  }
+
+  /// Missatges desats d'una conversa (`GET /chat/sessions/{id}/messages`,
+  /// tasca #164), en ordre cronològic. El backend només desa el text: les
+  /// targetes, els filtres i els itineraris no es recuperen.
+  Future<List<ChatMessage>> fetchMessages({
     required String token,
-    required String message,
-    String? sessionId,
-    String? locale,
+    required String sessionId,
   }) async {
-    final uri = Uri.parse('$_baseUrl/chat/messages');
+    final response = await _request(
+      'GET',
+      '/chat/sessions/${Uri.encodeComponent(sessionId)}/messages',
+      token: token,
+    );
+    if (response.statusCode != 200) {
+      throw _failure(response, sessionId: sessionId);
+    }
+    final messages = <ChatMessage>[];
+    for (final item in _items(response.body)) {
+      if (item is! Map<String, dynamic>) continue;
+      final id = item['id'];
+      final content = item['content'];
+      final role = switch (item['role']) {
+        'user' => ChatRole.user,
+        'assistant' => ChatRole.assistant,
+        _ => null,
+      };
+      if (id is! String || content is! String || role == null) continue;
+      if (content.trim().isEmpty) continue;
+      messages.add(ChatMessage(id: 'h$id', role: role, text: content.trim()));
+    }
+    return messages;
+  }
+
+  /// `items` d'una resposta de llista; si no hi és, la resposta no és vàlida.
+  static List<dynamic> _items(String body) {
+    final decoded = _decode(body);
+    final items = decoded is Map ? decoded['items'] : null;
+    if (items is! List) throw const ChatApiException(_unexpected);
+    return items;
+  }
+
+  Future<http.Response> _request(
+    String method,
+    String path, {
+    required String token,
+    Map<String, Object?>? body,
+  }) async {
+    final uri = Uri.parse('$_baseUrl$path');
+    final headers = {
+      'Authorization': 'Bearer $token',
+      if (body != null) 'Content-Type': 'application/json',
+    };
     try {
-      return await _client
-          .post(
-            uri,
-            headers: {
-              'Authorization': 'Bearer $token',
-              'Content-Type': 'application/json',
-            },
-            body: jsonEncode({
-              'message': message,
-              'sessionId': ?sessionId,
-              'locale': ?locale,
-            }),
-          )
-          .timeout(timeout);
+      final request = method == 'GET'
+          ? _client.get(uri, headers: headers)
+          : _client.post(uri, headers: headers, body: jsonEncode(body));
+      return await request.timeout(timeout);
     } on TimeoutException {
       throw const ChatApiException(
         'L\'assistent està trigant massa a respondre. Torna-ho a provar.',
@@ -171,6 +252,27 @@ class ChatApi {
         'No s\'ha pogut connectar amb l\'assistent. Comprova la connexió.',
       );
     }
+  }
+
+  /// Error d'una resposta no correcta. [sessionId] és la sessió que s'havia
+  /// enviat: sense codi, un 404 només vol dir "sessió perduda" si n'hi havia.
+  static ChatApiException _failure(
+    http.Response response, {
+    String? sessionId,
+  }) {
+    final error = _decode(response.body);
+    final code = error is Map && error['code'] is String
+        ? error['code'] as String
+        : null;
+    final sessionLost =
+        code == 'SESSION_NOT_FOUND' ||
+        (code == null && response.statusCode == 404 && sessionId != null);
+    return ChatApiException(
+      _errorMessage(response, code: code, hadSession: sessionId != null),
+      statusCode: response.statusCode,
+      code: code,
+      sessionLost: sessionLost,
+    );
   }
 
   static List<Event> _parseEvents(dynamic raw) {
@@ -195,6 +297,9 @@ class ChatApi {
       return null;
     }
   }
+
+  static const _unexpected =
+      'L\'assistent ha retornat una resposta inesperada.';
 
   static const _unavailable =
       'L\'assistent no està disponible ara mateix. Torna-ho a provar d\'aquí a una estona.';

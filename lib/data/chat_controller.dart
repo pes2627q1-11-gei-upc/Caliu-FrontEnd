@@ -8,7 +8,8 @@ import 'chat_message.dart';
 
 /// Estat del xat, separat de la UI (H.U #11).
 ///
-/// La pantalla només llegeix aquest estat i crida [send], [retry], [reset]...
+/// La pantalla només llegeix aquest estat i crida [send], [retry],
+/// [startNewConversation], [openSession]...
 /// Així la lògica es pot testejar sense widgets.
 class ChatController extends ChangeNotifier {
   ChatController({
@@ -43,8 +44,24 @@ class ChatController extends ChangeNotifier {
   /// Sessió de xat del backend; es reutilitza perquè l'assistent tingui context.
   String? sessionId;
 
+  /// S'està carregant una conversa desada: l'última en entrar al xat o una
+  /// de l'historial (tasca #164). No bloqueja l'input: si l'usuari escriu
+  /// abans que acabi, la càrrega es descarta.
+  bool loadingConversation = false;
+
+  /// S'està creant una conversa nova (tasca #162).
+  bool creatingSession = false;
+
   int _nextId = 0;
   bool _disposed = false;
+
+  /// Token amb què s'ha recuperat l'última conversa. Si canvia (s'ha tornat
+  /// a iniciar sessió, potser amb un altre compte), es torna a recuperar.
+  String? _restoredFor;
+
+  /// Comptador de càrregues: una càrrega només s'aplica si encara és l'última
+  /// (un enviament, una conversa nova o una altra càrrega la invaliden).
+  int _loadId = 0;
 
   Future<void> checkSession() async {
     checkingSession = true;
@@ -54,6 +71,134 @@ class ChatController extends ChangeNotifier {
     needsLogin = token == null || token.isEmpty;
     checkingSession = false;
     _notify();
+    if (!needsLogin && token != _restoredFor) await _restoreLast(token!);
+  }
+
+  /// En entrar al xat es conserva la conversa immediatament anterior
+  /// (H.U #48): es reobre la sessió més recent de l'historial. Si falla, es
+  /// comença una conversa nova sense mostrar cap error.
+  Future<void> _restoreLast(String token) async {
+    final changedAccount = _restoredFor != null;
+    _restoredFor = token;
+    if (changedAccount) {
+      // Els missatges en memòria poden ser d'un altre compte.
+      _messages.clear();
+      sessionId = null;
+      error = null;
+    } else if (_messages.isNotEmpty || sessionId != null) {
+      return;
+    }
+    final load = _startLoading();
+    try {
+      final sessions = await _api.listSessions(token: token);
+      if (!_isCurrent(load)) return;
+      final last = sessions.firstOrNull;
+      if (last == null) return;
+      final messages = last.isEmpty
+          ? const <ChatMessage>[]
+          : await _api.fetchMessages(token: token, sessionId: last.id);
+      if (!_isCurrent(load)) return;
+      sessionId = last.id;
+      _messages.addAll(messages);
+    } on ChatApiException catch (e) {
+      if (_isCurrent(load) && e.isUnauthorized) await _expire(token);
+    } finally {
+      _finishLoading(load);
+    }
+  }
+
+  /// Reobre una conversa de l'historial (tasca #164). Retorna false si no
+  /// s'ha pogut obrir (l'error queda a [error]).
+  Future<bool> openSession(String id) async {
+    if (isTyping || creatingSession) return false;
+    // Ja és la conversa oberta: es conserven les targetes i els itineraris,
+    // que el backend no desa.
+    if (id == sessionId && !loadingConversation) return true;
+    final token = await _session.readToken();
+    if (_disposed) return false;
+    if (token == null || token.isEmpty) {
+      needsLogin = true;
+      _notify();
+      return false;
+    }
+    error = null;
+    final load = _startLoading();
+    try {
+      final messages = await _api.fetchMessages(token: token, sessionId: id);
+      if (!_isCurrent(load)) return false;
+      _messages
+        ..clear()
+        ..addAll(messages);
+      sessionId = id;
+      return true;
+    } on ChatApiException catch (e) {
+      if (!_isCurrent(load)) return false;
+      if (e.isUnauthorized) await _expire(token);
+      error = e.isSessionLost ? 'Aquesta conversa ja no existeix.' : e.message;
+      return false;
+    } finally {
+      _finishLoading(load);
+    }
+  }
+
+  /// Historial de converses per a la pantalla d'historial (tasca #164).
+  /// Llança [ChatApiException] si no es pot carregar.
+  Future<List<ChatSessionSummary>> loadSessions() async {
+    final token = await _session.readToken();
+    if (token == null || token.isEmpty) {
+      throw const ChatApiException(
+        'La sessió ha caducat. Torna a iniciar sessió.',
+        statusCode: 401,
+      );
+    }
+    try {
+      return await _api.listSessions(token: token);
+    } on ChatApiException catch (e) {
+      if (e.isUnauthorized && !_disposed) {
+        await _expire(token);
+        _notify();
+      }
+      rethrow;
+    }
+  }
+
+  /// "Nova conversa" (tasca #162, H.U #47): crea una sessió nova al backend i
+  /// buida la pantalla. Les respostes de la sessió nova no tenen el context
+  /// de l'anterior, que es conserva a l'historial.
+  Future<void> startNewConversation() async {
+    if (isTyping || creatingSession) return;
+    // Ja és una conversa buida: no cal crear-ne una altra.
+    if (_messages.isEmpty && !loadingConversation) return;
+    final token = await _session.readToken();
+    if (_disposed) return;
+    if (token == null || token.isEmpty) {
+      needsLogin = true;
+      _notify();
+      return;
+    }
+    _cancelLoading();
+    creatingSession = true;
+    error = null;
+    _notify();
+    try {
+      final id = await _api.createSession(token: token);
+      if (_disposed) return;
+      _clearConversation();
+      sessionId = id;
+    } on ChatApiException catch (e) {
+      if (_disposed) return;
+      if (e.isUnauthorized) {
+        await _expire(token);
+        error = e.message;
+      } else {
+        // Sense sessió, el backend en crea una de nova (també sense context)
+        // amb el primer missatge: la conversa nova funciona igualment.
+        _clearConversation();
+      }
+    } finally {
+      creatingSession = false;
+      _notify();
+    }
   }
 
   /// Envia un missatge nou. Ignora textos buits o enviaments simultanis.
@@ -103,13 +248,45 @@ class ChatController extends ChangeNotifier {
     await _request(question);
   }
 
-  /// Comença una conversa nova (base per a la H.U #47).
+  /// Buida el xat en local, sense crear cap sessió al backend (el primer
+  /// missatge en crearà una). Per a una conversa nova, [startNewConversation].
   void reset() {
+    _cancelLoading();
+    _clearConversation();
+    isTyping = false;
+    _notify();
+  }
+
+  void _clearConversation() {
     _messages.clear();
     sessionId = null;
     error = null;
-    isTyping = false;
+  }
+
+  int _startLoading() {
+    loadingConversation = true;
     _notify();
+    return ++_loadId;
+  }
+
+  bool _isCurrent(int load) => !_disposed && load == _loadId;
+
+  void _finishLoading(int load) {
+    if (!_isCurrent(load)) return;
+    loadingConversation = false;
+    _notify();
+  }
+
+  void _cancelLoading() {
+    _loadId++;
+    loadingConversation = false;
+  }
+
+  /// Token caducat: cal tornar a iniciar sessió. Només s'esborra el token si
+  /// és el mateix que ha fallat.
+  Future<void> _expire(String token) async {
+    needsLogin = true;
+    if (await _session.readToken() == token) await _session.clear();
   }
 
   void dismissError() {
@@ -119,6 +296,8 @@ class ChatController extends ChangeNotifier {
   }
 
   Future<void> _request(ChatMessage message) async {
+    // Escriure abans que acabi de carregar una conversa la descarta.
+    _cancelLoading();
     error = null;
     isTyping = true;
     _notify();
@@ -158,9 +337,7 @@ class ChatController extends ChangeNotifier {
       if (_disposed) return;
       if (e.isSessionLost) sessionId = null;
       if (e.isUnauthorized) {
-        needsLogin = true;
-        // Només esborrem el token si és el mateix que ha fallat.
-        if (await _session.readToken() == token) await _session.clear();
+        await _expire(token);
         if (_disposed) return;
       }
       _markFailed(message.id);

@@ -1,4 +1,5 @@
 import 'package:caliu/data/auth_session.dart';
+import 'package:http/http.dart' as http;
 
 /// Sessió en memòria per als tests del xat.
 class MemorySession implements AuthSessionStore {
@@ -23,4 +24,16 @@ const eventJson = {
   'venue': 'Parc de la Ciutadella',
   'municipality': 'Barcelona',
   'startDate': '2026-11-21T18:00:00.000Z',
+};
+
+/// En obrir el xat es recupera l'última conversa (`GET /chat/sessions`,
+/// tasca #164). Aquest embolcall hi respon amb un historial buit i passa la
+/// resta de peticions a [handler], per als tests que només proven missatges.
+Future<http.Response> Function(http.Request) withoutHistory(
+  Future<http.Response> Function(http.Request) handler,
+) => (request) {
+  if (request.method == 'GET' && request.url.path.endsWith('/chat/sessions')) {
+    return Future.value(http.Response('{"items":[]}', 200));
+  }
+  return handler(request);
 };

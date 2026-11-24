@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'chat_history_screen.dart';
 import 'data/chat_api.dart';
 import 'data/chat_controller.dart';
 import 'data/chat_demo.dart';
@@ -11,6 +12,7 @@ import 'widgets/chat/chat_bubble.dart';
 import 'widgets/chat/typing_indicator.dart';
 
 /// Pantalla de l'assistent de Caliu (H.U #11, tasques #131 i #134).
+/// Botons de "Nova conversa" (#162) i d'historial (#164) a la barra.
 ///
 /// Només pinta l'estat de [ChatController]; tota la lògica és al controlador.
 class ChatScreen extends StatefulWidget {
@@ -101,6 +103,33 @@ class _ChatScreenState extends State<ChatScreen> {
     if (loggedIn == true && mounted) await _chat.checkSession();
   }
 
+  /// "Nova conversa" (tasca #162): l'anterior queda a l'historial.
+  Future<void> _newConversation() async {
+    await _chat.startNewConversation();
+    if (!mounted || _chat.error != null || _chat.messages.isNotEmpty) return;
+    _input.clear();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Conversa nova. L\'anterior és a l\'historial.'),
+        ),
+      );
+  }
+
+  /// Historial (tasca #164): si se'n tria una conversa, es reobre.
+  Future<void> _openHistory() async {
+    final id = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(
+        builder: (_) => ChatHistoryScreen(
+          loadSessions: _chat.loadSessions,
+          currentSessionId: _chat.sessionId,
+        ),
+      ),
+    );
+    if (id != null && mounted) await _chat.openSession(id);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -121,6 +150,40 @@ class _ChatScreenState extends State<ChatScreen> {
             ],
           ],
         ),
+        actions: [
+          ListenableBuilder(
+            listenable: _chat,
+            builder: (context, _) {
+              final ready = !_chat.checkingSession && !_chat.needsLogin;
+              final idle = !_chat.isTyping && !_chat.creatingSession;
+              final canStartNew =
+                  ready &&
+                  idle &&
+                  (_chat.messages.isNotEmpty || _chat.loadingConversation);
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    key: const ValueKey('chat-history'),
+                    color: Colors.white,
+                    disabledColor: Colors.white38,
+                    tooltip: 'Historial de converses',
+                    onPressed: ready && idle ? _openHistory : null,
+                    icon: const Icon(Icons.history),
+                  ),
+                  IconButton(
+                    key: const ValueKey('chat-new'),
+                    color: Colors.white,
+                    disabledColor: Colors.white38,
+                    tooltip: 'Nova conversa',
+                    onPressed: canStartNew ? _newConversation : null,
+                    icon: const Icon(Icons.add_comment_outlined),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
       body: ListenableBuilder(
         listenable: _chat,
@@ -135,6 +198,12 @@ class _ChatScreenState extends State<ChatScreen> {
           }
           return Column(
             children: [
+              if (_chat.loadingConversation || _chat.creatingSession)
+                const LinearProgressIndicator(
+                  key: ValueKey('chat-loading-conversation'),
+                  minHeight: 2,
+                  color: CaliuColors.red,
+                ),
               Expanded(
                 child: _chat.messages.isEmpty
                     ? _EmptyState(onSuggestion: _send)
@@ -150,7 +219,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 controller: _input,
                 focusNode: _focus,
                 enabled: !_chat.needsLogin,
-                busy: _chat.isTyping,
+                busy: _chat.isTyping || _chat.creatingSession,
                 onSend: _send,
               ),
             ],
