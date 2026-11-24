@@ -45,7 +45,7 @@ void main() {
 
       expect(uri.scheme, 'https');
       expect(uri.host, 'calendar.google.com');
-      expect(uri.path, '/calendar/r/eventedit');
+      expect(uri.path, '/calendar/render');
       expect(uri.queryParameters, {
         'action': 'TEMPLATE',
         'text': 'Música & dansa',

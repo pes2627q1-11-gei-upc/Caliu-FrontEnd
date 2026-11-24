@@ -147,7 +147,9 @@ class Event {
 
     final place = placeLine;
     final officialUrl = Uri.tryParse(url?.trim() ?? '');
-    return Uri.https('calendar.google.com', '/calendar/r/eventedit', {
+    // `/calendar/render` (no `/r/eventedit`): a Android l’app de Calendar
+    // intercepta eventedit sense passar el TEMPLATE i obre la vista buida.
+    return Uri.https('calendar.google.com', '/calendar/render', {
       'action': 'TEMPLATE',
       'text': title,
       'dates': dates,
