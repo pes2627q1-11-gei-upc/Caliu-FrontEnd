@@ -100,9 +100,8 @@ void main() {
 
     test('un 401 és una sessió caducada', () async {
       await expectLater(
-        _api(
-          (_) async => http.Response('{"error":"Token no vàlid"}', 401),
-        ).fetchRecommendations(token: 'tok'),
+        _api((_) async => http.Response('{"error":"Token no vàlid"}', 401))
+            .fetchRecommendations(token: 'tok'),
         throwsA(
           isA<RecommendationsApiException>().having(
             (e) => e.isUnauthorized,
@@ -130,9 +129,8 @@ void main() {
 
     test('JSON no vàlid i items mal formats', () async {
       await expectLater(
-        _api(
-          (_) async => http.Response('no és json', 200),
-        ).fetchRecommendations(token: 'tok'),
+        _api((_) async => http.Response('no és json', 200))
+            .fetchRecommendations(token: 'tok'),
         throwsA(isA<RecommendationsApiException>()),
       );
 
@@ -155,9 +153,8 @@ void main() {
 
     test('un error de xarxa és una RecommendationsApiException', () async {
       await expectLater(
-        _api(
-          (_) async => throw http.ClientException('offline'),
-        ).fetchRecommendations(token: 'tok'),
+        _api((_) async => throw http.ClientException('offline'))
+            .fetchRecommendations(token: 'tok'),
         throwsA(isA<RecommendationsApiException>()),
       );
     });
@@ -242,36 +239,37 @@ void main() {
       expect(find.text('1 recomanació'), findsOneWidget);
     });
 
-    testWidgets('en marcar un preferit desapareix i es tornen a demanar (#160)', (
-      tester,
-    ) async {
-      final requests = <Uri>[];
-      await pumpScreen(
-        tester,
-        api: _api((request) async {
-          requests.add(request.url);
-          return _page([
-            _event('evt-1', 'Concert al Parc'),
-            _event('evt-3', 'Teatre de nit'),
-          ]);
-        }),
-        favorites: await _favorites(const []),
-      );
-      expect(requests, hasLength(1));
-      expect(requests.single.queryParameters['lat'], '41.9800');
+    testWidgets(
+      'en marcar un preferit desapareix i es tornen a demanar (#160)',
+      (tester) async {
+        final requests = <Uri>[];
+        await pumpScreen(
+          tester,
+          api: _api((request) async {
+            requests.add(request.url);
+            return _page([
+              _event('evt-1', 'Concert al Parc'),
+              _event('evt-3', 'Teatre de nit'),
+            ]);
+          }),
+          favorites: await _favorites(const []),
+        );
+        expect(requests, hasLength(1));
+        expect(requests.single.queryParameters['lat'], '41.9800');
 
-      await tester.tap(
-        find.descendant(
-          of: find.byKey(const ValueKey('recommendation-evt-1')),
-          matching: find.byTooltip('Afegir a preferits'),
-        ),
-      );
-      await tester.pumpAndSettle();
+        await tester.tap(
+          find.descendant(
+            of: find.byKey(const ValueKey('recommendation-evt-1')),
+            matching: find.byTooltip('Afegir a preferits'),
+          ),
+        );
+        await tester.pumpAndSettle();
 
-      expect(find.text('Concert al Parc'), findsNothing);
-      expect(find.text('Teatre de nit'), findsOneWidget);
-      expect(requests, hasLength(2));
-    });
+        expect(find.text('Concert al Parc'), findsNothing);
+        expect(find.text('Teatre de nit'), findsOneWidget);
+        expect(requests, hasLength(2));
+      },
+    );
 
     testWidgets('diversos tocs seguits fan una sola recàrrega', (tester) async {
       var calls = 0;
@@ -400,7 +398,10 @@ void main() {
       );
 
       expect(seen.queryParameters.containsKey('lat'), isFalse);
-      expect(find.text('Encara no tenim recomanacions per a tu'), findsOneWidget);
+      expect(
+        find.text('Encara no tenim recomanacions per a tu'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('llista buida amb ubicació: suggereix ampliar el radi', (

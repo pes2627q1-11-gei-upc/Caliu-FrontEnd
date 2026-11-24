@@ -198,9 +198,8 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
       if (!background) _error = message;
     });
     if (background) {
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.maybeOf(context)
+          ?.showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -331,7 +330,11 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
   }
 
   Widget _buildBody(List<Event> visible) {
-    if (!_loadedOnce || (_loading && _events.isEmpty)) {
+    // Pestanya encara no visitada: no hi ha res a mostrar (ni un spinner,
+    // que a més seria una animació infinita mentre la pestanya és amagada).
+    if (!_loadedOnce) return const SizedBox.shrink();
+
+    if (_loading && _events.isEmpty) {
       return const Center(
         child: CircularProgressIndicator(color: CaliuColors.red),
       );
