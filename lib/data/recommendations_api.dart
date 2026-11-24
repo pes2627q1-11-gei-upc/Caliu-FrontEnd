@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../config.dart';
@@ -23,9 +24,9 @@ class RecommendationsApiException implements Exception {
 /// Client de `GET /recommendations` (H.U #8, backend #120): esdeveniments
 /// recomanats per a l'usuari autenticat, ordenats per puntuació.
 ///
-/// El backend fa servir el radi d'activitat de l'usuari i, si s'envien `lat`
-/// i `lng`, també la proximitat. Ja exclou els preferits que té desats al
-/// servidor; els preferits de l'app es filtren a la pantalla.
+/// Amb `lat` i `lng`, només dins del radi d'activitat de l'usuari i amb
+/// `distanceMeters`; sense ubicació, els pròxims per data. El backend ja
+/// exclou els preferits que té desats; els de l'app es filtren a la pantalla.
 class RecommendationsApi {
   RecommendationsApi({http.Client? client, String? baseUrl})
     : _client = client ?? http.Client(),
@@ -44,19 +45,20 @@ class RecommendationsApi {
     int page = 1,
     int limit = 40,
   }) async {
-    final uri = Uri.parse('$_baseUrl/recommendations').replace(
-      queryParameters: {
-        if (lat != null && lng != null) ...{
-          'lat': lat.toString(),
-          'lng': lng.toString(),
-        },
-        'page': '$page',
-        'limit': '${limit.clamp(1, maxLimit)}',
-      },
-    );
-
+    final safeLimit = limit.clamp(1, maxLimit);
     late final http.Response response;
     try {
+      final uri = Uri.parse('$_baseUrl/recommendations').replace(
+        queryParameters: {
+          // 4 decimals (~10 m) n'hi ha prou per ordenar per proximitat.
+          if (lat != null && lng != null) ...{
+            'lat': lat.toStringAsFixed(4),
+            'lng': lng.toStringAsFixed(4),
+          },
+          'page': '$page',
+          'limit': '$safeLimit',
+        },
+      );
       response = await _client
           .get(uri, headers: {'Authorization': 'Bearer $token'})
           .timeout(const Duration(seconds: 20));
@@ -64,7 +66,7 @@ class RecommendationsApi {
       throw const RecommendationsApiException(
         'Les recomanacions estan trigant massa. Torna-ho a provar.',
       );
-    } on Exception {
+    } catch (_) {
       throw const RecommendationsApiException(
         'No s\'han pogut carregar les recomanacions. Comprova la connexió.',
       );
@@ -100,7 +102,7 @@ class RecommendationsApi {
     return EventPageResult(
       items: items,
       page: number('page', page),
-      limit: number('limit', limit),
+      limit: number('limit', safeLimit),
       total: number('total', items.length),
     );
   }
@@ -114,15 +116,13 @@ class RecommendationsApi {
   }
 
   static String _errorMessage(int status, dynamic decoded) {
-    final serverMessage = decoded is Map && decoded['error'] is String
-        ? decoded['error'] as String
-        : null;
-    return switch (status) {
-      401 => 'La sessió ha caducat. Torna a iniciar sessió.',
-      400 => serverMessage ?? 'La petició de recomanacions no és vàlida.',
-      _ =>
-        'No s\'han pogut carregar les recomanacions ara mateix. '
-            'Torna-ho a provar d\'aquí a una estona.',
-    };
+    if (status == 401) return 'La sessió ha caducat. Torna a iniciar sessió.';
+    if (status == 400) {
+      // Un 400 només pot ser culpa de l'app: el detall va als logs.
+      final detail = decoded is Map ? decoded['error'] : null;
+      debugPrint('GET /recommendations 400: $detail');
+    }
+    return 'No s\'han pogut carregar les recomanacions ara mateix. '
+        'Torna-ho a provar d\'aquí a una estona.';
   }
 }
