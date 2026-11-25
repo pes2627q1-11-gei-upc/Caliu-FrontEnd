@@ -1,15 +1,13 @@
 import 'auth_session.dart';
 import 'favorites_api.dart';
+import 'favorites_http_api.dart';
 
 /// Alertes dels esdeveniments guardats: es poden silenciar d'un en un
 /// (H.U #52). Per defecte, tots els preferits tenen les alertes actives.
 ///
-/// El backend encara no ho exposa (tasca #170: camp `notificacionsActives`
-/// al registre del preferit + PATCH). Proposta de contracte (pendent de
-/// confirmar a l'OpenAPI del backend):
-/// - `GET /users/me/favorites` → cada item inclou `"notificacionsActives"`
-/// - `PATCH /users/me/favorites/{eventId}` → body
-///   `{ "notificacionsActives": true | false }`
+/// Endpoints del backend (OpenAPI): cada item de `GET /users/me/favorites`
+/// inclou `notificacionsActives`, i es canvia amb
+/// `PATCH /users/me/favorites/{eventId}`. Vegeu [HttpFavoriteAlertsApi].
 abstract interface class FavoriteAlertsApi {
   /// Ids dels preferits que tenen les alertes silenciades.
   Future<Set<String>> fetchMuted();
@@ -18,12 +16,11 @@ abstract interface class FavoriteAlertsApi {
   Future<void> setAlertsEnabled(String eventId, {required bool enabled});
 }
 
-/// Instància que fa servir l'app. Quan el backend estigui llest, aquí es
-/// canviarà la implementació simulada per la HTTP.
+/// Instància que fa servir l'app: el backend real (tasca #207).
 FavoriteAlertsApi createFavoriteAlertsApi({AuthSessionStore? session}) =>
-    MockFavoriteAlertsApi(session: session ?? AuthSession());
+    HttpFavoriteAlertsApi(FavoritesHttpClient(session: session));
 
-/// Implementació en memòria mentre no hi ha backend.
+/// Implementació en memòria, per als tests.
 class MockFavoriteAlertsApi implements FavoriteAlertsApi {
   MockFavoriteAlertsApi({
     this.session,

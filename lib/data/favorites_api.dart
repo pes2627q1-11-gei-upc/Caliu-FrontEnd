@@ -2,6 +2,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'auth_session.dart';
 import 'event.dart';
+import 'favorites_http_api.dart';
 
 class FavoritesApiException implements Exception {
   const FavoritesApiException(this.message, {this.statusCode});
@@ -18,11 +19,8 @@ class FavoritesApiException implements Exception {
 
 /// Preferits de l'usuari autenticat (H.U #16).
 ///
-/// El backend encara no exposa aquests endpoints. Proposta de contracte
-/// (pendent de confirmar a l'OpenAPI del backend):
-/// - `GET    /users/me/favorites`          → `{ "items": [Event, ...] }`
-/// - `POST   /users/me/favorites`          → body `{ "eventId": "..." }`
-/// - `DELETE /users/me/favorites/{eventId}`
+/// Endpoints del backend (OpenAPI): `GET` i `POST /users/me/favorites`, i
+/// `DELETE /users/me/favorites/{eventId}`. Vegeu [HttpFavoritesApi].
 abstract interface class FavoritesApi {
   /// Preferits de l'usuari, el més recent primer.
   Future<List<Event>> fetchFavorites();
@@ -36,12 +34,11 @@ abstract interface class FavoritesApi {
   Future<bool> isFavorite(String eventId);
 }
 
-/// Instància que fa servir l'app. Quan el backend estigui llest, aquí es
-/// canviarà la implementació simulada per la HTTP sense tocar les pantalles.
+/// Instància que fa servir l'app: el backend real (tasca #207).
 FavoritesApi createFavoritesApi({AuthSessionStore? session}) =>
-    MockFavoritesApi(session: session ?? AuthSession());
+    HttpFavoritesApi(FavoritesHttpClient(session: session));
 
-/// Implementació en memòria amb dades simulades mentre no hi ha backend.
+/// Implementació en memòria amb dades simulades, per als tests.
 class MockFavoritesApi implements FavoritesApi {
   MockFavoritesApi({
     this.session,
