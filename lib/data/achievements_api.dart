@@ -1,3 +1,4 @@
+import 'achievements_http_api.dart';
 import 'auth_session.dart';
 
 class AchievementsApiException implements Exception {
@@ -21,6 +22,7 @@ class Achievement {
     required this.target,
     this.progress = 0,
     this.icon = 'medal',
+    this.unlockedByServer,
   });
 
   final String id;
@@ -38,8 +40,12 @@ class Achievement {
   /// Clau de la icona (vegeu `achievementIcon` a la pantalla).
   final String icon;
 
-  /// Desbloquejada en arribar al límit.
-  bool get unlocked => progress >= target;
+  /// Estat que envia el backend (`unlocked`), si n'hi ha. Mana sobre el
+  /// càlcul local, per si el servidor aplica altres regles.
+  final bool? unlockedByServer;
+
+  /// Desbloquejada en arribar al límit (o segons el backend).
+  bool get unlocked => unlockedByServer ?? progress >= target;
 
   /// Fracció de 0 a 1 per a la barra de progrés.
   double get fraction => target <= 0 ? 1 : (progress / target).clamp(0, 1);
@@ -61,6 +67,9 @@ class Achievement {
       target: target.toInt(),
       progress: progress is num ? progress.toInt() : 0,
       icon: json['icon']?.toString() ?? 'medal',
+      unlockedByServer: json['unlocked'] is bool
+          ? json['unlocked'] as bool
+          : null,
     );
   }
 }
@@ -74,20 +83,18 @@ const achievementsAvailable = bool.fromEnvironment('ACHIEVEMENTS');
 
 /// Catàleg d'assoliments amb el progrés de l'usuari autenticat.
 ///
-/// El backend encara no l'exposa (tasques #175 i #176). Proposta de contracte
-/// (pendent de confirmar a l'OpenAPI del backend):
+/// Endpoint del backend (OpenAPI), vegeu [HttpAchievementsApi]:
 /// - `GET /achievements` → `{ "items": [{ "id", "title", "description",
-///   "icon", "target", "progress" }] }`; 401 sense JWT vàlid
+///   "icon", "target", "progress", "unlocked" }] }`; 401 sense JWT vàlid
 abstract interface class AchievementsApi {
   Future<List<Achievement>> fetchAchievements();
 }
 
-/// Instància que fa servir l'app. Quan el backend estigui llest, aquí es
-/// canviarà la implementació simulada per la HTTP.
+/// Instància que fa servir l'app: el backend real (tasca #230).
 AchievementsApi createAchievementsApi({AuthSessionStore? session}) =>
-    MockAchievementsApi(session: session ?? AuthSession());
+    HttpAchievementsApi(session: session);
 
-/// Implementació amb dades simulades mentre no hi ha backend.
+/// Implementació amb dades simulades, per als tests.
 class MockAchievementsApi implements AchievementsApi {
   MockAchievementsApi({
     this.session,

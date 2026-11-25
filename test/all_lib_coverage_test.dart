@@ -5,6 +5,7 @@ import 'package:caliu/activity_list.dart';
 import 'package:caliu/attended_list.dart';
 import 'package:caliu/config.dart';
 import 'package:caliu/data/achievements_api.dart';
+import 'package:caliu/data/achievements_http_api.dart';
 import 'package:caliu/data/activity_api.dart';
 import 'package:caliu/data/attended_api.dart';
 import 'package:caliu/data/auth_api.dart';
@@ -81,6 +82,7 @@ void main() {
     expect(ProfileAvatar, isNotNull);
     expect(AchievementsScreen, isNotNull);
     expect(MockAchievementsApi, isNotNull);
+    expect(HttpAchievementsApi, isNotNull);
     expect(AuthApi, isNotNull);
     expect(AuthSession, isNotNull);
     expect(AuthValidators.username, isA<Function>());
