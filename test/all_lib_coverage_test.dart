@@ -25,6 +25,7 @@ import 'package:caliu/data/favorite_alerts_controller.dart';
 import 'package:caliu/data/password_reset_api.dart';
 import 'package:caliu/data/password_reset_http_api.dart';
 import 'package:caliu/data/users_api.dart';
+import 'package:caliu/data/users_http_api.dart';
 import 'package:caliu/data/favorites_api.dart';
 import 'package:caliu/data/favorites_controller.dart';
 import 'package:caliu/data/favorites_http_api.dart';
@@ -102,6 +103,7 @@ void main() {
     expect(ForgotPasswordScreen, isNotNull);
     expect(NewPasswordScreen, isNotNull);
     expect(MockUsersApi, isNotNull);
+    expect(HttpUsersApi, isNotNull);
     expect(PublicProfileScreen, isNotNull);
     expect(FollowListsScreen, isNotNull);
     expect(UserAvatar, isNotNull);

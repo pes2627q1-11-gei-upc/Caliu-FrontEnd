@@ -1,4 +1,5 @@
 import 'auth_session.dart';
+import 'users_http_api.dart';
 
 class UsersApiException implements Exception {
   const UsersApiException(this.message, {this.statusCode});
@@ -64,15 +65,14 @@ class PublicUser {
 
 /// Perfils públics dels usuaris de la comunitat.
 ///
-/// El backend encara no l'exposa (tasca #178). Proposta de contracte
-/// (pendent de confirmar a l'OpenAPI del backend):
+/// Endpoints del backend (OpenAPI); vegeu [HttpUsersApi]:
 /// - `GET /users/{username}` →
 ///   `{ "id", "username", "avatarUrl", "sharedEventsCount", "isFollowing" }`
 ///   (sense email)
 /// - `POST /users/{id}/follow` i `DELETE /users/{id}/follow` (H.U #61,
 ///   tasca #181): seguir és idempotent i no es pot seguir un mateix
 /// - `GET /users/{id}/followers` i `GET /users/{id}/following` (H.U #62,
-///   tasca #183) → `{ "items": [PublicUser, ...] }`
+///   tasca #183) → `{ "items": [{ id, username }], total }`
 /// - 404 si l'usuari no existeix; 401 sense JWT vàlid
 abstract interface class UsersApi {
   Future<PublicUser> fetchPublicProfile(String username);
@@ -97,12 +97,11 @@ abstract interface class UsersApi {
 /// `/users/me/following`, o a l'id del token.
 const ownProfileId = 'me';
 
-/// Instància que fa servir l'app. Quan el backend estigui llest, aquí es
-/// canviarà la implementació simulada per la HTTP.
+/// Instància que fa servir l'app: el backend real.
 UsersApi createUsersApi({AuthSessionStore? session}) =>
-    MockUsersApi(session: session ?? AuthSession());
+    HttpUsersApi(session: session);
 
-/// Implementació amb dades simulades mentre no hi ha backend.
+/// Implementació amb dades simulades, per als tests.
 ///
 /// Guarda un graf de seguiments unidireccional (seguidor → seguits). L'usuari
 /// autenticat és [currentUserId] o, si no se'n dona cap, [ownProfileId]. Les
