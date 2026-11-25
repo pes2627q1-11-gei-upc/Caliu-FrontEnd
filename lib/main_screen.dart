@@ -5,6 +5,7 @@ import 'map_view.dart';
 import 'data/preferred_radius.dart';
 import 'data/search_radius.dart';
 import 'profile_screen.dart';
+import 'recommendations_screen.dart';
 import 'search_screen.dart';
 
 class MainScreen extends StatefulWidget {
@@ -48,21 +49,31 @@ class _MainScreenState extends State<MainScreen> {
   // botó enrere (#44). L'IndexedStack conserva l'estat de cada pantalla.
   List<Widget> get _screens => [
     SearchScreen(radius: _radius),
-    MapView(isActive: _selectedIndex == 1, radius: _radius),
+    // H.U #8: recomanacions. En tornar-hi es recarreguen.
+    RecommendationsScreen(isActive: _selectedIndex == 1),
+    MapView(isActive: _selectedIndex == 2, radius: _radius),
     const ProfileScreen(),
     // H.U #11: assistent. `isActive` fa que revisi la sessió en tornar-hi.
-    ChatScreen(isActive: _selectedIndex == 3),
+    ChatScreen(isActive: _selectedIndex == 4),
   ];
 
-  static const List<String> _labels = ['Inici', 'Mapa', 'Perfil', 'Xat'];
+  static const List<String> _labels = [
+    'Inici',
+    'Per a tu',
+    'Mapa',
+    'Perfil',
+    'Xat',
+  ];
   static const List<IconData> _outlinedIcons = [
     Icons.home_outlined,
+    Icons.star_outline,
     Icons.location_on_outlined,
     Icons.person_outline,
     Icons.chat_bubble_outline,
   ];
   static const List<IconData> _selectedIcons = [
     Icons.home,
+    Icons.star,
     Icons.location_on,
     Icons.person,
     Icons.chat_bubble,

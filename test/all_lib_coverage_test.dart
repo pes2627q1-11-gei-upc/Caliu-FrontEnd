@@ -37,6 +37,8 @@ import 'package:caliu/preferences_screen.dart';
 import 'package:caliu/data/preferred_radius.dart';
 import 'package:caliu/profile_screen.dart';
 import 'package:caliu/public_profile_screen.dart';
+import 'package:caliu/data/recommendations_api.dart';
+import 'package:caliu/recommendations_screen.dart';
 import 'package:caliu/register_screen.dart';
 import 'package:caliu/search_screen.dart';
 import 'package:caliu/square_crop_screen.dart';
@@ -128,6 +130,8 @@ void main() {
     expect(EventPreviewCard, isNotNull);
     expect(MapEventPreview, isNotNull);
     expect(ChatScreen, isNotNull);
+    expect(RecommendationsApi, isNotNull);
+    expect(RecommendationsScreen, isNotNull);
     expect(ChatApi, isNotNull);
     expect(ChatController, isNotNull);
     expect(ChatRole.values, isNotEmpty);

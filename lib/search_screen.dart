@@ -850,17 +850,6 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  String _subtitle(Event event) {
-    final parts = <String>[
-      if (event.municipality != null && event.municipality!.isNotEmpty)
-        event.municipality!,
-      if (event.distanceMeters != null)
-        '${(event.distanceMeters! / 1000).toStringAsFixed(1)} km',
-      if (event.categories.isNotEmpty) event.categories.first,
-    ];
-    return parts.join(' · ');
-  }
-
   @override
   Widget build(BuildContext context) {
     final activeFilters =
@@ -984,7 +973,7 @@ class _SearchScreenState extends State<SearchScreen> {
         final event = _results[index];
         return EventListTile(
           event: event,
-          subtitle: _subtitle(event),
+          subtitle: eventListSubtitle(event),
           onTap: () => _openDetail(event),
           trailing: FavoriteButton(event: event, controller: widget.favorites),
         );
