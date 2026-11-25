@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:caliu/chat_history_screen.dart';
 import 'package:caliu/chat_screen.dart';
+import 'package:caliu/data/auth_session.dart';
 import 'package:caliu/data/chat_api.dart';
 import 'package:caliu/data/chat_controller.dart';
 import 'package:caliu/data/chat_demo.dart';
@@ -70,6 +71,9 @@ class _Backend {
   _Backend({this.sessions = const {'items': []}, this.onCreate});
 
   Object sessions;
+
+  /// Codi de `GET /chat/sessions` (p. ex. 401 per a una sessió caducada).
+  int sessionsStatus = 200;
   _Handler? onCreate;
   final requests = <http.Request>[];
 
@@ -87,7 +91,7 @@ class _Backend {
     requests.add(request);
     final path = request.url.path;
     if (request.method == 'GET' && path == '/chat/sessions') {
-      return _json(sessions);
+      return _json(sessions, sessionsStatus);
     }
     if (request.method == 'GET' && path.startsWith('/chat/sessions/')) {
       final id = path.split('/')[3];
@@ -556,6 +560,158 @@ void main() {
       expect(find.text('Pregunta s1'), findsOneWidget);
       expect(find.text('Pregunta s2'), findsNothing);
     });
+
+    testWidgets('si la sessió ha caducat, l\'historial torna al xat amb el '
+        'botó d\'iniciar sessió', (tester) async {
+      final backend = _Backend(sessions: _sessionsJson);
+      await pumpChat(tester, backend);
+      backend.sessionsStatus = 401;
+
+      await tester.tap(find.byKey(const ValueKey('chat-history')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Historial de converses'), findsNothing);
+      expect(find.text('Pregunta s2'), findsOneWidget);
+      expect(find.textContaining('Torna a iniciar sessió'), findsOneWidget);
+      expect(find.text('Inicia sessió'), findsOneWidget);
+    });
+
+    testWidgets('mentre es crea una conversa nova no es pot enviar', (
+      tester,
+    ) async {
+      final pending = Completer<http.Response>();
+      final backend = _Backend(onCreate: (_) => pending.future);
+      final chat = await pumpChat(tester, backend);
+      await tester.enterText(find.byKey(const ValueKey('chat-input')), 'Hola');
+      await tester.pump();
+      await tester.tap(find.byKey(const ValueKey('chat-send')));
+      await settle(tester);
+
+      await tester.tap(find.byKey(const ValueKey('chat-new')));
+      await tester.pump();
+      expect(chat.creatingSession, isTrue);
+
+      await tester.enterText(
+        find.byKey(const ValueKey('chat-input')),
+        'Massa aviat',
+      );
+      await tester.pump();
+      expect(
+        tester
+            .widget<IconButton>(find.byKey(const ValueKey('chat-send')))
+            .onPressed,
+        isNull,
+      );
+
+      pending.complete(_json({'sessionId': 's-neta'}, 201));
+      await settle(tester);
+      expect(chat.messages, isEmpty);
+      expect(backend.sentMessages, hasLength(1));
+
+      // Ja s'ha creat: ara sí que es poden enviar.
+      await tester.tap(find.text(ChatScreen.suggestions.first));
+      await settle(tester);
+      expect(backend.sentMessages.last['sessionId'], 's-neta');
+    });
+  });
+
+  group('Sessió tancada, token il·legible i conversa nova en curs', () {
+    test('tancar sessió fora del xat buida la conversa i, en tornar a '
+        'entrar, es recupera', () async {
+      final session = MemorySession('tok');
+      final backend = _Backend(sessions: _sessionsJson);
+      final chat = backend.controller(session);
+      addTearDown(chat.dispose);
+      await chat.checkSession();
+      expect(chat.messages, hasLength(2));
+
+      session.token = null;
+      await chat.checkSession();
+
+      expect(chat.needsLogin, isTrue);
+      expect(chat.messages, isEmpty);
+      expect(chat.sessionId, isNull);
+
+      session.token = 'tok';
+      await chat.checkSession();
+
+      expect(chat.needsLogin, isFalse);
+      expect(chat.sessionId, 's2');
+      expect(chat.messages, hasLength(2));
+    });
+
+    test('un 401 a l\'historial deixa l\'avís per iniciar sessió', () async {
+      final session = MemorySession('tok');
+      final backend = _Backend();
+      final chat = backend.controller(session);
+      addTearDown(chat.dispose);
+      await chat.send('Hola');
+      backend.sessionsStatus = 401;
+
+      await expectLater(chat.loadSessions(), throwsA(isA<ChatApiException>()));
+
+      expect(chat.needsLogin, isTrue);
+      expect(chat.error, contains('Torna a iniciar sessió'));
+      expect(chat.messages, hasLength(2));
+      expect(session.token, isNull);
+
+      // En tornar a entrar, l'avís desapareix.
+      session.token = 'nou';
+      await chat.checkSession();
+      expect(chat.error, isNull);
+    });
+
+    test(
+      'si no es pot llegir el token, no queda cap càrrega encallada',
+      () async {
+        final chat = ChatController(
+          api: _Backend().api(),
+          session: _BrokenSession(),
+        );
+        addTearDown(chat.dispose);
+
+        await chat.checkSession();
+        expect(chat.checkingSession, isFalse);
+        expect(chat.needsLogin, isTrue);
+
+        await chat.send('Hola');
+        expect(chat.isTyping, isFalse);
+        expect(chat.messages.single.failed, isTrue);
+
+        await expectLater(
+          chat.loadSessions(),
+          throwsA(
+            isA<ChatApiException>().having(
+              (e) => e.isUnauthorized,
+              'isUnauthorized',
+              isTrue,
+            ),
+          ),
+        );
+      },
+    );
+
+    test('no s\'envia res mentre es crea una conversa nova', () async {
+      final pending = Completer<http.Response>();
+      final backend = _Backend(onCreate: (_) => pending.future);
+      final chat = backend.controller();
+      addTearDown(chat.dispose);
+      await chat.send('Hola');
+
+      final creating = chat.startNewConversation();
+      await Future<void>.delayed(Duration.zero);
+      expect(chat.creatingSession, isTrue);
+
+      await chat.send('Massa aviat');
+      await chat.retry(chat.messages.first.id);
+      expect(backend.sentMessages, hasLength(1));
+
+      pending.complete(_json({'sessionId': 's-neta'}, 201));
+      await creating;
+
+      expect(chat.messages, isEmpty);
+      expect(chat.sessionId, 's-neta');
+    });
   });
 
   group('Pantalla d\'historial', () {
@@ -619,6 +775,15 @@ void main() {
 
       expect(find.text('Concerts'), findsOneWidget);
     });
+
+    testWidgets('un error inesperat també es pot tornar a provar', (
+      tester,
+    ) async {
+      await pumpHistory(tester, () async => throw StateError('emmagatzematge'));
+
+      expect(find.textContaining('error inesperat'), findsOneWidget);
+      expect(find.text('Torna-ho a provar'), findsOneWidget);
+    });
   });
 
   test('mode demo: nova conversa i historial sense backend', () async {
@@ -649,4 +814,16 @@ Future<void> settle(WidgetTester tester) async {
   for (var i = 0; i < 20; i++) {
     await tester.pump(const Duration(milliseconds: 50));
   }
+}
+
+/// Emmagatzematge segur que falla en llegir el token.
+class _BrokenSession implements AuthSessionStore {
+  @override
+  Future<String?> readToken() async => throw StateError('keystore');
+
+  @override
+  Future<void> saveToken(String token) async {}
+
+  @override
+  Future<void> clear() async {}
 }

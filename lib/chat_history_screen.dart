@@ -60,11 +60,24 @@ class _ChatHistoryScreenState extends State<ChatHistoryScreen> {
       });
     } on ChatApiException catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = e.message;
-        _loading = false;
-      });
+      if (e.isUnauthorized) {
+        // Sense sessió, «Torna-ho a provar» no serviria: es torna al xat, que
+        // mostra el botó d'iniciar sessió.
+        Navigator.of(context).pop();
+        return;
+      }
+      _showError(e.message);
+    } catch (_) {
+      if (!mounted) return;
+      _showError('S\'ha produït un error inesperat. Torna-ho a provar.');
     }
+  }
+
+  void _showError(String message) {
+    setState(() {
+      _error = message;
+      _loading = false;
+    });
   }
 
   @override

@@ -64,14 +64,37 @@ class ChatController extends ChangeNotifier {
   int _loadId = 0;
 
   Future<void> checkSession() async {
+    final wasLoggedOut = needsLogin;
     checkingSession = true;
     _notify();
-    final token = await _session.readToken();
+    final token = await _readToken();
     if (_disposed) return;
     needsLogin = token == null || token.isEmpty;
+    if (needsLogin && error == null) {
+      // S'ha tancat la sessió fora del xat (p. ex. des de Perfil): la
+      // conversa és del compte anterior i el xat ha de demanar iniciar
+      // sessió, no quedar-se mostrant-la amb l'input desactivat.
+      _cancelLoading();
+      _clearConversation();
+      _restoredFor = null;
+    } else if (!needsLogin && wasLoggedOut) {
+      // L'avís de sessió caducada ja no té sentit un cop s'ha entrat.
+      error = null;
+    }
     checkingSession = false;
     _notify();
     if (!needsLogin && token != _restoredFor) await _restoreLast(token!);
+  }
+
+  /// Llegeix el token sense llançar mai: si l'emmagatzematge segur falla, es
+  /// tracta com si no hi hagués sessió (el xat demana iniciar-la) en lloc de
+  /// deixar un indicador de càrrega encallat.
+  Future<String?> _readToken() async {
+    try {
+      return await _session.readToken();
+    } catch (_) {
+      return null;
+    }
   }
 
   /// En entrar al xat es conserva la conversa immediatament anterior
@@ -114,10 +137,11 @@ class ChatController extends ChangeNotifier {
     // Ja és la conversa oberta: es conserven les targetes i els itineraris,
     // que el backend no desa.
     if (id == sessionId && !loadingConversation) return true;
-    final token = await _session.readToken();
+    final token = await _readToken();
     if (_disposed) return false;
     if (token == null || token.isEmpty) {
       needsLogin = true;
+      error = _sessionExpired;
       _notify();
       return false;
     }
@@ -144,12 +168,9 @@ class ChatController extends ChangeNotifier {
   /// Historial de converses per a la pantalla d'historial (tasca #164).
   /// Llança [ChatApiException] si no es pot carregar.
   Future<List<ChatSessionSummary>> loadSessions() async {
-    final token = await _session.readToken();
+    final token = await _readToken();
     if (token == null || token.isEmpty) {
-      throw const ChatApiException(
-        'La sessió ha caducat. Torna a iniciar sessió.',
-        statusCode: 401,
-      );
+      throw const ChatApiException(_sessionExpired, statusCode: 401);
     }
     try {
       return await _api.listSessions(token: token);
@@ -169,10 +190,11 @@ class ChatController extends ChangeNotifier {
     if (isTyping || creatingSession) return;
     // Ja és una conversa buida: no cal crear-ne una altra.
     if (_messages.isEmpty && !loadingConversation) return;
-    final token = await _session.readToken();
+    final token = await _readToken();
     if (_disposed) return;
     if (token == null || token.isEmpty) {
       needsLogin = true;
+      error = _sessionExpired;
       _notify();
       return;
     }
@@ -204,7 +226,8 @@ class ChatController extends ChangeNotifier {
   /// Envia un missatge nou. Ignora textos buits o enviaments simultanis.
   Future<void> send(String rawText) async {
     final text = rawText.trim();
-    if (text.isEmpty || isTyping) return;
+    // Mentre es crea una conversa nova, el missatge s'esborraria en acabar.
+    if (text.isEmpty || isTyping || creatingSession) return;
     if (text.length > ChatApi.maxMessageLength) {
       error =
           'El missatge és massa llarg (màxim ${ChatApi.maxMessageLength} caràcters).';
@@ -222,7 +245,7 @@ class ChatController extends ChangeNotifier {
 
   /// Torna a enviar un missatge que ha fallat.
   Future<void> retry(String messageId) async {
-    if (isTyping) return;
+    if (isTyping || creatingSession) return;
     final index = _messages.indexWhere(
       (m) => m.id == messageId && m.isUser && m.failed,
     );
@@ -236,7 +259,7 @@ class ChatController extends ChangeNotifier {
   /// treu la resposta alternativa i repeteix la pregunta. El backend no l'ha
   /// desat a l'historial, així que no queda duplicada.
   Future<void> retryFallback(String fallbackId) async {
-    if (isTyping) return;
+    if (isTyping || creatingSession) return;
     final index = _messages.indexWhere(
       (m) => m.id == fallbackId && m.isFallback,
     );
@@ -284,10 +307,22 @@ class ChatController extends ChangeNotifier {
 
   /// Token caducat: cal tornar a iniciar sessió. Només s'esborra el token si
   /// és el mateix que ha fallat.
+  ///
+  /// Deixa sempre un [error]: si el xat té missatges, el bàner és l'únic lloc
+  /// amb el botó d'iniciar sessió (sense missatges ja surt la pantalla de
+  /// login).
   Future<void> _expire(String token) async {
     needsLogin = true;
-    if (await _session.readToken() == token) await _session.clear();
+    error ??= _sessionExpired;
+    try {
+      if (await _readToken() == token) await _session.clear();
+    } catch (_) {
+      // Si no es pot esborrar, el pròxim intent tornarà a donar 401.
+    }
   }
+
+  static const _sessionExpired =
+      'La sessió ha caducat. Torna a iniciar sessió.';
 
   void dismissError() {
     if (error == null) return;
@@ -302,10 +337,11 @@ class ChatController extends ChangeNotifier {
     isTyping = true;
     _notify();
 
-    final token = await _session.readToken();
+    final token = await _readToken();
     if (_disposed) return;
     if (token == null || token.isEmpty) {
       needsLogin = true;
+      error = _sessionExpired;
       _markFailed(message.id);
       isTyping = false;
       _notify();

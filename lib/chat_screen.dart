@@ -74,7 +74,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _send([String? text]) async {
     final value = text ?? _input.text;
-    if (value.trim().isEmpty || _chat.isTyping) return;
+    if (value.trim().isEmpty || _chat.isTyping || _chat.creatingSession) {
+      return;
+    }
     _input.clear();
     await _chat.send(value);
   }
@@ -206,7 +208,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               Expanded(
                 child: _chat.messages.isEmpty
-                    ? _EmptyState(onSuggestion: _send)
+                    ? _EmptyState(
+                        // Sense sessió o mentre es crea una conversa nova, els
+                        // suggeriments no es poden enviar.
+                        onSuggestion: _chat.needsLogin || _chat.creatingSession
+                            ? null
+                            : _send,
+                      )
                     : _MessageList(chat: _chat, onOpenEvent: _openEvent),
               ),
               if (_chat.error != null)
@@ -275,7 +283,7 @@ class _MessageList extends StatelessWidget {
 class _EmptyState extends StatelessWidget {
   const _EmptyState({required this.onSuggestion});
 
-  final ValueChanged<String> onSuggestion;
+  final ValueChanged<String>? onSuggestion;
 
   @override
   Widget build(BuildContext context) {
@@ -310,7 +318,9 @@ class _EmptyState extends StatelessWidget {
               for (final suggestion in ChatScreen.suggestions)
                 ActionChip(
                   label: Text(suggestion),
-                  onPressed: () => onSuggestion(suggestion),
+                  onPressed: onSuggestion == null
+                      ? null
+                      : () => onSuggestion!(suggestion),
                   backgroundColor: Colors.white,
                   side: BorderSide(
                     color: CaliuColors.maroon.withValues(alpha: 0.2),
