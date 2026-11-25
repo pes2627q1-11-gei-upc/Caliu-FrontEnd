@@ -51,6 +51,7 @@ import 'package:caliu/widgets/event_preview_card.dart';
 import 'package:caliu/widgets/favorite_button.dart';
 import 'package:caliu/widgets/favorites_login_prompt.dart';
 import 'package:caliu/widgets/map_event_preview.dart';
+import 'package:caliu/chat_history_screen.dart';
 import 'package:caliu/chat_screen.dart';
 import 'package:caliu/data/chat_api.dart';
 import 'package:caliu/data/chat_controller.dart';
@@ -130,6 +131,7 @@ void main() {
     expect(EventPreviewCard, isNotNull);
     expect(MapEventPreview, isNotNull);
     expect(ChatScreen, isNotNull);
+    expect(ChatHistoryScreen, isNotNull);
     expect(RecommendationsApi, isNotNull);
     expect(RecommendationsScreen, isNotNull);
     expect(ChatApi, isNotNull);

@@ -23,7 +23,10 @@ Future<ChatController> _pump(
   MemorySession? session,
 }) async {
   final chat = ChatController(
-    api: ChatApi(client: MockClient(handler), baseUrl: 'http://api.test'),
+    api: ChatApi(
+      client: MockClient(withoutHistory(handler)),
+      baseUrl: 'http://api.test',
+    ),
     session: session ?? MemorySession(token),
   );
   addTearDown(chat.dispose);

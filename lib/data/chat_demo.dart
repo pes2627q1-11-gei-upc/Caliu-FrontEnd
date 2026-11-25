@@ -3,6 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'auth_session.dart';
 import 'chat_api.dart';
 import 'chat_filters.dart';
+import 'chat_message.dart';
 import 'chat_plan.dart';
 import 'event.dart';
 
@@ -39,6 +40,51 @@ class DemoChatApi extends ChatApi {
   /// reintentar-los, responen bé.
   final Set<String> _failedOnce = {};
 
+  /// Converses en memòria per provar "Nova conversa" (#162) i l'historial
+  /// (#164). Es perden en tancar l'app.
+  final List<_DemoSession> _sessions = [];
+  int _nextSession = 0;
+  int _nextMessage = 0;
+
+  _DemoSession _newSession() {
+    final session = _DemoSession('demo-${++_nextSession}');
+    _sessions.insert(0, session);
+    return session;
+  }
+
+  @override
+  Future<String> createSession({required String token}) async =>
+      _newSession().id;
+
+  @override
+  Future<List<ChatSessionSummary>> listSessions({
+    required String token,
+  }) async => [
+    for (final session in _sessions)
+      ChatSessionSummary(
+        id: session.id,
+        title: session.messages.firstOrNull?.text,
+        lastActivityAt: session.lastActivityAt,
+      ),
+  ];
+
+  @override
+  Future<List<ChatMessage>> fetchMessages({
+    required String token,
+    required String sessionId,
+  }) async {
+    final session = _sessions.where((s) => s.id == sessionId).firstOrNull;
+    if (session == null) {
+      throw const ChatApiException(
+        'Aquesta conversa ja no existeix.',
+        statusCode: 404,
+        code: 'SESSION_NOT_FOUND',
+        sessionLost: true,
+      );
+    }
+    return List.of(session.messages);
+  }
+
   @override
   Future<ChatReply> sendMessage({
     required String token,
@@ -46,6 +92,37 @@ class DemoChatApi extends ChatApi {
     String? sessionId,
     String? locale,
   }) async {
+    final reply = await _reply(message);
+    // Com el backend: una resposta alternativa no es desa ni crea sessió.
+    if (reply.isFallback) return reply;
+    final session =
+        _sessions.where((s) => s.id == sessionId).firstOrNull ?? _newSession();
+    session.messages.addAll([
+      ChatMessage(
+        id: 'hd${_nextMessage++}',
+        role: ChatRole.user,
+        text: message.trim(),
+      ),
+      ChatMessage(
+        id: 'hd${_nextMessage++}',
+        role: ChatRole.assistant,
+        text: reply.reply,
+      ),
+    ]);
+    session.lastActivityAt = DateTime.now();
+    _sessions
+      ..remove(session)
+      ..insert(0, session);
+    return ChatReply(
+      sessionId: session.id,
+      reply: reply.reply,
+      events: reply.events,
+      filters: reply.filters,
+      plan: reply.plan,
+    );
+  }
+
+  Future<ChatReply> _reply(String message) async {
     if (latency > Duration.zero) await Future<void>.delayed(latency);
     final text = message.toLowerCase();
     // Prova dels errors (#144): «prova error» dona una resposta alternativa i
@@ -179,4 +256,12 @@ class DemoChatApi extends ChatApi {
       ),
     );
   }
+}
+
+class _DemoSession {
+  _DemoSession(this.id);
+
+  final String id;
+  final List<ChatMessage> messages = [];
+  DateTime lastActivityAt = DateTime.now();
 }
