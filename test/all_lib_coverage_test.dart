@@ -44,6 +44,7 @@ import 'package:caliu/data/preferred_radius.dart';
 import 'package:caliu/profile_screen.dart';
 import 'package:caliu/public_profile_screen.dart';
 import 'package:caliu/data/recommendations_api.dart';
+import 'package:caliu/data/recommendations_location.dart';
 import 'package:caliu/recommendations_screen.dart';
 import 'package:caliu/register_screen.dart';
 import 'package:caliu/search_screen.dart';
@@ -56,6 +57,7 @@ import 'package:caliu/widgets/event_list_tile.dart';
 import 'package:caliu/widgets/event_preview_card.dart';
 import 'package:caliu/widgets/favorite_button.dart';
 import 'package:caliu/widgets/favorites_login_prompt.dart';
+import 'package:caliu/widgets/home_recommendations.dart';
 import 'package:caliu/widgets/map_event_preview.dart';
 import 'package:caliu/chat_history_screen.dart';
 import 'package:caliu/chat_screen.dart';
@@ -73,6 +75,7 @@ import 'package:caliu/widgets/chat/chat_filters_row.dart';
 import 'package:caliu/widgets/chat/chat_itinerary_card.dart';
 import 'package:caliu/widgets/chat/typing_indicator.dart';
 import 'package:caliu/widgets/profile_avatar.dart';
+import 'package:caliu/widgets/recommendation_card.dart';
 import 'package:caliu/widgets/user_avatar.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -80,6 +83,9 @@ void main() {
   test('inclou tot lib/ a la cobertura', () {
     // Referències mínimes perquè l'analitzador no elimini els imports.
     expect(apiBaseUrl, isA<String>());
+    expect(recommendationsLocationIfAllowed, isNotNull);
+    expect(HomeRecommendations, isNotNull);
+    expect(RecommendationCard, isNotNull);
     expect(MockAvatarApi, isNotNull);
     expect(HttpAvatarApi, isNotNull);
     expect(AvatarController, isNotNull);

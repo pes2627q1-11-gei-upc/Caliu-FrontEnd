@@ -1,22 +1,19 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 
 import 'data/auth_session.dart';
 import 'data/event.dart';
 import 'data/favorites_controller.dart';
 import 'data/recommendations_api.dart';
+import 'data/recommendations_location.dart';
 import 'event_detail_screen.dart';
 import 'login_screen.dart';
 import 'theme/caliu_colors.dart';
 import 'widgets/centered_message.dart';
-import 'widgets/event_list_tile.dart';
-import 'widgets/favorite_button.dart';
+import 'widgets/recommendation_card.dart';
 
-/// Ubicació per ordenar les recomanacions per proximitat.
-typedef RecommendationsLocation = ({double lat, double lng});
+export 'data/recommendations_location.dart' show RecommendationsLocation;
 
 /// Pestanya «Per a tu» (H.U #8, tasca #122): esdeveniments recomanats segons
 /// els preferits, les preferències i la ubicació de l'usuari.
@@ -219,31 +216,11 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
 
   Future<RecommendationsLocation?> _position() async {
     try {
-      return await (widget.locate ?? _gpsIfAllowed)().timeout(
-        const Duration(seconds: 6),
-      );
+      final locate = widget.locate ?? recommendationsLocationIfAllowed;
+      return await locate().timeout(const Duration(seconds: 6));
     } catch (_) {
       return null;
     }
-  }
-
-  /// No demana permís: el mapa ja ho fa. Primer l'última posició coneguda
-  /// (no existeix a web) i, si no n'hi ha, una de nova amb límit de temps.
-  static Future<RecommendationsLocation?> _gpsIfAllowed() async {
-    if (!await Geolocator.isLocationServiceEnabled()) return null;
-    final permission = await Geolocator.checkPermission();
-    if (permission != LocationPermission.always &&
-        permission != LocationPermission.whileInUse) {
-      return null;
-    }
-    final last = kIsWeb ? null : await Geolocator.getLastKnownPosition();
-    final position =
-        last ??
-        await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.medium,
-          timeLimit: const Duration(seconds: 5),
-        );
-    return (lat: position.latitude, lng: position.longitude);
   }
 
   Future<void> _login() async {
@@ -382,20 +359,21 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
       );
     }
 
+    // Mateix disseny de targeta que la secció de recomanacions d'Inici.
     return ListView.separated(
       key: const ValueKey('recommendations-list'),
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       itemCount: visible.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 10),
+      separatorBuilder: (context, index) => const SizedBox(height: 16),
       itemBuilder: (context, index) {
         final event = visible[index];
-        return EventListTile(
+        return RecommendationCard(
           key: ValueKey('recommendation-${event.id}'),
           event: event,
-          subtitle: eventListSubtitle(event),
+          favorites: _favorites,
+          imageHeight: RecommendationCard.wideImageHeight,
           onTap: () => _openDetail(event),
-          trailing: FavoriteButton(event: event, controller: _favorites),
         );
       },
     );
