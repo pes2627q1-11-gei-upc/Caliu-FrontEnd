@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:caliu/data/auth_session.dart';
@@ -64,6 +65,7 @@ Future<void> _pumpHome(
   required FavoritesController favorites,
   AuthSessionStore? session,
   VoidCallback? onSeeAll,
+  bool isActive = true,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -76,6 +78,7 @@ Future<void> _pumpHome(
               favorites: favorites,
               locate: () async => null,
               refreshDelay: Duration.zero,
+              isActive: isActive,
               onSeeAll: onSeeAll ?? () {},
             ),
           ],
@@ -191,6 +194,113 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('Recomanacions'), findsNothing);
+    });
+  });
+
+  group('HomeRecommendations amb canvi de sessió', () {
+    String bearer(http.Request request) =>
+        request.headers['Authorization'] ?? '';
+
+    testWidgets('A → B amb error de càrrega no mostra les recomanacions d\'A', (
+      tester,
+    ) async {
+      final session = _Session('A');
+      final api = _api((request) async {
+        if (bearer(request) == 'Bearer A') {
+          return _page([_event('a-1', 'Recomanació d\'A')]);
+        }
+        return http.Response('{}', 500);
+      });
+      final favorites = await _favorites();
+      await _pumpHome(tester, api: api, favorites: favorites, session: session);
+      expect(find.text('Recomanació d\'A'), findsOneWidget);
+
+      // Surt d'Inici, tanca sessió amb A i entra amb B.
+      await _pumpHome(
+        tester,
+        api: api,
+        favorites: favorites,
+        session: session,
+        isActive: false,
+      );
+      session.token = 'B';
+      await _pumpHome(tester, api: api, favorites: favorites, session: session);
+
+      expect(find.text('Recomanació d\'A'), findsNothing);
+      expect(find.text('Recomanacions'), findsNothing);
+    });
+
+    testWidgets('descarta la resposta pendent si la sessió ha canviat', (
+      tester,
+    ) async {
+      final session = _Session('A');
+      final pendingA = Completer<http.Response>();
+      final api = _api((request) {
+        if (bearer(request) == 'Bearer A') return pendingA.future;
+        return Future.value(_page([_event('b-1', 'Recomanació de B')]));
+      });
+      await _pumpHome(
+        tester,
+        api: api,
+        favorites: await _favorites(),
+        session: session,
+      );
+
+      // Mentre la petició d'A és en curs, la sessió passa a B.
+      session.token = 'B';
+      pendingA.complete(_page([_event('a-1', 'Recomanació d\'A')]));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Recomanació d\'A'), findsNothing);
+    });
+
+    testWidgets('amb una nova càrrega de B, la resposta tardana d\'A no la '
+        'trepitja', (tester) async {
+      final session = _Session('A');
+      final pendingA = Completer<http.Response>();
+      final api = _api((request) {
+        if (bearer(request) == 'Bearer A') return pendingA.future;
+        return Future.value(_page([_event('b-1', 'Recomanació de B')]));
+      });
+      final favorites = await _favorites();
+      await _pumpHome(tester, api: api, favorites: favorites, session: session);
+
+      await _pumpHome(
+        tester,
+        api: api,
+        favorites: favorites,
+        session: session,
+        isActive: false,
+      );
+      session.token = 'B';
+      await _pumpHome(tester, api: api, favorites: favorites, session: session);
+      expect(find.text('Recomanació de B'), findsOneWidget);
+
+      pendingA.complete(_page([_event('a-1', 'Recomanació d\'A')]));
+      await tester.pumpAndSettle();
+      expect(find.text('Recomanació d\'A'), findsNothing);
+      expect(find.text('Recomanació de B'), findsOneWidget);
+    });
+
+    testWidgets('si els preferits no canvien, no es torna a demanar', (
+      tester,
+    ) async {
+      var calls = 0;
+      final favorites = await _favorites();
+      await _pumpHome(
+        tester,
+        api: _api((_) async {
+          calls++;
+          return _page(_events(3));
+        }),
+        favorites: favorites,
+      );
+      expect(calls, 1);
+
+      // Recarregar els mateixos preferits notifica, però no hi ha canvis.
+      await favorites.load();
+      await tester.pumpAndSettle();
+      expect(calls, 1);
     });
   });
 

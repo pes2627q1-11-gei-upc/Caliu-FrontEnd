@@ -80,12 +80,19 @@ class _HomeRecommendationsState extends State<HomeRecommendations> {
       widget.favorites ?? FavoritesController.shared;
 
   List<Event> _events = const [];
+
+  /// Token del compte al qual pertanyen [_events]. Si la sessió canvia, les
+  /// recomanacions de l'anterior es descarten abans de demanar-ne de noves.
+  String? _eventsToken;
+
   int _request = 0;
   Timer? _refreshTimer;
+  Set<String> _favoriteIds = {};
 
   @override
   void initState() {
     super.initState();
+    _favoriteIds = _currentFavoriteIds();
     _favorites.addListener(_favoritesChanged);
     if (widget.isActive) _load();
   }
@@ -103,14 +110,28 @@ class _HomeRecommendationsState extends State<HomeRecommendations> {
     super.dispose();
   }
 
+  Set<String> _currentFavoriteIds() =>
+      _favorites.favorites.map((event) => event.id).toSet();
+
   /// El marcat desapareix a l'instant (filtre de [_visible]) i poc després es
-  /// tornen a demanar. També cobreix iniciar sessió, que recarrega preferits.
+  /// tornen a demanar. Com a «Per a tu», només es recarrega si els preferits
+  /// han canviat de veritat: el controlador notifica també en carregar.
   void _favoritesChanged() {
     if (!mounted) return;
+    final ids = _currentFavoriteIds();
+    final changed =
+        ids.length != _favoriteIds.length || !ids.containsAll(_favoriteIds);
+    _favoriteIds = ids;
     setState(() {});
-    if (!widget.isActive) return;
+    if (!changed || !widget.isActive) return;
     _refreshTimer?.cancel();
     _refreshTimer = Timer(widget.refreshDelay, _load);
+  }
+
+  /// Buida la secció i desvincula les dades de qualsevol compte.
+  void _clear() {
+    _eventsToken = null;
+    setState(() => _events = const []);
   }
 
   /// Els preferits ja marcats no es recomanen (com a «Per a tu»).
@@ -119,16 +140,21 @@ class _HomeRecommendationsState extends State<HomeRecommendations> {
       .take(widget.maxItems)
       .toList();
 
-  /// Recàrrega silenciosa: si falla, es manté el que hi havia.
+  /// Recàrrega silenciosa. Les dades queden vinculades al token amb què
+  /// s'han demanat: si la sessió ha canviat, es buiden abans de la petició i
+  /// les respostes del compte anterior es descarten. Si falla, només es manté
+  /// el que hi havia quan és del mateix compte.
   Future<void> _load() async {
     final request = ++_request;
     try {
       final token = await _session.readToken();
       if (!mounted || request != _request) return;
       if (token == null || token.isEmpty) {
-        setState(() => _events = const []);
+        _clear();
         return;
       }
+      if (token != _eventsToken) _clear();
+
       RecommendationsLocation? position;
       try {
         final locate = widget.locate ?? recommendationsLocationIfAllowed;
@@ -145,13 +171,22 @@ class _HomeRecommendationsState extends State<HomeRecommendations> {
         limit: widget.maxItems * 2,
       );
       if (!mounted || request != _request) return;
+      // La sessió pot haver canviat mentre esperàvem la resposta.
+      if (await _session.readToken() != token) {
+        if (mounted && request == _request) _clear();
+        return;
+      }
+      if (!mounted || request != _request) return;
+      _eventsToken = token;
       setState(() => _events = page.items);
     } on RecommendationsApiException catch (e) {
       if (!mounted || request != _request) return;
       // Sessió caducada: la secció s'amaga; «Per a tu» gestiona el login.
-      if (e.isUnauthorized) setState(() => _events = const []);
+      if (e.isUnauthorized) _clear();
     } catch (_) {
-      // Error de xarxa o d'emmagatzematge: no es mostra res de nou.
+      // P. ex. si falla el secure storage: no podem saber de qui són les
+      // dades, així que no se'n mostra cap.
+      if (mounted && request == _request) _clear();
     }
   }
 
