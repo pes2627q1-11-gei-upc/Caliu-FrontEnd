@@ -20,6 +20,7 @@ import 'package:caliu/data/events_api.dart';
 import 'package:caliu/data/favorite_alerts_api.dart';
 import 'package:caliu/data/favorite_alerts_controller.dart';
 import 'package:caliu/data/password_reset_api.dart';
+import 'package:caliu/data/password_reset_http_api.dart';
 import 'package:caliu/data/users_api.dart';
 import 'package:caliu/data/favorites_api.dart';
 import 'package:caliu/data/favorites_controller.dart';
@@ -91,6 +92,7 @@ void main() {
     expect(previewWhen, isA<Function>());
     expect(EventsApi, isNotNull);
     expect(MockPasswordResetApi, isNotNull);
+    expect(HttpPasswordResetApi, isNotNull);
     expect(ForgotPasswordScreen, isNotNull);
     expect(NewPasswordScreen, isNotNull);
     expect(MockUsersApi, isNotNull);
