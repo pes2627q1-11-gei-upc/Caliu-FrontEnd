@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'auth_session.dart';
+import 'avatar_http_api.dart';
 
 class AvatarApiException implements Exception {
   const AvatarApiException(this.message, {this.statusCode});
@@ -14,8 +15,11 @@ class AvatarApiException implements Exception {
   String toString() => message;
 }
 
-/// Regles de la foto de perfil. La H.U #35 deixa la mida i els tipus a
-/// confirmar per l'equip: aquests valors són una proposta.
+/// Regles del fitxer **original** que tria l'usuari (abans de retallar-lo).
+///
+/// El que es puja al backend és sempre el retall en PNG de 512×512 de
+/// `SquareCropScreen`, que compleix les regles del servidor (JPEG o PNG, fins
+/// a 2 MiB) encara que l'original sigui un WebP o pesi més de 2 MiB.
 abstract final class AvatarRules {
   /// Mida màxima del fitxer original que tria l'usuari.
   static const maxBytes = 5 * 1024 * 1024;
@@ -50,11 +54,10 @@ abstract final class AvatarRules {
 
 /// Foto de perfil de l'usuari autenticat (H.U #35).
 ///
-/// El backend encara no l'exposa (tasques #148 i #149). Proposta de contracte
-/// (pendent de confirmar a l'OpenAPI del backend):
-/// - `PUT /users/me/avatar` (multipart, camp `avatar`) → `{ "avatarUrl" }`;
-///   substitueix l'anterior. 400 si el tipus no és permès, 413 si és massa
-///   gran, 401 sense JWT vàlid
+/// Endpoints del backend (OpenAPI), vegeu [HttpAvatarApi]:
+/// - `PUT /users/me/avatar` (multipart, camp `avatar`, JPEG o PNG fins a
+///   2 MiB) → `{ "avatarUrl" }`; substitueix l'anterior. 400 si la imatge no
+///   és vàlida, 413 si és massa gran, 401 sense JWT vàlid
 /// - `GET /users/me` inclou `avatarUrl`
 abstract interface class AvatarApi {
   /// Foto actual, o null si encara no en té.
@@ -64,12 +67,11 @@ abstract interface class AvatarApi {
   Future<void> uploadAvatar(Uint8List bytes, {required String contentType});
 }
 
-/// Instància que fa servir l'app. Quan el backend estigui llest, aquí es
-/// canviarà la implementació simulada per la HTTP.
+/// Instància que fa servir l'app: el backend real (tasca #231).
 AvatarApi createAvatarApi({AuthSessionStore? session}) =>
-    MockAvatarApi(session: session ?? AuthSession());
+    HttpAvatarApi(session: session);
 
-/// Implementació en memòria mentre no hi ha backend.
+/// Implementació en memòria, per als tests.
 class MockAvatarApi implements AvatarApi {
   MockAvatarApi({
     this.session,
