@@ -94,7 +94,7 @@ class Event {
     });
   }
 
-  Uri? get googleCalendarUri {
+  Uri? googleCalendarUri({DateTime? now}) {
     final start = startDate;
     final end = endDate;
     if (start == null || (end != null && end.isBefore(start))) return null;
@@ -114,10 +114,12 @@ class Event {
       startInMadrid.month,
       startInMadrid.day,
     );
-    final nextDay = DateTime.utc(
-      firstDay.year,
-      firstDay.month,
-      firstDay.day + 1,
+    final referenceNow = now ?? DateTime.now();
+    final todayInMadrid = _madridDateTime(referenceNow);
+    final today = DateTime.utc(
+      todayInMadrid.year,
+      todayInMadrid.month,
+      todayInMadrid.day,
     );
     final String dates;
     // L’agenda representa els dies sense hora d’inici amb la mitjanit local.
@@ -128,21 +130,44 @@ class Event {
         lastDay.month,
         lastDay.day + 1,
       );
-      // Exposicions llargues: només el primer dia (dia sencer).
-      final dayEnd = exclusiveEnd.difference(firstDay) >= maxSpan
-          ? nextDay
-          : exclusiveEnd;
-      dates = '${formatDay(firstDay)}/${formatDay(dayEnd)}';
+      var dayStart = firstDay;
+      var dayEnd = exclusiveEnd;
+      if (exclusiveEnd.difference(firstDay) >= maxSpan) {
+        if (!today.isBefore(exclusiveEnd)) return null;
+        // Una exposició en curs es pot visitar avui, no el dia d’inauguració.
+        if (today.isAfter(firstDay)) dayStart = today;
+        dayEnd = DateTime.utc(dayStart.year, dayStart.month, dayStart.day + 1);
+      }
+      dates = '${formatDay(dayStart)}/${formatDay(dayEnd)}';
     } else {
       // El backend també pot repetir l’inici quan no disposa de data de fi.
       final calendarEnd = end == null || end.isAtSameMomentAs(start)
           ? start.add(const Duration(hours: 2))
           : end;
-      // Intervals llargs: primer dia amb la hora d’inici i 2 h de durada.
-      final eventEnd = calendarEnd.difference(start) >= maxSpan
-          ? start.add(const Duration(hours: 2))
-          : calendarEnd;
-      dates = '${formatUtc(start)}/${formatUtc(eventEnd)}';
+      var eventStart = start;
+      var eventEnd = calendarEnd;
+      if (calendarEnd.difference(start) >= maxSpan) {
+        if (referenceNow.isAfter(calendarEnd)) return null;
+        if (today.isAfter(firstDay)) {
+          eventStart = _utcFromMadrid(
+            DateTime.utc(
+              today.year,
+              today.month,
+              today.day,
+              startInMadrid.hour,
+              startInMadrid.minute,
+              startInMadrid.second,
+              startInMadrid.millisecond,
+              startInMadrid.microsecond,
+            ),
+          );
+        }
+        // Proposta de 2 h, sense sobrepassar el final real de l’activitat.
+        eventEnd = eventStart.add(const Duration(hours: 2));
+        if (eventEnd.isAfter(calendarEnd)) eventEnd = calendarEnd;
+        if (!eventEnd.isAfter(eventStart)) return null;
+      }
+      dates = '${formatUtc(eventStart)}/${formatUtc(eventEnd)}';
     }
 
     final place = placeLine;
@@ -175,6 +200,16 @@ class Event {
     final summerTime =
         !utc.isBefore(clockChange(3)) && utc.isBefore(clockChange(10));
     return utc.add(Duration(hours: summerTime ? 2 : 1));
+  }
+
+  // Converteix components locals de Madrid sense usar la zona del dispositiu.
+  static DateTime _utcFromMadrid(DateTime local) {
+    for (final offset in [2, 1]) {
+      final utc = local.subtract(Duration(hours: offset));
+      if (_madridDateTime(utc) == local) return utc;
+    }
+    // Al salt de primavera, una hora inexistent es desplaça una hora endavant.
+    return local.subtract(const Duration(hours: 1));
   }
 
   factory Event.fromJson(Map<String, dynamic> json) {
