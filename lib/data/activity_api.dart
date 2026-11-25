@@ -1,5 +1,6 @@
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import 'activity_http_api.dart';
 import 'auth_session.dart';
 import 'event.dart';
 
@@ -37,8 +38,7 @@ class ActivityEntry {
 /// encara no existeix. Fins llavors, l'app només mostra dades simulades
 /// ([MockActivityApi]).
 ///
-/// El backend encara no l'exposa. Proposta de contracte (pendent de
-/// confirmar a l'OpenAPI del backend):
+/// Endpoint del backend (OpenAPI), vegeu [HttpActivityApi]:
 /// - `GET /users/me/activity` →
 ///   `{ "items": [{ "id", "event": Event, "attendedAt" }] }`,
 ///   el més recent primer. Només ha d'incloure assistències validades per
@@ -48,12 +48,11 @@ abstract interface class ActivityApi {
   Future<List<ActivityEntry>> fetchActivity();
 }
 
-/// Instància que fa servir l'app. Quan el backend estigui llest, aquí es
-/// canviarà la implementació simulada per la HTTP.
+/// Instància que fa servir l'app: el backend real (tasca #229).
 ActivityApi createActivityApi({AuthSessionStore? session}) =>
-    MockActivityApi(session: session ?? AuthSession());
+    HttpActivityApi(AttendanceHttpClient(session: session));
 
-/// Implementació amb dades simulades mentre no hi ha backend.
+/// Implementació amb dades simulades, per als tests.
 class MockActivityApi implements ActivityApi {
   MockActivityApi({
     this.session,

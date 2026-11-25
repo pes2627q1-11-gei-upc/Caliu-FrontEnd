@@ -7,6 +7,7 @@ import 'package:caliu/config.dart';
 import 'package:caliu/data/achievements_api.dart';
 import 'package:caliu/data/achievements_http_api.dart';
 import 'package:caliu/data/activity_api.dart';
+import 'package:caliu/data/activity_http_api.dart';
 import 'package:caliu/data/attended_api.dart';
 import 'package:caliu/data/auth_api.dart';
 import 'package:caliu/data/auth_session.dart';
@@ -117,6 +118,7 @@ void main() {
     expect(AttendedList, isNotNull);
     expect(MockAttendedApi, isNotNull);
     expect(MockActivityApi, isNotNull);
+    expect(HttpActivityApi, isNotNull);
     expect(CenteredMessage, isNotNull);
     expect(EventListTile, isNotNull);
     expect(EventDetailScreen, isNotNull);
