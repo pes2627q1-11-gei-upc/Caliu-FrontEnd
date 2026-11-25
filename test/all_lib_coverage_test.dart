@@ -23,6 +23,7 @@ import 'package:caliu/data/password_reset_api.dart';
 import 'package:caliu/data/users_api.dart';
 import 'package:caliu/data/favorites_api.dart';
 import 'package:caliu/data/favorites_controller.dart';
+import 'package:caliu/data/favorites_http_api.dart';
 import 'package:caliu/data/map_event_markers.dart';
 import 'package:caliu/event_detail_screen.dart';
 import 'package:caliu/favorites_list.dart';
@@ -99,6 +100,7 @@ void main() {
     expect(kMapMaxZoom, greaterThan(kStopClusteringZoom));
     expect(focusForClusterTap, isA<Function>());
     expect(MockFavoritesApi, isNotNull);
+    expect(HttpFavoritesApi, isNotNull);
     expect(FavoritesController, isNotNull);
     expect(FavoriteButton, isNotNull);
     expect(AlertsToggleButton, isNotNull);
