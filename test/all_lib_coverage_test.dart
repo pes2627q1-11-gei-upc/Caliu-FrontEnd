@@ -14,6 +14,7 @@ import 'package:caliu/data/auth_session.dart';
 import 'package:caliu/data/auth_validators.dart';
 import 'package:caliu/data/avatar_api.dart';
 import 'package:caliu/data/avatar_controller.dart';
+import 'package:caliu/data/avatar_http_api.dart';
 import 'package:caliu/data/date_range_filter.dart';
 import 'package:caliu/data/event.dart';
 import 'package:caliu/data/event_query.dart';
@@ -78,6 +79,7 @@ void main() {
     // Referències mínimes perquè l'analitzador no elimini els imports.
     expect(apiBaseUrl, isA<String>());
     expect(MockAvatarApi, isNotNull);
+    expect(HttpAvatarApi, isNotNull);
     expect(AvatarController, isNotNull);
     expect(SquareCropScreen, isNotNull);
     expect(ProfileAvatar, isNotNull);
