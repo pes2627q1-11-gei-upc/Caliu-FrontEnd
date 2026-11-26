@@ -228,7 +228,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     final chips = <String>{...event.categories, ...event.tags}.toList();
     final price = _priceLabel(event);
     final place = event.placeLine;
-    final calendarUri = event.googleCalendarUri;
+    final calendarUri = event.googleCalendarUri();
 
     return Scaffold(
       backgroundColor: CaliuColors.beige,

@@ -5,7 +5,9 @@ import 'map_view.dart';
 import 'data/preferred_radius.dart';
 import 'data/search_radius.dart';
 import 'profile_screen.dart';
+import 'recommendations_screen.dart';
 import 'search_screen.dart';
+import 'widgets/home_recommendations.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key, this.preferredRadius});
@@ -47,22 +49,40 @@ class _MainScreenState extends State<MainScreen> {
   // MapView rep si és la pestanya visible: fora d'ella no ha d'interceptar el
   // botó enrere (#44). L'IndexedStack conserva l'estat de cada pantalla.
   List<Widget> get _screens => [
-    SearchScreen(radius: _radius),
-    MapView(isActive: _selectedIndex == 1, radius: _radius),
+    // Inici: la cerca amb les recomanacions a dalt (només aquí, no a la
+    // cerca que s'obre des del mapa). «Veure tot» porta a «Per a tu».
+    SearchScreen(
+      radius: _radius,
+      homeHeader: HomeRecommendations(
+        isActive: _selectedIndex == 0,
+        onSeeAll: () => setState(() => _selectedIndex = 1),
+      ),
+    ),
+    // H.U #8: recomanacions. En tornar-hi es recarreguen.
+    RecommendationsScreen(isActive: _selectedIndex == 1),
+    MapView(isActive: _selectedIndex == 2, radius: _radius),
     const ProfileScreen(),
     // H.U #11: assistent. `isActive` fa que revisi la sessió en tornar-hi.
-    ChatScreen(isActive: _selectedIndex == 3),
+    ChatScreen(isActive: _selectedIndex == 4),
   ];
 
-  static const List<String> _labels = ['Inici', 'Mapa', 'Perfil', 'Xat'];
+  static const List<String> _labels = [
+    'Inici',
+    'Per a tu',
+    'Mapa',
+    'Perfil',
+    'Xat',
+  ];
   static const List<IconData> _outlinedIcons = [
     Icons.home_outlined,
+    Icons.star_outline,
     Icons.location_on_outlined,
     Icons.person_outline,
     Icons.chat_bubble_outline,
   ];
   static const List<IconData> _selectedIcons = [
     Icons.home,
+    Icons.star,
     Icons.location_on,
     Icons.person,
     Icons.chat_bubble,

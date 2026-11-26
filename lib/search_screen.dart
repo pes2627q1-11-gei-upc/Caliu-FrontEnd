@@ -13,13 +13,25 @@ import 'widgets/event_list_tile.dart';
 import 'widgets/favorite_button.dart';
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key, this.radius, this.api, this.favorites});
+  const SearchScreen({
+    super.key,
+    this.radius,
+    this.api,
+    this.favorites,
+    this.homeHeader,
+  });
 
   final SearchRadius? radius;
   final EventsApi? api;
 
   /// Per defecte, [FavoritesController.shared].
   final FavoritesController? favorites;
+
+  /// Contingut propi de la pàgina d'Inici (p. ex. les recomanacions) que es
+  /// mostra damunt dels resultats. Només el passa la pestanya Inici: la cerca
+  /// que s'obre des del mapa no en té. S'amaga quan hi ha una cerca aplicada
+  /// (text o filtres) per deixar tot l'espai als resultats.
+  final Widget? homeHeader;
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -55,6 +67,10 @@ class _SearchScreenState extends State<SearchScreen> {
   bool _loadingCategories = true;
   String? _error;
   bool _searched = false;
+
+  /// Si l'última cerca executada tenia criteris de l'usuari (text o filtres).
+  /// El radi no hi compta: per defecte ve de les preferències (#125).
+  bool _searchActive = false;
 
   @override
   void initState() {
@@ -114,6 +130,14 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  bool get _hasSearchCriteria =>
+      _searchController.text.trim().isNotEmpty ||
+      _selectedCategories.isNotEmpty ||
+      _comarcaController.text.trim().isNotEmpty ||
+      _municipalityController.text.trim().isNotEmpty ||
+      _dateFilter != null ||
+      _radius.price != null;
+
   EventQuery _buildQuery({bool preview = false}) {
     final radius = preview ? _filterRadius : _radius;
     final categories = _selectedCategories.toList()..sort();
@@ -140,6 +164,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _loading = true;
       _error = null;
       _searched = true;
+      _searchActive = _hasSearchCriteria;
     });
 
     try {
@@ -850,17 +875,6 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  String _subtitle(Event event) {
-    final parts = <String>[
-      if (event.municipality != null && event.municipality!.isNotEmpty)
-        event.municipality!,
-      if (event.distanceMeters != null)
-        '${(event.distanceMeters! / 1000).toStringAsFixed(1)} km',
-      if (event.categories.isNotEmpty) event.categories.first,
-    ];
-    return parts.join(' · ');
-  }
-
   @override
   Widget build(BuildContext context) {
     final activeFilters =
@@ -934,9 +948,52 @@ class _SearchScreenState extends State<SearchScreen> {
               ],
             ),
           ),
-          Expanded(child: _buildBody()),
+          Expanded(
+            child: widget.homeHeader == null ? _buildBody() : _buildHomeBody(),
+          ),
         ],
       ),
+    );
+  }
+
+  /// Inici: la capçalera (recomanacions) i els resultats fan scroll junts,
+  /// perquè el carrusel no robi espai fix a la llista. Amb una cerca aplicada
+  /// la capçalera s'amaga, però es manté muntada per no perdre'n l'estat ni
+  /// tornar-la a carregar en esborrar la cerca.
+  Widget _buildHomeBody() {
+    return CustomScrollView(
+      key: const ValueKey('search-home-body'),
+      slivers: [
+        SliverToBoxAdapter(
+          child: Visibility(
+            key: const ValueKey('search-home-header'),
+            visible: !_searchActive,
+            maintainState: true,
+            child: widget.homeHeader!,
+          ),
+        ),
+        if (!_loading && _error == null && _results.isNotEmpty)
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+            sliver: SliverList.separated(
+              itemCount: _results.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 10),
+              itemBuilder: (context, index) => _resultTile(_results[index]),
+            ),
+          )
+        else
+          // Carregant, error o sense resultats: el mateix missatge de sempre.
+          SliverFillRemaining(hasScrollBody: false, child: _buildBody()),
+      ],
+    );
+  }
+
+  Widget _resultTile(Event event) {
+    return EventListTile(
+      event: event,
+      subtitle: eventListSubtitle(event),
+      onTap: () => _openDetail(event),
+      trailing: FavoriteButton(event: event, controller: widget.favorites),
     );
   }
 
@@ -980,15 +1037,7 @@ class _SearchScreenState extends State<SearchScreen> {
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       itemCount: _results.length,
       separatorBuilder: (context, index) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final event = _results[index];
-        return EventListTile(
-          event: event,
-          subtitle: _subtitle(event),
-          onTap: () => _openDetail(event),
-          trailing: FavoriteButton(event: event, controller: widget.favorites),
-        );
-      },
+      itemBuilder: (context, index) => _resultTile(_results[index]),
     );
   }
 }

@@ -101,7 +101,10 @@ class _NewPasswordScreenState extends State<NewPasswordScreen> {
                       TextFormField(
                         controller: _tokenController,
                         textInputAction: TextInputAction.next,
-                        textCapitalization: TextCapitalization.characters,
+                        // El codi del correu és en minúscules: no forcem
+                        // majúscules ni correccions automàtiques.
+                        autocorrect: false,
+                        enableSuggestions: false,
                         decoration: const InputDecoration(
                           labelText: 'Codi del correu',
                           prefixIcon: Icon(Icons.key_outlined),

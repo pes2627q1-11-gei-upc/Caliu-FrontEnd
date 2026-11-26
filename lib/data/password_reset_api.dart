@@ -1,5 +1,7 @@
 import 'dart:math';
 
+import 'password_reset_http_api.dart';
+
 class PasswordResetException implements Exception {
   const PasswordResetException(this.message, {this.statusCode});
 
@@ -16,21 +18,22 @@ class PasswordResetException implements Exception {
   String toString() => message;
 }
 
-/// El backend encara no envia el correu de recuperació (tasques #172 i #173):
-/// sense correu, l'usuari no pot aconseguir el codi i quedaria encallat. Per
-/// això l'enllaç «He oblidat la contrasenya» s'amaga fins que funcioni
-/// (revisió de la PR #33). Per provar-lo:
+/// L'enllaç «He oblidat la contrasenya» es va amagar perquè, sense backend,
+/// l'usuari no rebia cap correu i quedava encallat (revisió de la PR #33).
+/// Ara els endpoints existeixen (tasca #232), però el correu només s'envia si
+/// el servidor té configurat el servei (si no, respon 503). Cal que l'equip
+/// confirmi que funciona abans d'activar-lo. Per provar-lo:
 /// `flutter run --dart-define=PASSWORD_RESET=true`.
 const passwordResetAvailable = bool.fromEnvironment('PASSWORD_RESET');
 
 /// Recuperació de contrasenya per correu (H.U #57).
 ///
-/// El backend encara no l'exposa (tasques #172 i #173). Proposta de contracte
-/// (pendent de confirmar a l'OpenAPI del backend):
-/// - `POST /auth/forgot-password` → body `{ "email" }`. Respon sempre 202,
-///   existeixi o no el compte, perquè no reveli quins correus hi ha.
+/// Endpoints del backend (OpenAPI), vegeu [HttpPasswordResetApi]:
+/// - `POST /auth/forgot-password` → body `{ "email" }`. Respon 202 existeixi
+///   o no el compte, perquè no reveli quins correus hi ha; 503 si el servei
+///   de correu no està configurat.
 /// - `POST /auth/reset-password` → body `{ "token", "password" }`. 400 si
-///   el token no és vàlid, ha caducat o ja s'ha fet servir.
+///   el codi no és vàlid, ha caducat o ja s'ha fet servir.
 /// - Tots dos amb rate limit: 429 si se supera.
 abstract interface class PasswordResetApi {
   /// Demana que s'enviï el correu amb el token de reset.
@@ -40,11 +43,10 @@ abstract interface class PasswordResetApi {
   Future<void> resetPassword({required String token, required String password});
 }
 
-/// Instància que fa servir l'app. Quan el backend estigui llest, aquí es
-/// canviarà la implementació simulada per la HTTP.
-PasswordResetApi createPasswordResetApi() => MockPasswordResetApi();
+/// Instància que fa servir l'app: el backend real (tasca #232).
+PasswordResetApi createPasswordResetApi() => HttpPasswordResetApi();
 
-/// Implementació en memòria mentre no hi ha backend. Simula els comptes
+/// Implementació en memòria, per als tests. Simula els comptes
 /// existents, la caducitat dels tokens, que només es puguin fer servir un cop
 /// i el rate limit.
 class MockPasswordResetApi implements PasswordResetApi {

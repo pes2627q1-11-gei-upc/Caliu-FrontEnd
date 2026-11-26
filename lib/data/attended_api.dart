@@ -1,4 +1,5 @@
 import 'activity_api.dart';
+import 'activity_http_api.dart';
 import 'auth_session.dart';
 import 'event.dart';
 
@@ -16,21 +17,19 @@ class AttendedApiException implements Exception {
 
 /// Esdeveniments passats als quals ha assistit l'usuari autenticat (H.U #51).
 ///
-/// El backend encara no l'exposa (tasca #168). Proposta de contracte
-/// (pendent de confirmar a l'OpenAPI del backend):
+/// Endpoint del backend (OpenAPI), vegeu [HttpAttendedApi]:
 /// - `GET /users/me/attended` → `{ "items": [Event, ...] }`, només
-///   esdeveniments passats, el més recent primer
+///   esdeveniments acabats, del més recent al més antic
 abstract interface class AttendedApi {
   /// Esdeveniments passats als quals ha assistit, el més recent primer.
   Future<List<Event>> fetchAttended();
 }
 
-/// Instància que fa servir l'app. Quan el backend estigui llest, aquí es
-/// canviarà la implementació simulada per la HTTP.
+/// Instància que fa servir l'app: el backend real (tasca #229).
 AttendedApi createAttendedApi({AuthSessionStore? session}) =>
-    MockAttendedApi(session: session ?? AuthSession());
+    HttpAttendedApi(AttendanceHttpClient(session: session));
 
-/// Implementació amb dades simulades mentre no hi ha backend.
+/// Implementació amb dades simulades, per als tests.
 class MockAttendedApi implements AttendedApi {
   MockAttendedApi({
     this.session,

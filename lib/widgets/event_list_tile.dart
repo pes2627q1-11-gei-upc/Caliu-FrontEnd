@@ -4,6 +4,19 @@ import '../data/event.dart';
 import '../theme/caliu_colors.dart';
 import 'caliu_chip.dart';
 
+/// Subtítol de la targeta a les llistes de cerca i recomanacions: municipi,
+/// distància (si n'hi ha) i primera categoria.
+String eventListSubtitle(Event event) {
+  final parts = <String>[
+    if (event.municipality != null && event.municipality!.isNotEmpty)
+      event.municipality!,
+    if (event.distanceMeters != null)
+      '${(event.distanceMeters! / 1000).toStringAsFixed(1)} km',
+    if (event.categories.isNotEmpty) event.categories.first,
+  ];
+  return parts.join(' · ');
+}
+
 /// Targeta d'esdeveniment per a llistes (cerca, preferits…).
 class EventListTile extends StatelessWidget {
   const EventListTile({
