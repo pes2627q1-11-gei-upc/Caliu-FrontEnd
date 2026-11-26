@@ -43,7 +43,7 @@ class FavoriteButton extends StatelessWidget {
   /// del canvi optimista (p. ex. per oferir "Desfer", tasca #167).
   final VoidCallback? onRemoved;
 
-  /// Mostra el marcador amb l'etiqueta «Desar» o «Desat» a la fitxa.
+  /// Mostra el botó amb etiqueta «Desar» / «Desat» (cor) a la barra de la fitxa.
   final bool showBookmark;
 
   @override
@@ -57,7 +57,7 @@ class FavoriteButton extends StatelessWidget {
         if (showBookmark) {
           return OutlinedButton.icon(
             onPressed: onPressed,
-            icon: Icon(active ? Icons.bookmark : Icons.bookmark_border),
+            icon: Icon(active ? Icons.favorite : Icons.favorite_border),
             label: Text(active ? 'Desat' : 'Desar'),
             style: OutlinedButton.styleFrom(
               foregroundColor: Colors.white,
