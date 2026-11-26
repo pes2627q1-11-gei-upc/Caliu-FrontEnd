@@ -295,18 +295,6 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                                 );
                               },
                             ),
-                            Material(
-                              color: Colors.black45,
-                              shape: const CircleBorder(),
-                              child: FavoriteButton(
-                                event: event,
-                                controller: widget.favorites,
-                                color: Colors.white,
-                                activeColor: CaliuColors.redSoft,
-                                size: 22,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
                             _roundIconButton(
                               icon: Icons.ios_share,
                               onPressed: () => _stub('Compartir'),
