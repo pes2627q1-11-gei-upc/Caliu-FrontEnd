@@ -14,62 +14,63 @@ Map<String, dynamic> _eventJson({
   String title = 'Concert al Parc',
   double lng = 2.1734,
   double lat = 41.3851,
-}) =>
-    {
-      'id': id,
-      'title': title,
-      'location': {
-        'type': 'Point',
-        'coordinates': [lng, lat],
-      },
-    };
+}) => {
+  'id': id,
+  'title': title,
+  'location': {
+    'type': 'Point',
+    'coordinates': [lng, lat],
+  },
+};
 
 String _pageBody({
   List<Map<String, dynamic>> items = const [],
   int page = 1,
   int limit = 20,
   int? total,
-}) =>
-    jsonEncode({
-      'items': items,
-      'page': page,
-      'limit': limit,
-      'total': total ?? items.length,
-    });
+}) => jsonEncode({
+  'items': items,
+  'page': page,
+  'limit': limit,
+  'total': total ?? items.length,
+});
 
 void main() {
   group('EventsApi.fetchEvents', () {
-    test('200 amb llista: converteix id, títol i coordenades GeoJSON', () async {
-      final client = MockClient((request) async {
-        expect(request.method, 'GET');
-        expect(request.url.path, '/events');
-        return http.Response(
-          _pageBody(items: [
-            _eventJson(id: 'abc', title: 'Fira', lng: 2.15, lat: 41.40),
-          ]),
-          200,
-          headers: {'content-type': 'application/json'},
-        );
-      });
-      final api = EventsApi(client: client, baseUrl: _baseUrl);
+    test(
+      '200 amb llista: converteix id, títol i coordenades GeoJSON',
+      () async {
+        final client = MockClient((request) async {
+          expect(request.method, 'GET');
+          expect(request.url.path, '/events');
+          return http.Response(
+            _pageBody(
+              items: [
+                _eventJson(id: 'abc', title: 'Fira', lng: 2.15, lat: 41.40),
+              ],
+            ),
+            200,
+            headers: {'content-type': 'application/json'},
+          );
+        });
+        final api = EventsApi(client: client, baseUrl: _baseUrl);
 
-      final page = await api.fetchEvents(const EventQuery());
+        final page = await api.fetchEvents(const EventQuery());
 
-      expect(page.items, hasLength(1));
-      expect(page.total, 1);
-      final event = page.items.single;
-      expect(event, isA<Event>());
-      expect(event.id, 'abc');
-      expect(event.title, 'Fira');
-      expect(event.location, isNotNull);
-      expect(event.location!.longitude, closeTo(2.15, 1e-9));
-      expect(event.location!.latitude, closeTo(41.40, 1e-9));
-    });
+        expect(page.items, hasLength(1));
+        expect(page.total, 1);
+        final event = page.items.single;
+        expect(event, isA<Event>());
+        expect(event.id, 'abc');
+        expect(event.title, 'Fira');
+        expect(event.location, isNotNull);
+        expect(event.location!.longitude, closeTo(2.15, 1e-9));
+        expect(event.location!.latitude, closeTo(41.40, 1e-9));
+      },
+    );
 
     test('200 amb llista buida: retorna items buits i total 0', () async {
-      final client = MockClient(
-        (_) async => http.Response(_pageBody(), 200),
-      );
+      final client = MockClient((_) async => http.Response(_pageBody(), 200));
       final api = EventsApi(client: client, baseUrl: _baseUrl);
 
       final page = await api.fetchEvents(const EventQuery());
@@ -101,33 +102,26 @@ void main() {
       );
     });
 
-    test(
-      '404: llença EventsApiException amb missatge de no trobat',
-      () async {
-        final client = MockClient(
-          (_) async => http.Response('{}', 404),
-        );
-        final api = EventsApi(client: client, baseUrl: _baseUrl);
+    test('404: llença EventsApiException amb missatge de no trobat', () async {
+      final client = MockClient((_) async => http.Response('{}', 404));
+      final api = EventsApi(client: client, baseUrl: _baseUrl);
 
-        // Comportament real: el 404 de _getJson sempre diu
-        // "Esdeveniment no trobat", també a GET /events.
-        await expectLater(
-          api.fetchEvents(const EventQuery()),
-          throwsA(
-            isA<EventsApiException>().having(
-              (e) => e.message,
-              'message',
-              'Esdeveniment no trobat',
-            ),
+      // Comportament real: el 404 de _getJson sempre diu
+      // "Esdeveniment no trobat", també a GET /events.
+      await expectLater(
+        api.fetchEvents(const EventQuery()),
+        throwsA(
+          isA<EventsApiException>().having(
+            (e) => e.message,
+            'message',
+            'Esdeveniment no trobat',
           ),
-        );
-      },
-    );
+        ),
+      );
+    });
 
     test('JSON mal format amb 200: propaga FormatException', () async {
-      final client = MockClient(
-        (_) async => http.Response('no-és-json{', 200),
-      );
+      final client = MockClient((_) async => http.Response('no-és-json{', 200));
       final api = EventsApi(client: client, baseUrl: _baseUrl);
 
       // jsonDecode després del 200 no es captura a _getJson.
@@ -170,18 +164,36 @@ void main() {
         expect(seen.queryParameters['radiusKm'], '12.5');
         expect(seen.queryParameters['page'], '2');
         expect(seen.queryParameters['limit'], '10');
-        expect(
-          seen.queryParameters['from'],
-          from.toUtc().toIso8601String(),
-        );
-        expect(
-          seen.queryParameters['to'],
-          to.toUtc().toIso8601String(),
-        );
-        // EventQuery no té filtre de preu: no ha d'aparèixer a la URL.
+        expect(seen.queryParameters['from'], from.toUtc().toIso8601String());
+        expect(seen.queryParameters['to'], to.toUtc().toIso8601String());
+        // Sense price al query: no ha d'aparèixer a la URL.
         expect(seen.queryParameters.containsKey('price'), isFalse);
       },
     );
+
+    test('envia price=free o price=paid quan el filtre hi és (#157)', () async {
+      Uri? seen;
+      final client = MockClient((request) async {
+        seen = request.url;
+        return http.Response(_pageBody(), 200);
+      });
+      final api = EventsApi(client: client, baseUrl: _baseUrl);
+
+      await api.fetchEvents(
+        const EventQuery(price: EventPriceFilter.free, limit: 5),
+      );
+      expect(seen!.queryParameters['price'], 'free');
+
+      await api.fetchEvents(
+        const EventQuery(price: EventPriceFilter.paid, q: 'jazz'),
+      );
+      expect(seen!.queryParameters['price'], 'paid');
+      expect(seen!.queryParameters['q'], 'jazz');
+
+      await api.fetchNearby(lat: 41.4, lng: 2.1, price: EventPriceFilter.paid);
+      expect(seen!.queryParameters['price'], 'paid');
+      expect(seen!.queryParameters['lat'], '41.4');
+    });
   });
 
   group('EventsApi.fetchById', () {
@@ -189,7 +201,9 @@ void main() {
       final client = MockClient((request) async {
         expect(request.url.path, '/events/evt-9');
         return http.Response(
-          jsonEncode(_eventJson(id: 'evt-9', title: 'Teatre', lng: 1.1, lat: 42.0)),
+          jsonEncode(
+            _eventJson(id: 'evt-9', title: 'Teatre', lng: 1.1, lat: 42.0),
+          ),
           200,
         );
       });
@@ -227,10 +241,7 @@ void main() {
       late Uri seen;
       final client = MockClient((request) async {
         seen = request.url;
-        return http.Response(
-          _pageBody(items: [_eventJson()]),
-          200,
-        );
+        return http.Response(_pageBody(items: [_eventJson()]), 200);
       });
       final api = EventsApi(client: client, baseUrl: _baseUrl);
 

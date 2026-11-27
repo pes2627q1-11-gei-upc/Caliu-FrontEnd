@@ -24,10 +24,29 @@ App mòbil **Flutter** de **Caliu**: mapa i agenda d’esdeveniments culturals a
 
 ## Què fa
 
-- **Mapa** amb esdeveniments propers (geolocalització).
-- **Fitxa** d’esdeveniment (imatge, categories, lloc, enllaç web oficial quan hi ha `url`).
+- **Mapa** amb esdeveniments propers (geolocalització) i **clustering** de marcadors (#114; el zoom en tocar un clúster és la #115).
+- **Fitxa** d’esdeveniment amb imatge, categories, lloc i enllaç web oficial quan hi ha `url`. **Veure ruta** obre les indicacions a Google Maps quan l’esdeveniment té una ubicació o un lloc concret.
 - **Cerca i filtres** (text, categories/chips, radi).
 - Parla amb el backend **només** per HTTP/JSON; contracte: OpenAPI del repo backend.
+- **Veure al mapa** des de la fitxa centra el mapa de Caliu en l’esdeveniment i obre la previsualització del marcador quan hi ha coordenades.
+- **Afegir al calendari** obre un esborrany a Google Calendar amb el lloc i l’enllaç oficial, si estan disponibles. Si l’agenda només indica el dia, l’esborrany és de dia sencer. Si hi ha hora d’inici però falta la de fi, proposa una durada de 2 hores. Si l’interval dura 14 dies o més, proposa avui quan ja està en curs (segons el dia de Madrid), o el primer dia si encara no ha començat. En els intervals amb hora manté l’hora d’inici i proposa 2 hores, sense superar el final real de l’activitat. Les activitats llargues ja finalitzades no mostren el botó. S’utilitza `/calendar/render` per obrir l’esborrany a Android.
+
+El selector de radi de la cerca permet aplicar entre 1 i 50 km, d'1 en 1, des de la
+ubicació real, amb un valor inicial de 5 km. El filtre es comparteix amb el
+mapa i es pot treure sense perdre els altres filtres de cerca.
+«Filtrar» s'obre com una pantalla completa, amb cerca, categories i targetes
+de data; es tanca amb la creu o el botó enrere. El contingut es pot desplaçar
+i el botó d'aplicar queda fix a baix, dins de la zona segura.
+El lliscador actualitza només la previsualització i el recompte. «Aplicar
+filtres» confirma tots els canvis a la cerca i al mapa; la creu i el botó
+enrere els descarten. Els límits de l'API continuen sent 0,1–500 km;
+el selector de la interfície ofereix 1–50 km.
+Comarca i Municipi són selectors amb les localitats retornades per
+`GET /events/locations`. En escollir una comarca, el municipi es restableix
+i només s'ofereixen els seus municipis. Cal desplegar primer aquest endpoint
+al backend; si no està disponible, es mostra un error amb opció de reintentar.
+Si una localitat seleccionada ja no surt al catàleg, es conserva al selector
+fins que l'usuari la canviï o restableixi els filtres.
 
 ## Arrencada ràpida
 
@@ -110,6 +129,45 @@ flutter build apk --dart-define=API_BASE_URL=https://caliu-api.onrender.com
 A l’app, pestanya **Perfil** → «Estat del servidor» (ha de sortir verd / Connectat).
 
 Més detall: [docs/onboarding.md](docs/onboarding.md).
+
+## Provar a la web
+
+L'app final és **només Android**, però també es compila per a web perquè la puguem provar des de l'ordinador sense emulador ni mòbil. Guia completa: [docs/deploy-web.md](docs/deploy-web.md).
+
+### Versió desplegada (sempre activa)
+
+**https://pes2627q1-11-gei-upc.github.io/Caliu-FrontEnd/**
+
+- Es publica automàticament a **cada merge a `development`** (workflow [`deploy-web.yml`](.github/workflows/deploy-web.yml), 3–5 min).
+- Fa servir l'API de Render (`https://caliu-api.onrender.com`).
+- Si no veus l'últim canvi: **Ctrl + Shift + R** (el navegador guarda la versió anterior uns minuts).
+
+### En local
+
+Des de l'arrel del repo:
+
+```powershell
+.\scripts\run-web.ps1
+```
+
+- Obre Chrome a `http://localhost:5000` amb hot reload (`r` a la terminal per recarregar, `R` per reiniciar).
+- Agafa la clau de Maps d'`android/local.properties` (genera `web/maps_config.js`, que no es puja).
+- Fa servir l'API de `.env` si existeix (copia `.env.example` → `.env`); si no, Render.
+
+Per comprovar que compila com al deploy:
+
+```powershell
+flutter build web --release --dart-define=API_BASE_URL=https://caliu-api.onrender.com
+python -m http.server 5000 --directory build\web   # obre http://localhost:5000
+```
+
+### Si no carreguen esdeveniments
+
+1. **Render s'adorm** (pla gratuït): obre https://caliu-api.onrender.com/health, espera `{"status":"ok"}` (fins a 1 min) i recarrega.
+2. **F12 → Console:** si surt un error de **CORS**, el port no és el 5000 o falta l'origen a `CORS_ORIGINS` de Render.
+3. **Mapa gris:** falta la clau a `android/local.properties` o la *Maps JavaScript API* no està activada.
+
+> Abans de tancar una H.U, prova-la també al mòbil: permisos, notificacions i rendiment real no es poden validar a web.
 
 ## Stack
 

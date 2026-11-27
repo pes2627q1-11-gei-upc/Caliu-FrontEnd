@@ -3,12 +3,16 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'data/event.dart';
+import 'data/search_radius.dart';
 import 'data/events_api.dart';
+import 'data/map_event_markers.dart';
 import 'event_detail_screen.dart';
 import 'search_screen.dart';
 import 'theme/caliu_colors.dart';
+import 'widgets/map_event_preview.dart';
 
 /// Amaga POIs i etiquetes de llocs de Google (feedback demo: sense info externa).
 const String _mapStyleNoPois = '''
@@ -33,22 +37,44 @@ final LatLngBounds _cataloniaBounds = LatLngBounds(
 enum _LocationMode {
   /// Centrat a la posició de l'usuari.
   user,
+
   /// Sense GPS usable: mostrem Barcelona.
   fallbackBarcelona,
 }
 
 class MapView extends StatefulWidget {
-  const MapView({super.key});
+  const MapView({super.key, this.isActive = true, this.radius, this.eventsApi})
+    : focusedEvent = null;
+
+  const MapView.forEvent({super.key, required Event event})
+    : focusedEvent = event,
+      isActive = true,
+      radius = null,
+      eventsApi = null;
+
+  final Event? focusedEvent;
+
+  /// Si la pestanya Mapa és la visible (el mapa continua muntat a l'`IndexedStack`).
+  final bool isActive;
+  final SearchRadius? radius;
+
+  /// Injectable per als tests (MockClient); en producció usa l'API per defecte.
+  final EventsApi? eventsApi;
 
   @override
   State<MapView> createState() => _MapViewState();
 }
 
 class _MapViewState extends State<MapView> {
-  final EventsApi _eventsApi = EventsApi();
+  late final EventsApi _eventsApi = widget.eventsApi ?? EventsApi();
+  late final SearchRadius _radius;
 
   GoogleMapController? mapController;
   Set<Marker> _markers = {};
+  Set<ClusterManager> _clusterManagers = {};
+
+  /// #44: esdeveniment del marcador tocat (previsualització ràpida).
+  Event? _selected;
   final Map<String, Event> _eventsById = {};
 
   bool _eventsRequestInFlight = false;
@@ -65,21 +91,84 @@ class _MapViewState extends State<MapView> {
 
   CameraPosition? _lastCamera;
   LatLngBounds? _loadedBounds;
+  double? _loadedZoom;
   Timer? _cameraIdleTimer;
   int _loadGeneration = 0;
 
+  /// Generació del ClusterManager (es renova en passar a mode clúster).
+  int _clusterGeneration = 0;
+  bool _clusteringEnabled = true;
+
+  /// En allunyar: força refresca a l'idle (zona visible més gran).
+  bool _pendingWideReload = false;
+
+  /// Zona on ja hem confirmat que no hi ha esdeveniments (evita bucle de fetch).
+  LatLngBounds? _confirmedEmptyBounds;
+
+  /// Evita dues animacions seguides si es toca el mateix clúster de pressa (#115).
+  bool _clusterZoomInFlight = false;
+
   bool get _hasUserLocation => _locationMode == _LocationMode.user;
+  bool get _showingEventLocation => widget.focusedEvent?.hasLocation == true;
 
   @override
   void dispose() {
     _cameraIdleTimer?.cancel();
+    if (!_showingEventLocation) {
+      _radius.removeListener(_radiusChanged);
+      if (widget.radius == null) _radius.dispose();
+    }
     super.dispose();
   }
 
   @override
   void initState() {
     super.initState();
+    if (_showingEventLocation) {
+      final event = widget.focusedEvent!;
+      _focus = event.location!;
+      _selected = event;
+      _eventsById[event.id] = event;
+      _clusteringEnabled = false;
+      _applyMarkersFromEvents([event], recreateClusterManager: false);
+      _mapReadyToShow = true;
+      return;
+    }
+    _radius = widget.radius ?? SearchRadius();
+    _radius.addListener(_radiusChanged);
     unawaited(_bootstrap());
+  }
+
+  void _radiusChanged() {
+    ++_loadGeneration;
+    _loadedBounds = null;
+    _loadedZoom = null;
+    _confirmedEmptyBounds = null;
+    setState(() {
+      _markers = {};
+      _clusterManagers = {};
+      _selected = null;
+      _eventsById.clear();
+      _eventsRequestInFlight = false;
+    });
+    if (!_radius.locating) {
+      unawaited(_showRadiusAndReload());
+    }
+  }
+
+  Future<void> _showRadiusAndReload() async {
+    final center = _radius.center;
+    final km = _radius.radiusKm;
+    if (center != null && km != null && mapController != null) {
+      try {
+        await mapController!.animateCamera(
+          CameraUpdate.newLatLngBounds(_boundsAround(center, km), 32),
+        );
+      } catch (_) {
+        // El mapa pot estar acabant de crear-se; el filtre continua actiu.
+      }
+    }
+    if (mounted) await _reloadForVisibleRegion(force: true);
   }
 
   Future<void> _bootstrap() async {
@@ -90,9 +179,7 @@ class _MapViewState extends State<MapView> {
   }
 
   /// #153: centra al GPS si es pot; si es denega el permís, Barcelona + banner.
-  Future<void> _resolveAndApplyFocus({
-    required bool requestIfNeeded,
-  }) async {
+  Future<void> _resolveAndApplyFocus({required bool requestIfNeeded}) async {
     setState(() => _locating = true);
     try {
       final result = await _resolveFocus(requestIfNeeded: requestIfNeeded);
@@ -113,12 +200,10 @@ class _MapViewState extends State<MapView> {
     }
   }
 
-  Future<({
-    LatLng focus,
-    _LocationMode mode,
-    String? banner,
-    bool deniedForever,
-  })> _resolveFocus({required bool requestIfNeeded}) async {
+  Future<
+    ({LatLng focus, _LocationMode mode, String? banner, bool deniedForever})
+  >
+  _resolveFocus({required bool requestIfNeeded}) async {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
@@ -139,8 +224,7 @@ class _MapViewState extends State<MapView> {
         return (
           focus: _barcelona,
           mode: _LocationMode.fallbackBarcelona,
-          banner:
-              'Permís d\'ubicació denegat. Pots activar-lo amb el botó d\'ubicació.',
+          banner: 'Permís d\'ubicació denegat. Pots activar-lo amb el botó d\'ubicació.',
           deniedForever: false,
         );
       }
@@ -149,8 +233,7 @@ class _MapViewState extends State<MapView> {
         return (
           focus: _barcelona,
           mode: _LocationMode.fallbackBarcelona,
-          banner:
-              'Permís d\'ubicació bloquejat. Obre la configuració per activar-lo.',
+          banner: 'Permís d\'ubicació bloquejat. Obre la configuració per activar-lo.',
           deniedForever: true,
         );
       }
@@ -225,14 +308,16 @@ class _MapViewState extends State<MapView> {
     }
     if (!mounted) return;
     _loadedBounds = null;
+    _loadedZoom = null;
+    _confirmedEmptyBounds = null;
     await _loadAroundFocus(focus: _focus, notifyIfEmpty: false);
   }
 
   LatLngBounds _expandBounds(LatLngBounds bounds, double marginFraction) {
-    final latSpan =
-        (bounds.northeast.latitude - bounds.southwest.latitude).abs();
-    final lngSpan =
-        (bounds.northeast.longitude - bounds.southwest.longitude).abs();
+    final latSpan = (bounds.northeast.latitude - bounds.southwest.latitude)
+        .abs();
+    final lngSpan = (bounds.northeast.longitude - bounds.southwest.longitude)
+        .abs();
     final latPad = latSpan * marginFraction;
     final lngPad = lngSpan * marginFraction;
     return LatLngBounds(
@@ -255,14 +340,11 @@ class _MapViewState extends State<MapView> {
   }
 
   bool _isUsableBounds(LatLngBounds bounds) {
-    final latSpan =
-        (bounds.northeast.latitude - bounds.southwest.latitude).abs();
-    final lngSpan =
-        (bounds.northeast.longitude - bounds.southwest.longitude).abs();
-    return latSpan > 0.002 &&
-        lngSpan > 0.002 &&
-        latSpan < 40 &&
-        lngSpan < 40;
+    final latSpan = (bounds.northeast.latitude - bounds.southwest.latitude)
+        .abs();
+    final lngSpan = (bounds.northeast.longitude - bounds.southwest.longitude)
+        .abs();
+    return latSpan > 0.002 && lngSpan > 0.002 && latSpan < 40 && lngSpan < 40;
   }
 
   LatLng _boundsCenter(LatLngBounds bounds) {
@@ -286,8 +368,14 @@ class _MapViewState extends State<MapView> {
     final latDelta = radiusKm / 111.0;
     final lngDelta = radiusKm / 85.0;
     return LatLngBounds(
-      southwest: LatLng(center.latitude - latDelta, center.longitude - lngDelta),
-      northeast: LatLng(center.latitude + latDelta, center.longitude + lngDelta),
+      southwest: LatLng(
+        center.latitude - latDelta,
+        center.longitude - lngDelta,
+      ),
+      northeast: LatLng(
+        center.latitude + latDelta,
+        center.longitude + lngDelta,
+      ),
     );
   }
 
@@ -313,10 +401,25 @@ class _MapViewState extends State<MapView> {
       visible = _boundsAround(_lastCamera?.target ?? _focus, 8);
     }
 
-    if (!force &&
-        _loadedBounds != null &&
-        _boundsContain(_loadedBounds!, visible)) {
-      return;
+    final zoom = _lastCamera?.zoom ?? _initialZoom;
+    // Allunyar: la finestra creix; el marge carregat pot continuar “contenint”
+    // la vista i cal forçar fetch (si no, zones noves sense pins).
+    final zoomedOutSinceLoad =
+        _loadedZoom != null && zoom < (_loadedZoom! - 0.6);
+
+    final alreadyConfirmedEmpty =
+        _confirmedEmptyBounds != null &&
+        _boundsContain(_confirmedEmptyBounds!, visible);
+
+    if (!force) {
+      // Zona ja sabuda buida → no insistir (el refresh manual sí que força).
+      if (alreadyConfirmedEmpty) return;
+      if (_eventsRequestInFlight) return;
+      if (!zoomedOutSinceLoad &&
+          _loadedBounds != null &&
+          _boundsContain(_loadedBounds!, visible)) {
+        return;
+      }
     }
 
     final queryBounds = _expandBounds(visible, _viewportMargin);
@@ -360,7 +463,13 @@ class _MapViewState extends State<MapView> {
     bool notifyIfEmpty = false,
     bool notifyErrors = true,
   }) async {
-    if (!mounted) return;
+    if (!mounted || _radius.locating) return;
+    final selectedCenter = _radius.center;
+    if (selectedCenter != null && _radius.radiusKm != null) {
+      lat = selectedCenter.latitude;
+      lng = selectedCenter.longitude;
+      radiusKm = _radius.radiusKm!;
+    }
     final generation = ++_loadGeneration;
     _eventsRequestInFlight = true;
 
@@ -370,17 +479,31 @@ class _MapViewState extends State<MapView> {
         lng: lng,
         radiusKm: radiusKm,
         limit: 250,
+        price: _radius.price,
       );
       if (!mounted || generation != _loadGeneration) return;
 
       final withLocation = events.where((e) => e.hasLocation).toList();
+      final byId = indexEventsWithLocation(withLocation);
       _eventsById
         ..clear()
-        ..addEntries(withLocation.map((e) => MapEntry(e.id, e)));
+        ..addAll(byId);
       _loadedBounds = queryBounds;
+      _loadedZoom = _lastCamera?.zoom ?? _initialZoom;
+      // Si no hi ha res: marcar la zona perquè no tornem a demanar en bucle.
+      _confirmedEmptyBounds = withLocation.isEmpty ? queryBounds : null;
 
       setState(() {
-        _markers = withLocation.map(_markerFor).toSet();
+        _clusteringEnabled = shouldClusterAtZoom(
+          _lastCamera?.zoom ?? _initialZoom,
+        );
+        // No recrear el ClusterManager a cada fetch: és lent i fa parpellejar.
+        _applyMarkersFromEvents(
+          withLocation,
+          recreateClusterManager:
+              _clusteringEnabled && _clusterManagers.isEmpty,
+        );
+        _selected = selectionAfterReload(_selected, _eventsById);
         _eventsRequestInFlight = false;
       });
 
@@ -400,29 +523,98 @@ class _MapViewState extends State<MapView> {
     }
   }
 
-  Marker _markerFor(Event event) {
-    final category =
-        event.categories.isNotEmpty ? event.categories.first : null;
-    final distanceKm = event.distanceMeters != null
-        ? '${(event.distanceMeters! / 1000).toStringAsFixed(1)} km'
-        : null;
-    final snippet = [
-      ?category,
-      ?distanceKm,
-    ].join(' · ');
-
-    return Marker(
-      markerId: MarkerId(event.id),
-      position: event.location!,
-      infoWindow: InfoWindow(
-        title: event.title,
-        snippet: snippet.isEmpty ? null : snippet,
-      ),
-      onTap: () => _openDetail(event),
+  /// Actualitza `_markers` / `_clusterManagers` a partir dels events en memòria.
+  ///
+  /// [recreateClusterManager]: true en càrregues noves o en tornar al mode
+  /// clúster (evita clústers fantasma); false si només canvien els pins.
+  void _applyMarkersFromEvents(
+    Iterable<Event> events, {
+    required bool recreateClusterManager,
+  }) {
+    if (_clusteringEnabled &&
+        (recreateClusterManager || _clusterManagers.isEmpty)) {
+      _clusterGeneration++;
+    }
+    final markerSet = buildEventMarkerSet(
+      events,
+      clusterGeneration: _clusterGeneration,
+      cluster: _clusteringEnabled,
+      onTap: _selectEvent,
+      onInfoWindowTap: _openInGoogleMaps,
+      onClusterTap: _onClusterTap,
     );
+    _clusterManagers = markerSet.clusterManagers;
+    _markers = markerSet.markers;
+  }
+
+  /// #115: en tocar un clúster, apropa la càmera (bounds o zoom si coincideixen).
+  Future<void> _onClusterTap(Cluster cluster) async {
+    if (_clusterZoomInFlight) return;
+    final controller = mapController;
+    if (controller == null) return;
+
+    final focus = focusForClusterTap(
+      bounds: cluster.bounds,
+      position: cluster.position,
+      currentZoom: _lastCamera?.zoom ?? _initialZoom,
+      maxZoom: kMapMaxZoom,
+    );
+
+    final CameraUpdate? update = switch (focus) {
+      ClusterTapFitBounds(:final bounds, :final paddingPx) =>
+        CameraUpdate.newLatLngBounds(bounds, paddingPx),
+      ClusterTapZoomTo(:final center, :final zoom) =>
+        CameraUpdate.newLatLngZoom(center, zoom),
+      ClusterTapNoop() => null,
+    };
+    if (update == null) return;
+
+    _clusterZoomInFlight = true;
+    try {
+      await controller.animateCamera(update);
+    } catch (_) {
+      // Mapa no llest o bounds invàlids.
+    } finally {
+      _clusterZoomInFlight = false;
+    }
+  }
+
+  void _syncClusteringWithZoom(double zoom) {
+    final shouldCluster = shouldClusterAtZoom(zoom);
+    if (shouldCluster == _clusteringEnabled) return;
+    if (!mounted) return;
+    final enablingClusters = shouldCluster;
+    setState(() {
+      _clusteringEnabled = shouldCluster;
+      // Pins de cache de seguida (sense esperar la xarxa).
+      _applyMarkersFromEvents(
+        _eventsById.values,
+        recreateClusterManager: enablingClusters,
+      );
+    });
+    if (enablingClusters) {
+      // Allunyar: pins de cache ja visibles; a l'idle força fetch de la zona ampla.
+      _pendingWideReload = true;
+      _loadedZoom = null;
+      _loadedBounds = null;
+      _confirmedEmptyBounds = null;
+    }
+  }
+
+  void _selectEvent(Event event) {
+    setState(() => _selected = _eventsById[event.id] ?? event);
+  }
+
+  void _clearSelection() {
+    if (_selected == null) return;
+    setState(() => _selected = null);
   }
 
   void _openDetail(Event event) {
+    if (_showingEventLocation) {
+      Navigator.of(context).pop();
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => EventDetailScreen(
@@ -433,14 +625,21 @@ class _MapViewState extends State<MapView> {
     );
   }
 
+  Future<void> _openInGoogleMaps(Event event) async {
+    final uri = event.googleMapsUri;
+    if (uri == null) return;
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok) _showMessage('No s\'ha pogut obrir Google Maps');
+  }
+
   void _showMessage(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _refresh() async {
+    _confirmedEmptyBounds = null;
     await _reloadForVisibleRegion(
       force: true,
       notifyIfEmpty: true,
@@ -450,15 +649,19 @@ class _MapViewState extends State<MapView> {
 
   void _onCameraMove(CameraPosition position) {
     _lastCamera = position;
+    // Dissolve / agrupa segons el zoom (el ClusterManager natiu no té maxZoom).
+    _syncClusteringWithZoom(position.zoom);
   }
 
   void _onCameraIdle() {
     if (!_acceptCameraIdleReloads) return;
     _cameraIdleTimer?.cancel();
-    _cameraIdleTimer = Timer(const Duration(milliseconds: 350), () {
+    _cameraIdleTimer = Timer(const Duration(milliseconds: 180), () {
+      final force = _pendingWideReload;
+      _pendingWideReload = false;
       unawaited(
         _reloadForVisibleRegion(
-          force: false,
+          force: force,
           notifyIfEmpty: false,
           notifyErrors: false,
         ),
@@ -486,48 +689,47 @@ class _MapViewState extends State<MapView> {
         backgroundColor: CaliuColors.maroonDeep,
         foregroundColor: Colors.white,
         title: const Text('Mapa'),
-        actions: [
-          IconButton(
-            tooltip: _hasUserLocation
-                ? 'Centrar a la meva ubicació'
-                : 'Activar ubicació',
-            onPressed: _locating ? null : _onRecenterPressed,
-            icon: _locating
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : Icon(
-                    _hasUserLocation
-                        ? Icons.my_location
-                        : Icons.location_disabled,
-                  ),
-          ),
-          IconButton(
-            tooltip: 'Cerca',
-            onPressed: () {
-              final target = _lastCamera?.target ?? _focus;
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => SearchScreen(
-                    lat: target.latitude,
-                    lng: target.longitude,
-                  ),
+        actions: _showingEventLocation
+            ? null
+            : [
+                IconButton(
+                  tooltip: _hasUserLocation
+                      ? 'Centrar a la meva ubicació'
+                      : 'Activar ubicació',
+                  onPressed: _locating ? null : _onRecenterPressed,
+                  icon: _locating
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Icon(
+                          _hasUserLocation
+                              ? Icons.my_location
+                              : Icons.location_disabled,
+                        ),
                 ),
-              );
-            },
-            icon: const Icon(Icons.search),
-          ),
-          IconButton(
-            tooltip: 'Actualitzar',
-            onPressed: _eventsRequestInFlight ? null : _refresh,
-            icon: const Icon(Icons.refresh),
-          ),
-        ],
+                IconButton(
+                  tooltip: 'Cerca',
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            SearchScreen(radius: _radius, api: _eventsApi),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.search),
+                ),
+                IconButton(
+                  tooltip: 'Actualitzar',
+                  onPressed: _eventsRequestInFlight ? null : _refresh,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ],
       ),
       body: !_mapReadyToShow
           ? const ColoredBox(color: CaliuColors.beige)
@@ -560,27 +762,57 @@ class _MapViewState extends State<MapView> {
                     ),
                   ),
                 Expanded(
-                  child: GoogleMap(
-                    onMapCreated: _onMapCreated,
-                    style: _mapStyleNoPois,
-                    initialCameraPosition: CameraPosition(
-                      target: _focus,
-                      zoom: _initialZoom,
-                    ),
-                    // #117: càmera limitada a Catalunya.
-                    cameraTargetBounds:
-                        CameraTargetBounds(_cataloniaBounds),
-                    minMaxZoomPreference:
-                        const MinMaxZoomPreference(7, 18),
-                    // #153: només si tenim permís (evita comportaments estranys).
-                    myLocationEnabled: _hasUserLocation,
-                    myLocationButtonEnabled: false,
-                    mapToolbarEnabled: false,
-                    compassEnabled: true,
-                    markers: _markers,
-                    onCameraMove: _onCameraMove,
-                    onCameraIdle: _onCameraIdle,
-                    onTap: (_) {},
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: GoogleMap(
+                          onMapCreated: _showingEventLocation
+                              ? null
+                              : _onMapCreated,
+                          style: _mapStyleNoPois,
+                          initialCameraPosition: CameraPosition(
+                            target: _focus,
+                            zoom: _initialZoom,
+                          ),
+                          // #117: càmera limitada a Catalunya.
+                          cameraTargetBounds: _showingEventLocation
+                              ? CameraTargetBounds.unbounded
+                              : CameraTargetBounds(_cataloniaBounds),
+                          minMaxZoomPreference: const MinMaxZoomPreference(
+                            7,
+                            kMapMaxZoom,
+                          ),
+                          // #153: només si tenim permís (evita comportaments estranys).
+                          myLocationEnabled: _hasUserLocation,
+                          myLocationButtonEnabled: false,
+                          mapToolbarEnabled: false,
+                          compassEnabled: true,
+                          // #114/#115: clustering natiu + zoom en tocar el clúster.
+                          clusterManagers: _clusterManagers,
+                          markers: _markers,
+                          onCameraMove: _showingEventLocation
+                              ? null
+                              : _onCameraMove,
+                          onCameraIdle: _showingEventLocation
+                              ? null
+                              : _onCameraIdle,
+                          // #44: tocar el mapa fora d'un marcador tanca la previsualització.
+                          onTap: (_) => _clearSelection(),
+                        ),
+                      ),
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: MapEventPreview(
+                          selected: _selected,
+                          active: widget.isActive,
+                          closeOnBack: !_showingEventLocation,
+                          onOpen: _openDetail,
+                          onClose: _clearSelection,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],

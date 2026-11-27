@@ -39,7 +39,10 @@ void main() {
     });
 
     test('comprova que la confirmació sigui idèntica', () {
-      expect(AuthValidators.passwordConfirmation('secret12', 'secret12'), isNull);
+      expect(
+        AuthValidators.passwordConfirmation('secret12', 'secret12'),
+        isNull,
+      );
       expect(
         AuthValidators.passwordConfirmation('secret13', 'secret12'),
         isNotNull,

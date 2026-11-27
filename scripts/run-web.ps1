@@ -8,9 +8,11 @@
 # Ús (des de l'arrel del FrontEnd):
 #   .\scripts\run-web.ps1
 #   .\scripts\run-web.ps1 -NoWebSecurity   # si el backend encara no té CORS (només dev!)
+#   .\scripts\run-web.ps1 -ChatDemo        # xat amb respostes d'exemple (targetes i itinerari), sense Gemini
 
 param(
-    [switch] $NoWebSecurity
+    [switch] $NoWebSecurity,
+    [switch] $ChatDemo
 )
 
 $ErrorActionPreference = "Stop"
@@ -40,6 +42,9 @@ if (Test-Path (Join-Path $root ".env")) {
 }
 if ($NoWebSecurity) {
     $flutterArgs += @("--web-browser-flag", "--disable-web-security")
+}
+if ($ChatDemo) {
+    $flutterArgs += "--dart-define=CHAT_DEMO=true"
 }
 
 Write-Host "==> flutter $($flutterArgs -join ' ')"

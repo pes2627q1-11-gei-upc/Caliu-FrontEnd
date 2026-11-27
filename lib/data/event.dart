@@ -56,6 +56,162 @@ class Event {
     return parts.join(', ');
   }
 
+  /// Lloc en una línia curta (espai i municipi), per al popup del marcador.
+  /// No repeteix el municipi si ja surt al nom de l'espai o a l'adreça.
+  String get shortPlace {
+    String? clean(String? value) =>
+        value == null || value.trim().isEmpty ? null : value.trim();
+    final where = clean(venue) ?? clean(address);
+    final town = clean(municipality) ?? clean(comarca);
+    if (where == null) return town ?? '';
+    if (town == null || where.toLowerCase().contains(town.toLowerCase())) {
+      return where;
+    }
+    return '$where, $town';
+  }
+
+  /// Enllaç per obrir la ubicació a Google Maps (null si no té coordenades).
+  Uri? get googleMapsUri {
+    final point = location;
+    if (point == null) return null;
+    return Uri.https('www.google.com', '/maps/search/', {
+      'api': '1',
+      'query': '${point.latitude},${point.longitude}',
+    });
+  }
+
+  Uri? get googleMapsDirectionsUri {
+    final point = location;
+    final hasVenue = venue?.trim().isNotEmpty == true;
+    final hasAddress = address?.trim().isNotEmpty == true;
+    if (point == null && !hasVenue && !hasAddress) return null;
+
+    return Uri.https('www.google.com', '/maps/dir/', {
+      'api': '1',
+      'destination': point == null
+          ? placeLine
+          : '${point.latitude},${point.longitude}',
+    });
+  }
+
+  Uri? googleCalendarUri({DateTime? now}) {
+    final start = startDate;
+    final end = endDate;
+    if (start == null || (end != null && end.isBefore(start))) return null;
+
+    String formatUtc(DateTime date) {
+      final isoDate = date.toUtc().toIso8601String().split('.').first;
+      return '${isoDate.replaceAll('-', '').replaceAll(':', '')}Z';
+    }
+
+    String formatDay(DateTime date) =>
+        date.toIso8601String().split('T').first.replaceAll('-', '');
+
+    const maxSpan = Duration(days: 14);
+    final startInMadrid = _madridDateTime(start);
+    final firstDay = DateTime.utc(
+      startInMadrid.year,
+      startInMadrid.month,
+      startInMadrid.day,
+    );
+    final referenceNow = now ?? DateTime.now();
+    final todayInMadrid = _madridDateTime(referenceNow);
+    final today = DateTime.utc(
+      todayInMadrid.year,
+      todayInMadrid.month,
+      todayInMadrid.day,
+    );
+    final String dates;
+    // L’agenda representa els dies sense hora d’inici amb la mitjanit local.
+    if (startInMadrid == firstDay) {
+      final lastDay = _madridDateTime(end ?? start);
+      final exclusiveEnd = DateTime.utc(
+        lastDay.year,
+        lastDay.month,
+        lastDay.day + 1,
+      );
+      var dayStart = firstDay;
+      var dayEnd = exclusiveEnd;
+      if (exclusiveEnd.difference(firstDay) >= maxSpan) {
+        if (!today.isBefore(exclusiveEnd)) return null;
+        // Una exposició en curs es pot visitar avui, no el dia d’inauguració.
+        if (today.isAfter(firstDay)) dayStart = today;
+        dayEnd = DateTime.utc(dayStart.year, dayStart.month, dayStart.day + 1);
+      }
+      dates = '${formatDay(dayStart)}/${formatDay(dayEnd)}';
+    } else {
+      // El backend també pot repetir l’inici quan no disposa de data de fi.
+      final calendarEnd = end == null || end.isAtSameMomentAs(start)
+          ? start.add(const Duration(hours: 2))
+          : end;
+      var eventStart = start;
+      var eventEnd = calendarEnd;
+      if (calendarEnd.difference(start) >= maxSpan) {
+        if (referenceNow.isAfter(calendarEnd)) return null;
+        if (today.isAfter(firstDay)) {
+          eventStart = _utcFromMadrid(
+            DateTime.utc(
+              today.year,
+              today.month,
+              today.day,
+              startInMadrid.hour,
+              startInMadrid.minute,
+              startInMadrid.second,
+              startInMadrid.millisecond,
+              startInMadrid.microsecond,
+            ),
+          );
+        }
+        // Proposta de 2 h, sense sobrepassar el final real de l’activitat.
+        eventEnd = eventStart.add(const Duration(hours: 2));
+        if (eventEnd.isAfter(calendarEnd)) eventEnd = calendarEnd;
+        if (!eventEnd.isAfter(eventStart)) return null;
+      }
+      dates = '${formatUtc(eventStart)}/${formatUtc(eventEnd)}';
+    }
+
+    final place = placeLine;
+    final officialUrl = Uri.tryParse(url?.trim() ?? '');
+    // `/calendar/render` (no `/r/eventedit`): a Android l’app de Calendar
+    // intercepta eventedit sense passar el TEMPLATE i obre la vista buida.
+    return Uri.https('calendar.google.com', '/calendar/render', {
+      'action': 'TEMPLATE',
+      'text': title,
+      'dates': dates,
+      'stz': 'Europe/Madrid',
+      'etz': 'Europe/Madrid',
+      if (place.isNotEmpty) 'location': place,
+      if (officialUrl != null &&
+          officialUrl.host.isNotEmpty &&
+          (officialUrl.isScheme('https') || officialUrl.isScheme('http')))
+        'details': officialUrl.toString(),
+    });
+  }
+
+  // Mateixa regla que el sincronitzador de l’agenda. Emprem un DateTime UTC
+  // per llegir els components de Madrid sense dependre de la zona del mòbil.
+  static DateTime _madridDateTime(DateTime date) {
+    final utc = date.toUtc();
+    DateTime clockChange(int month) {
+      final lastDay = DateTime.utc(utc.year, month + 1, 0, 1);
+      return lastDay.subtract(Duration(days: lastDay.weekday % 7));
+    }
+
+    final summerTime =
+        !utc.isBefore(clockChange(3)) && utc.isBefore(clockChange(10));
+    return utc.add(Duration(hours: summerTime ? 2 : 1));
+  }
+
+  // Converteix components locals de Madrid sense usar la zona del dispositiu.
+  static DateTime _utcFromMadrid(DateTime local) {
+    for (final offset in [2, 1]) {
+      final utc = local.subtract(Duration(hours: offset));
+      if (_madridDateTime(utc) == local) return utc;
+    }
+    // Al salt de primavera, una hora inexistent es desplaça una hora endavant.
+    return local.subtract(const Duration(hours: 1));
+  }
+
   factory Event.fromJson(Map<String, dynamic> json) {
     LatLng? location;
     final rawLocation = json['location'];
@@ -75,7 +231,10 @@ class Event {
 
     List<String> parseStringList(dynamic value) {
       if (value is List) {
-        return value.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+        return value
+            .map((e) => e.toString())
+            .where((e) => e.isNotEmpty)
+            .toList();
       }
       return const [];
     }

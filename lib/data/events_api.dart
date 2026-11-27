@@ -44,22 +44,46 @@ class ApiHealth {
   final String? error;
 }
 
+class EventLocation {
+  const EventLocation({required this.comarca, required this.municipality});
+  final String comarca;
+  final String municipality;
+}
+
 class EventsApi {
   EventsApi({http.Client? client, String? baseUrl})
-      : _client = client ?? http.Client(),
-        _baseUrl = baseUrl ?? apiBaseUrl;
+    : _client = client ?? http.Client(),
+      _baseUrl = baseUrl ?? apiBaseUrl;
 
   final http.Client _client;
   final String _baseUrl;
 
   String get baseUrl => _baseUrl;
 
+  Future<List<EventLocation>> fetchLocations() async {
+    final decoded = await _getJson(Uri.parse('$_baseUrl/events/locations'));
+    if (decoded is! Map<String, dynamic> || decoded['locations'] is! List) {
+      throw EventsApiException('Resposta inesperada del catàleg de localitats');
+    }
+    return (decoded['locations'] as List)
+        .whereType<Map<String, dynamic>>()
+        .map(
+          (row) => EventLocation(
+            comarca: (row['comarca'] as String? ?? '').trim(),
+            municipality: (row['municipality'] as String? ?? '').trim(),
+          ),
+        )
+        .where((row) => row.comarca.isNotEmpty || row.municipality.isNotEmpty)
+        .toList();
+  }
+
   /// GET /health — útil per veure si el mòbil arriba a l’API.
   Future<ApiHealth> fetchHealth() async {
     final uri = Uri.parse('$_baseUrl/health');
     try {
-      final response =
-          await _client.get(uri).timeout(const Duration(seconds: 8));
+      final response = await _client
+          .get(uri)
+          .timeout(const Duration(seconds: 8));
       if (response.statusCode != 200) {
         return ApiHealth(
           ok: false,
@@ -82,18 +106,13 @@ class EventsApi {
         service: decoded['service']?.toString(),
       );
     } on Exception catch (e) {
-      return ApiHealth(
-        ok: false,
-        baseUrl: _baseUrl,
-        error: e.toString(),
-      );
+      return ApiHealth(ok: false, baseUrl: _baseUrl, error: e.toString());
     }
   }
 
   Future<EventPageResult> fetchEvents(EventQuery query) async {
-    final uri = Uri.parse('$_baseUrl/events').replace(
-      queryParameters: query.toQueryParameters(),
-    );
+    final uri = Uri.parse('$_baseUrl/events')
+        .replace(queryParameters: query.toQueryParameters());
 
     final decoded = await _getJson(uri);
     if (decoded is! Map<String, dynamic>) {
@@ -102,10 +121,7 @@ class EventsApi {
 
     final items = decoded['items'];
     final list = items is List
-        ? items
-            .whereType<Map<String, dynamic>>()
-            .map(Event.fromJson)
-            .toList()
+        ? items.whereType<Map<String, dynamic>>().map(Event.fromJson).toList()
         : <Event>[];
 
     return EventPageResult(
@@ -114,7 +130,9 @@ class EventsApi {
       limit: decoded['limit'] is num
           ? (decoded['limit'] as num).toInt()
           : query.limit,
-      total: decoded['total'] is num ? (decoded['total'] as num).toInt() : list.length,
+      total: decoded['total'] is num
+          ? (decoded['total'] as num).toInt()
+          : list.length,
     );
   }
 
@@ -123,6 +141,7 @@ class EventsApi {
     required double lng,
     double radiusKm = 15,
     int limit = 50,
+    String? price,
   }) async {
     final page = await fetchEvents(
       EventQuery(
@@ -130,6 +149,7 @@ class EventsApi {
         lng: lng,
         radiusKm: radiusKm,
         limit: limit,
+        price: price,
       ),
     );
     return page.items;

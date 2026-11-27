@@ -1,20 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'data/event.dart';
 import 'data/events_api.dart';
+import 'data/favorite_alerts_controller.dart';
+import 'data/favorites_controller.dart';
+import 'map_view.dart';
 import 'theme/caliu_colors.dart';
+import 'widgets/alerts_toggle_button.dart';
 import 'widgets/caliu_chip.dart';
+import 'widgets/favorite_button.dart';
 
 class EventDetailScreen extends StatefulWidget {
   const EventDetailScreen({
     super.key,
     required this.eventId,
     this.initialEvent,
+    this.favorites,
+    this.alerts,
+    this.showAlerts = favoriteAlertsAvailable,
   });
 
   final String eventId;
   final Event? initialEvent;
+
+  /// Per defecte, [FavoritesController.shared].
+  final FavoritesController? favorites;
+
+  /// Per defecte, [FavoriteAlertsController.shared].
+  final FavoriteAlertsController? alerts;
+
+  /// Mostrar la campana d'alertes. Per defecte, només si les notificacions
+  /// ja funcionen ([favoriteAlertsAvailable]).
+  final bool showAlerts;
 
   @override
   State<EventDetailScreen> createState() => _EventDetailScreenState();
@@ -77,9 +96,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         if (_event == null) _error = e.message;
       });
       if (_event != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(e.message)));
       }
     } catch (e) {
       if (!mounted) return;
@@ -99,8 +117,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     }
 
     final day = _weekdays[start.weekday - 1];
-    final date =
-        '$day, ${start.day} de ${_months[start.month - 1]}';
+    final date = '$day, ${start.day} de ${_months[start.month - 1]}';
     final time =
         '${start.hour.toString().padLeft(2, '0')}:${start.minute.toString().padLeft(2, '0')}';
     final schedule = event.schedule?.trim();
@@ -117,9 +134,8 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   }
 
   void _stub(String label) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$label (properament)')),
-    );
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text('$label (properament)')));
   }
 
   Future<void> _openOfficialUrl(String rawUrl) async {
@@ -134,17 +150,37 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('L\'enllaç oficial no és vàlid')),
+        const SnackBar(content: Text('L’enllaç oficial no és vàlid')),
       );
       return;
     }
 
-    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok && mounted) {
+    await _launchExternalUrl(uri, 'No s’ha pogut obrir l’enllaç');
+  }
+
+  Future<void> _openRoute(Event event) async {
+    final uri = event.googleMapsDirectionsUri;
+    if (uri == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No s\'ha pogut obrir l\'enllaç')),
+        const SnackBar(
+          content: Text('La ubicació de l’esdeveniment no està disponible'),
+        ),
       );
+      return;
     }
+
+    await _launchExternalUrl(uri, 'No s’ha pogut obrir la ruta a Google Maps');
+  }
+
+  Future<void> _launchExternalUrl(Uri uri, String errorMessage) async {
+    try {
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+    } on PlatformException {
+      // El dispositiu no ha pogut obrir l'enllaç.
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(errorMessage)));
   }
 
   @override
@@ -189,12 +225,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
     final categoryLabel = event.categories.isNotEmpty
         ? event.categories.join(' | ').toUpperCase()
         : null;
-    final chips = <String>{
-      ...event.categories,
-      ...event.tags,
-    }.toList();
+    final chips = <String>{...event.categories, ...event.tags}.toList();
     final price = _priceLabel(event);
     final place = event.placeLine;
+    final calendarUri = event.googleCalendarUri();
 
     return Scaffold(
       backgroundColor: CaliuColors.beige,
@@ -229,9 +263,43 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                       Positioned(
                         top: MediaQuery.paddingOf(context).top + 8,
                         right: 12,
-                        child: _roundIconButton(
-                          icon: Icons.ios_share,
-                          onPressed: () => _stub('Compartir'),
+                        child: Row(
+                          children: [
+                            // Campana d'alertes: només si és un preferit.
+                            ListenableBuilder(
+                              listenable:
+                                  widget.favorites ??
+                                  FavoritesController.shared,
+                              builder: (context, _) {
+                                final favorites =
+                                    widget.favorites ??
+                                    FavoritesController.shared;
+                                if (!widget.showAlerts ||
+                                    !favorites.isFavorite(event.id)) {
+                                  return const SizedBox.shrink();
+                                }
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: Material(
+                                    color: Colors.black45,
+                                    shape: const CircleBorder(),
+                                    child: AlertsToggleButton(
+                                      event: event,
+                                      alerts: widget.alerts,
+                                      favorites: favorites,
+                                      color: Colors.white70,
+                                      activeColor: Colors.white,
+                                      size: 22,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                            _roundIconButton(
+                              icon: Icons.ios_share,
+                              onPressed: () => _stub('Compartir'),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -282,10 +350,36 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                           ),
                           const SizedBox(height: 14),
                           _infoRow(Icons.schedule, _formatWhen(event)),
+                          if (calendarUri != null)
+                            TextButton.icon(
+                              onPressed: () => _launchExternalUrl(
+                                calendarUri,
+                                'No s’ha pogut obrir Google Calendar',
+                              ),
+                              icon: const Icon(Icons.event_available_outlined),
+                              label: const Text('Afegir al calendari'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: CaliuColors.red,
+                              ),
+                            ),
                           if (place.isNotEmpty) ...[
                             const SizedBox(height: 8),
                             _infoRow(Icons.place_outlined, place),
                           ],
+                          if (event.hasLocation)
+                            TextButton.icon(
+                              onPressed: () => Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) =>
+                                      MapView.forEvent(event: event),
+                                ),
+                              ),
+                              icon: const Icon(Icons.map_outlined),
+                              label: const Text('Veure al mapa'),
+                              style: TextButton.styleFrom(
+                                foregroundColor: CaliuColors.red,
+                              ),
+                            ),
                           if (price != null) ...[
                             const SizedBox(height: 8),
                             _infoRow(Icons.payments_outlined, price),
@@ -328,8 +422,7 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                             SizedBox(
                               width: double.infinity,
                               child: OutlinedButton.icon(
-                                onPressed: () =>
-                                    _openOfficialUrl(event.url!),
+                                onPressed: () => _openOfficialUrl(event.url!),
                                 icon: const Icon(Icons.open_in_new),
                                 label: const Text('Web oficial'),
                                 style: OutlinedButton.styleFrom(
@@ -364,21 +457,16 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             child: Row(
               children: [
                 Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _stub('Desar'),
-                    icon: const Icon(Icons.bookmark_border),
-                    label: const Text('Desar'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white54),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
+                  child: FavoriteButton(
+                    event: event,
+                    controller: widget.favorites,
+                    showBookmark: true,
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: FilledButton(
-                    onPressed: () => _stub('Veure ruta'),
+                    onPressed: () => _openRoute(event),
                     style: FilledButton.styleFrom(
                       backgroundColor: CaliuColors.red,
                       foregroundColor: Colors.white,

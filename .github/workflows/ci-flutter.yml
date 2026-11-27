@@ -20,6 +20,8 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
+      - name: Comprova el format (dart format lib test)
+        run: dart format --output=none --set-exit-if-changed lib test
       - run: flutter analyze --no-fatal-infos
       - run: flutter test --coverage
       - uses: actions/upload-artifact@v4

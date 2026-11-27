@@ -49,6 +49,16 @@ class AuthenticatedProfile {
   }
 }
 
+/// Preferències de l'usuari: categories i radi d'activitat (H.U #9).
+class UserPreferences {
+  const UserPreferences({required this.categories, this.proximitatKm});
+
+  final List<String> categories;
+
+  /// Radi d'activitat en km (tasca #124); null si l'usuari no n'ha triat cap.
+  final double? proximitatKm;
+}
+
 class AuthResult {
   const AuthResult({required this.user, required this.token});
 
@@ -212,6 +222,44 @@ class AuthApi {
     );
     _requireSuccess(response, 200, 'No s’han pogut desar les preferències.');
     return _parseStringList(_decode(response), 'preferences');
+  }
+
+  /// Categories i radi d'activitat (`GET /users/me/preferences`, H.U #9).
+  Future<UserPreferences> fetchUserPreferences(String token) async {
+    final response = await _send('GET', '/users/me/preferences', token: token);
+    _requireSuccess(response, 200, 'No s’han pogut carregar les preferències.');
+    return _parseUserPreferences(_decode(response));
+  }
+
+  /// Desa les categories i el radi (`null` l'esborra) amb
+  /// `PUT /users/me/preferences` (tasques #124 i #123 del backend).
+  Future<UserPreferences> saveUserPreferences({
+    required String token,
+    required List<String> categories,
+    required double? proximitatKm,
+  }) async {
+    final response = await _send(
+      'PUT',
+      '/users/me/preferences',
+      token: token,
+      body: {'preferences': categories, 'proximitatKm': proximitatKm},
+    );
+    _requireSuccess(response, 200, 'No s’han pogut desar les preferències.');
+    return _parseUserPreferences(_decode(response));
+  }
+
+  UserPreferences _parseUserPreferences(dynamic decoded) {
+    final categories = _parseStringList(decoded, 'preferences');
+    final radius = (decoded as Map<String, dynamic>)['proximitatKm'];
+    if (radius != null && radius is! num) {
+      throw const AuthApiException(
+        'La resposta de categories o preferències no té el format esperat.',
+      );
+    }
+    return UserPreferences(
+      categories: categories,
+      proximitatKm: (radius as num?)?.toDouble(),
+    );
   }
 
   Future<List<String>> fetchCategories() async {

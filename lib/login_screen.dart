@@ -3,14 +3,30 @@ import 'package:flutter/material.dart';
 import 'data/auth_api.dart';
 import 'data/auth_session.dart';
 import 'data/auth_validators.dart';
+import 'data/password_reset_api.dart';
+import 'forgot_password_screen.dart';
 import 'theme/caliu_colors.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, this.notice, this.authApi, this.authSession});
+  const LoginScreen({
+    super.key,
+    this.notice,
+    this.authApi,
+    this.authSession,
+    this.passwordResetApi,
+    this.showForgotPassword = passwordResetAvailable,
+  });
 
   final String? notice;
   final AuthApi? authApi;
   final AuthSessionStore? authSession;
+
+  /// Per a "He oblidat la contrasenya"; per defecte, [createPasswordResetApi].
+  final PasswordResetApi? passwordResetApi;
+
+  /// Mostrar l'enllaç «He oblidat la contrasenya». Per defecte, només si el
+  /// backend ja envia el correu ([passwordResetAvailable]).
+  final bool showForgotPassword;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -27,6 +43,28 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isSubmitting = false;
   bool _obscurePassword = true;
   String? _errorMessage;
+
+  /// Avís després de canviar la contrasenya (tasca #174).
+  String? _resetNotice;
+
+  Future<void> _openForgotPassword() async {
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => ForgotPasswordScreen(
+          initialEmail: _emailController.text,
+          api: widget.passwordResetApi,
+        ),
+      ),
+    );
+    if (changed == true && mounted) {
+      setState(() {
+        _passwordController.clear();
+        _errorMessage = null;
+        _resetNotice =
+            'Contrasenya canviada. Ja pots iniciar sessió amb la nova.';
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -105,6 +143,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 16),
                         _LoginNotice(message: notice),
                       ],
+                      if (_resetNotice case final notice?) ...[
+                        const SizedBox(height: 16),
+                        _LoginNotice(message: notice),
+                      ],
                       const SizedBox(height: 24),
                       TextFormField(
                         controller: _emailController,
@@ -144,6 +186,16 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         validator: AuthValidators.password,
                       ),
+                      if (widget.showForgotPassword)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: _isSubmitting
+                                ? null
+                                : _openForgotPassword,
+                            child: const Text('He oblidat la contrasenya'),
+                          ),
+                        ),
                       if (_errorMessage case final message?) ...[
                         const SizedBox(height: 16),
                         _LoginError(message: message),
