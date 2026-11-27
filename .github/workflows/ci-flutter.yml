@@ -24,6 +24,24 @@ jobs:
         run: dart format --output=none --set-exit-if-changed lib test
       - run: flutter analyze --no-fatal-infos
       - run: flutter test --coverage
+      - name: Comprova el mínim de cobertura de línies
+        shell: bash
+        env:
+          MIN_COVERAGE: 80
+        run: |
+          awk -F: -v min="$MIN_COVERAGE" '
+            $1 == "LH" { hit += $2 }
+            $1 == "LF" { found += $2 }
+            END {
+              if (found == 0) {
+                print "Error: LCOV sense línies comptabilitzades."
+                exit 1
+              }
+              coverage = 100 * hit / found
+              printf "Cobertura de línies: %.2f%% (%d/%d); mínim: %s%%\n", coverage, hit, found, min
+              if (coverage < min) exit 1
+            }
+          ' coverage/lcov.info
       - uses: actions/upload-artifact@v4
         with:
           name: flutter-coverage
